@@ -1,0 +1,10 @@
+flask
+flask-compress
+flask-cors
+flask-httpauth
+google-cloud-firestore
+google-cloud-run
+google-cloud-logging
+requests
+uuid
+gunicorn

@@ -1,0 +1,56 @@
+# Copyright 2024 Google, LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+steps:
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - '--no-cache'
+      - '-t'
+      - gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA
+      - '-t'
+      - gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest
+      - 'Litmus/worker'
+      - '-f'
+      - Litmus/worker/Dockerfile
+    id: Build-Litmus-WORKER
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA
+    id: Push-Litmus-WORKER
+  - name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest
+    id: Push-Litmus-WORKER-Latest
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk:slim'
+    entrypoint: gcloud
+    args:
+      - 'run'
+      - 'jobs'
+      - 'deploy'
+      - '$_SERVICE_NAME'
+      - '--image=gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest'
+      - '--region=$_DEPLOY_REGION'
+      - '--quiet'
+    id: Deploy-Litmus-WORKER
+images:
+  - gcr.io/$PROJECT_ID/$_SERVICE_NAME:$COMMIT_SHA
+  - gcr.io/$PROJECT_ID/$_SERVICE_NAME:latest
+options:
+  logging: CLOUD_LOGGING_ONLY
+substitutions:
+  _SERVICE_NAME: litmus-worker
+  _DEPLOY_REGION: europe-west3

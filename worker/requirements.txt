@@ -1,0 +1,5 @@
+requests
+uuid
+google-cloud-firestore
+google-cloud-aiplatform
+google-cloud-logging

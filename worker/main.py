@@ -1,0 +1,173 @@
+# Copyright 2024 Google, LLC.
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#    http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+import os
+import requests
+from google.cloud import firestore
+from datetime import datetime
+from util.assess import ask_llm_against_golden
+from google.cloud import logging
+
+# setup logging
+# Instantiates a client
+logging_client = logging.Client()
+# The name of the log to write to
+log_name = "Litmus-worker"
+# Selects the log to write to
+logger = logging_client.logger(log_name)
+# Writes the log entry
+logger.log_text("### Litmus-worker starting ###")
+
+
+def execute_request(request_data):
+    """Executes a given request and returns the response."""
+    url = request_data.get("url")
+    method = request_data.get("method", "POST")  # Default to POST
+    body = request_data.get("body")
+    headers = request_data.get("headers")
+
+    try:
+        if method == "POST":
+            response = requests.post(url, json=body, headers=headers)
+        elif method == "GET":
+            response = requests.get(url, headers=headers)
+        elif method == "PUT":
+            response = requests.put(url, json=body, headers=headers)
+        elif method == "DELETE":
+            response = requests.delete(url, headers=headers)
+        else:
+            raise ValueError(f"Unsupported HTTP method: {method}")
+
+        response.raise_for_status()
+        return response.json()
+    except requests.exceptions.RequestException as e:
+        return {"status": "Failed", "error": str(e)}
+
+
+def execute_tests_and_store_results(run_id, template_id):
+    """Executes tests from a template and stores results, updating progress."""
+    db = firestore.Client()
+    run_ref = db.collection("test_runs").document(run_id)
+    run_data = run_ref.get().to_dict()
+
+    if not run_data:
+        print(f"Error: Run ID '{run_id}' not found.")
+        return
+
+    if not template_id:
+        print(f"Error: Template ID not found for run '{run_id}'")
+        return
+
+    # Get test cases from the subcollection
+    test_cases_ref = db.collection(f"test_cases_{run_id}")
+    test_cases = [doc.to_dict() for doc in test_cases_ref.stream()]
+
+    # Update run status to "Running"
+    run_ref.update({"status": "Running"})
+    num_tests = len(test_cases)
+    num_completed = 0
+    logger.log_text(f"Running {num_tests} tests")
+
+    for i, test_case in enumerate(test_cases):
+        # Execute pre-request (if available)
+        if test_case.get("pre_request"):
+            execute_request(test_case["pre_request"])
+
+        request_data = test_case.get("request")
+        golden_response = test_case.get("golden_response")
+
+        try:
+            actual_response = execute_request(request_data)
+
+            # Compare with golden response
+            if golden_response:
+                # Exception handling for ask_llm_against_golden
+                try:
+                    llm_assessment = ask_llm_against_golden(
+                        statement=actual_response.get("output").get("text"),
+                        golden=golden_response.get("text"),
+                    )
+
+                    # Check if llm_assessment is valid
+                    if llm_assessment and "similarity" in llm_assessment:
+                        if llm_assessment.get("similarity") > 0.5:
+                            test_result = {
+                                "status": "Passed",
+                                "response": actual_response,
+                                "assessment": llm_assessment,
+                            }
+                        else:
+                            test_result = {
+                                "status": "Failed",
+                                "expected": golden_response,
+                                "response": actual_response,
+                                "assessment": llm_assessment,
+                            }
+                    else:
+                        # Handle invalid llm_assessment
+                        test_result = {
+                            "status": "Error",
+                            "response": actual_response,
+                            "error": "LLM assessment returned an invalid response",
+                        }
+
+                except Exception as e:
+                    # Log the specific error from ask_llm_against_golden
+                    logger.log_text(
+                        f"Error in ask_llm_against_golden: {str(e)}", severity="ERROR"
+                    )
+                    test_result = {
+                        "status": "Error",
+                        "response": actual_response,
+                        "error": f"Error during LLM assessment: {str(e)}",
+                    }
+            else:
+                # Handle case where golden response is missing
+                test_result = {
+                    "status": "Passed",
+                    "response": actual_response,
+                    "note": "No golden response available",
+                }
+
+        except requests.exceptions.RequestException as e:
+            test_result = {"status": "Failed", "error": str(e)}
+
+        # Execute post-request (if available)
+        if test_case.get("post_request"):
+            execute_request(test_case["post_request"])
+
+        # Store test result in Firestore
+        test_case_ref = db.collection(f"test_cases_{run_id}").document(
+            f"test_case_{i+1}"
+        )
+        test_case_ref.update({"result": test_result})
+
+        num_completed += 1
+
+        # Update run progress
+        run_ref.update({"progress": f"{num_completed}/{num_tests}"})
+
+    end_time = datetime.utcnow()
+    # Update run status to "Completed"
+    run_ref.update({"status": "Completed", "end_time": end_time})
+    logger.log_text(f"Running tests completed")
+
+
+if __name__ == "__main__":
+    run_id = os.environ.get("RUN_ID")
+    template_id = os.environ.get("TEMPLATE_ID")
+    if not run_id or not template_id:
+        raise ValueError("RUN_ID and TEMPLATE_ID environment variables must be set")
+
+    execute_tests_and_store_results(run_id, template_id)

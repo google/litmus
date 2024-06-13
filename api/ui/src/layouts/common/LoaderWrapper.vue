@@ -1,0 +1,79 @@
+<!-- 
+Copyright 2024 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. 
+-->
+
+<script setup lang="ts">
+import { storeToRefs } from "pinia";
+import { useUIStore } from "@/stores/ui";
+
+const uiStore = useUIStore();
+const { isLoading } = storeToRefs(uiStore);
+</script>
+
+<template>
+  <div
+    :class="{
+      'page-loader': true,
+      loading: isLoading,
+      hidden: !isLoading,
+    }"
+  >
+    <div class="bar" />
+  </div>
+</template>
+
+<style scoped>
+.page-loader {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  z-index: 10000000;
+  pointer-events: none;
+  opacity: 0;
+  transition: width 1350ms ease-in-out, opacity 350ms linear, left 50ms ease-in-out;
+}
+
+.bar {
+  background-color: rgb(var(--v-theme-primary));
+  height: 5px;
+  width: 100%;
+}
+
+.hidden {
+  opacity: 0;
+}
+
+.loading {
+  opacity: 1;
+  animation: loading 2000ms ease-in-out;
+  animation-iteration-count: infinite;
+}
+
+@keyframes loading {
+  0% {
+    width: 0;
+    left: 0;
+  }
+  50% {
+    width: 100%;
+    left: 0;
+  }
+  100% {
+    width: 100%;
+    left: 100%;
+  }
+}
+</style>

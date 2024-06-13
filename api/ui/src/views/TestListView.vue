@@ -1,0 +1,55 @@
+<!-- 
+Copyright 2024 Google LLC
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License. 
+-->
+
+<template>
+  <Breadcrumbs :title="page.title" :breadcrumbs="breadcrumbs"></Breadcrumbs>
+  <div class="page">
+    <div class="components-list">
+      <CardCodeExample title="Stripe">
+        <n-scrollbar x-scrollable style="width: 100%">
+          <Tests class="table-min-width" striped />
+        </n-scrollbar>
+      </CardCodeExample>
+    </div>
+  </div>
+</template>
+
+<script lang="ts" setup>
+import { NScrollbar } from "naive-ui";
+import Tests from "@/components/tables/Tests.vue";
+import { ref } from "vue";
+import Breadcrumbs from "@/components/shared/Breadcrumbs.vue";
+
+// component content
+const page = ref({ title: "Tests" });
+const breadcrumbs = ref([
+  {
+    title: "Tests",
+    disabled: true,
+    href: "#",
+  },
+]);
+</script>
+
+<style scoped lang="scss">
+.components-list {
+  grid-template-columns: none;
+}
+
+.table-min-width {
+  min-width: 480px;
+}
+</style>

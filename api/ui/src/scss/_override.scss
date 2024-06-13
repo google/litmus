@@ -1,0 +1,106 @@
+// Copyright 2024 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
+/* General Styles */
+html {
+  .bg-success,
+  .bg-info,
+  .bg-warning {
+    color: white !important;
+  }
+}
+
+.v-row + .v-row {
+  margin-top: 0;
+}
+
+.v-divider {
+  opacity: 1;
+  border-color: var(--v-theme-borderLight);
+}
+
+.v-table > .v-table__wrapper > table > thead > tr > th {
+  color: inherit;
+}
+
+.border-blue-right {
+  border-right: 1px solid rgba(var(--v-theme-borderLight), 0.36);
+}
+
+.link-hover {
+  text-decoration: none;
+  &:hover {
+    text-decoration: underline;
+  }
+}
+
+.v-selection-control {
+  flex: unset;
+}
+
+/* No Spacer */
+.no-spacer .v-list-item__spacer {
+  display: none !important;
+}
+
+/* Animation */
+@keyframes progress-circular-rotate {
+  100% {
+    transform: rotate(270deg);
+  }
+}
+
+/* Header & Toolbar Styles */
+header.v-toolbar--border {
+  border-color: var(--v-theme-borderLight);
+}
+
+.v-toolbar.v-app-bar {
+  border-bottom: 1px solid rgba(var(--v-theme-borderLight), 0.8);
+}
+
+/* Sheet Style */
+.v-sheet--border {
+  border: 1px solid rgba(var(--v-theme-borderLight), 0.8);
+}
+
+/* Table Styles */
+.v-table.v-table--hover > .v-table__wrapper > table > tbody > tr:hover > td {
+  background: var(--v-theme-gray100);
+}
+
+/* Accordion Page Styles */
+.v-expansion-panel {
+  border: 1px solid var(--v-theme-borderLight);
+  &:not(:first-child) {
+    margin-top: -1px;
+  }
+  .v-expansion-panel-text__wrapper {
+    border-top: 1px solid var(--v-theme-borderLight);
+    padding: 16px 24px;
+  }
+  &.v-expansion-panel--active {
+    .v-expansion-panel-title--active .v-expansion-panel-title__overlay {
+      background-color: var(--v-theme-gray100);
+    }
+  }
+}
+
+.v-expansion-panel--active > .v-expansion-panel-title {
+  min-height: unset;
+}
+
+.v-expansion-panel--disabled .v-expansion-panel-title {
+  color: rgba(var(--v-theme-on-surface), 0.15);
+}
