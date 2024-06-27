@@ -150,7 +150,7 @@ func main() {
 		"--project", projectID,
 		"--region", region,
 		"--allow-unauthenticated",
-		"--image", "gcr.io/litmusai-dev/litmus-ai-api:latest",
+		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed image
 		"--service-account", apiServiceAccount, // Use the created service account
 		// Add other required/optional flags for your Cloud Run service
 	)
@@ -178,7 +178,7 @@ func main() {
 		"gcloud", "run", "jobs", "create", "litmus-worker",
 		"--project", projectID,
 		"--region", region,
-		"--image", "gcr.io/litmusai-dev/litmus-ai-worker:latest",
+		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed image
 		"--service-account", workerServiceAccount, // Use the created service account
 		// Add other required/optional flags for your Cloud Run job
 	)
