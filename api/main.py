@@ -13,7 +13,6 @@
 # limitations under the License.
 
 from flask import Flask, jsonify, request, make_response
-from flask_cors import CORS
 from flask_compress import Compress
 from flask_httpauth import HTTPBasicAuth
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -61,13 +60,12 @@ def invoke_job(project_id, region, job_id, run_id, template_id):
 
 
 app = Flask(__name__, static_folder="ui/dist/", static_url_path="/")
-CORS(app, supports_credentials=True)
 auth = HTTPBasicAuth()
 # Turn on compression
 Compress(app)
 
 if not settings.disable_auth:
-    users = {"user": generate_password_hash(settings.auth_pass)}
+    users = {settings.auth_user: generate_password_hash(settings.auth_pass)}
 
 db = firestore.Client()
 

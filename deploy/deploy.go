@@ -17,6 +17,7 @@ package main
 import (
 	"fmt"
 	"log"
+	"math/rand"
 	"os"
 	"os/exec"
 	"strings"
@@ -44,6 +45,15 @@ func main() {
 		if len(parts) == 2 {
 			envVars[parts[0]] = parts[1]
 		}
+	}
+
+	// --- Generate or use provided PASSWORD ---
+	if _, ok := envVars["PASSWORD"]; !ok {
+		// Generate a random password if not provided
+		envVars["PASSWORD"] = generateRandomPassword(16) // Generate a 16-character password
+		fmt.Printf("Generated random password: %s\n", envVars["PASSWORD"])
+	} else {
+		fmt.Printf("Using provided password.\n")
 	}
 
 	// Enable required APIs
@@ -150,7 +160,7 @@ func main() {
 		"--project", projectID,
 		"--region", region,
 		"--allow-unauthenticated",
-		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed image
+		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed
 		"--service-account", apiServiceAccount, // Use the created service account
 		// Add other required/optional flags for your Cloud Run service
 	)
@@ -161,9 +171,9 @@ func main() {
 	}
 
 	// Add Region
-	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("%s=%s", "GCP_REGION", region))
+	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_REGION=%s", region))
 	// Add Project
-	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("%s=%s", "GCP_PROJECT", projectID))
+	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_PROJECT=%s", projectID))
 
 	go showInProgress(deployServiceCmd)
 	output2, err := deployServiceCmd.CombinedOutput() // Capture command output
@@ -178,7 +188,7 @@ func main() {
 		"gcloud", "run", "jobs", "create", "litmus-worker",
 		"--project", projectID,
 		"--region", region,
-		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed image
+		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed
 		"--service-account", workerServiceAccount, // Use the created service account
 		// Add other required/optional flags for your Cloud Run job
 	)
@@ -189,9 +199,9 @@ func main() {
 	}
 
 	// Add Region
-	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("%s=%s", "GCP_REGION", region))
+	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_REGION=%s", region))
 	// Add Project
-	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("%s=%s", "GCP_PROJECT", projectID))
+	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_PROJECT=%s", projectID))
 
 	go showInProgress(deployJobCmd)
 	if err := deployJobCmd.Run(); err != nil {
@@ -285,4 +295,15 @@ func showInProgress(cmd *exec.Cmd) {
 			fmt.Print(".")
 		}
 	}
+}
+
+// generateRandomPassword generates a random password of the given length
+func generateRandomPassword(length int) string {
+	rand.Seed(time.Now().UnixNano())
+	chars := []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()")
+	var password []rune
+	for i := 0; i < length; i++ {
+		password = append(password, chars[rand.Intn(len(chars))])
+	}
+	return string(password)
 }

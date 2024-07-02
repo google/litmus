@@ -86,9 +86,14 @@ Apache 2.0; see [`LICENSE`](LICENSE) for details.
 
 ## Disclaimer
 
-This project is not an official Google project. It is not supported by
-Google and Google specifically disclaims all warranties as to its quality,
-merchantability, or fitness for a particular purpose.
+This project is not an official Google project. It is not supported by Google and Google specifically disclaims all warranties as to its quality, merchantability, or fitness for a particular purpose.
 
+**Code Use and Cloud Costs:**
 
+The code provided in this repository is provided "as is" without warranty of any kind, express or implied. It is your responsibility to understand the code, its dependencies, and its potential impact on your Google Cloud environment. 
 
+Please be aware that deploying and running this application on Google Cloud will incur costs associated with the services it utilizes, such as Cloud Run, Firestore, and potentially others. You are solely responsible for monitoring and managing these costs. We recommend setting up appropriate budget alerts and monitoring tools within your Google Cloud Console to avoid unexpected expenses. 
+
+**Security and Abuse:**
+
+Also ensure you follow security best practices when deploying and configuring this application. Improper configuration or use could potentially lead to security vulnerabilities or abuse. We recommend reviewing the security documentation provided by Google Cloud and implementing appropriate security measures to protect your project.
