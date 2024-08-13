@@ -45,7 +45,4 @@ jobs:
       run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:latest
 
     - name: Deploy to Cloud Run
-      run: gcloud run jobs deploy litmus-worker \
-        --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:latest \
-        --region=europe-west1 \
-        --quiet
+      run: gcloud run jobs deploy litmus-worker --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:latest --region=europe-west1 --quiet
