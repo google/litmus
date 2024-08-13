@@ -44,9 +44,6 @@ jobs:
     - name: Push Docker latest tagged image to Artifact Registry
       run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest
 
-    - name: Deploy to Cloud Run
-      run: gcloud run jobs deploy litmus-api --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest --region=europe-west1 --quiet
-
   api-build-deploy:
     runs-on: ubuntu-latest
 
@@ -89,16 +86,3 @@ jobs:
 
     - name: Push Docker latest tagged image to Artifact Registry
       run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest
-
-    - name: Deploy to Cloud Run
-      run: gcloud run deploy litmus-api --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest --region=europe-west1 --quiet
-
-    # Optional: Output deployment URL
-    - name: Get Deployment URL
-      id: deploy-url
-      run: echo "::set-output name=url::$(gcloud run services describe litmus-api --region europe-west1 --format 'value(status.url)')"
-
-    # Optional: Print deployment URL
-    - name: Print Deployment URL
-      if: steps.deploy-url.outputs.url
-      run: echo "Deployed to: ${{ steps.deploy-url.outputs.url }}"
