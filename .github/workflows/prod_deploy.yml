@@ -121,4 +121,4 @@ jobs:
     # Upload binary to Google Cloud Storage
     - name: Upload to Google Cloud Storage
       run: |
-        gsutil cp litmus gs://litmus-cloud/litmus
+        gcloud storage cp litmus gs://litmus-cloud/litmus
