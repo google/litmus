@@ -116,7 +116,7 @@ jobs:
     # Build the application
     - name: Build application
       run: |
-        go build -o litmus ./litmus.go
+        go build -o litmus ./cli/litmus.go
 
     # Upload binary to Google Cloud Storage
     - name: Upload to Google Cloud Storage
