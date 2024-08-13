@@ -32,20 +32,16 @@ Litmus consists of three core components:
 
 ## Getting Started
 
-**1. Quick Deployment with the Deployment Tool:**
+**1. Quick Deployment with the Litmus CLI:**
 
    - This is the easiest way to set up Litmus. 
    - Make sure you have the Google Cloud SDK installed and configured with the correct project.
-   - Run the deployment script: 
-     ```bash
-     cd deploy
-     ./deploy my-project us-central1 PASSWORD=test AI_DEFAULT_MODEL=gemini-1.5-flash
-     ```
-     - Replace placeholders with your actual values:
-       - `<your-project-id>`: Your Google Cloud Project ID.
-       - `<your-gcp-region>`: Your Google Cloud region.
-       - `<your-password>`: A password for API authentication.
-       - `<your-llm-model>`: The LLM model you want to use.
+   
+   - Install the Litmus CLI: 
+     ```curl litmus.pso.dev | sudo sh```
+
+   - Run the deployment script with the following CLI command: 
+     ```litmus deploy```
 
    - **The deployment script will:**
      - Create service accounts and grant necessary permissions.
