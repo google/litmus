@@ -51,11 +51,14 @@ func main() {
 	if len(os.Args) < 2 {
 		fmt.Println("Usage: go run litmus.go <command> [options] [flags]")
 		fmt.Println("Commands:")
+		fmt.Println("  open: Open the Web application")
 		fmt.Println("  deploy: Deploy the application")
 		fmt.Println("  destroy: Remove the application")
+		fmt.Println("  status: Show the status of the Litmus deployment")
+		fmt.Println("  version: Display the version of the Litmus CLI")
 		fmt.Println("  execute: Execute a payload to the deployed endpoint")
 		fmt.Println("  ls: List all runs")
-		fmt.Println("  open <runID>: Open the URL for a certain runID")
+		fmt.Println("  run <runID>: Open the URL for a certain runID")
 		fmt.Println("Options:")
 		fmt.Println("  --project <project-id>: Specify the project ID (overrides default)")
 		fmt.Println("  --region <region>: Specify the region (defaults to 'us-central1')")
@@ -120,11 +123,17 @@ func main() {
 	case "ls":
 		listRuns(projectID)
 	case "open":
+		openLitmus(projectID)
+	case "run":
 		if runID == "" {
-			fmt.Println("Error: 'open' command requires a runID argument")
+			fmt.Println("Error: 'run' command requires a runID argument")
 			return
 		}
 		openRun(projectID, runID)
+	case "status":
+		showStatus(projectID)
+	case "version":
+		displayVersion()
 	default:
 		fmt.Println("Invalid command:", command)
 	}
@@ -465,6 +474,45 @@ func destroyResources(projectID, region string) {
 	}
 
 	fmt.Println("\nResource destruction complete.")
+}
+
+// showStatus displays the status of the Litmus deployment
+func showStatus(projectID string) {
+	serviceURL, err := accessSecret(projectID, "litmus-service-url")
+	if err != nil {
+		fmt.Println("Litmus is not deployed or there was an error retrieving the status.")
+		return
+	}
+
+	password, err := accessSecret(projectID, "litmus-password")
+	if err != nil {
+		fmt.Println("Error retrieving password from Secret Manager:", err)
+		return
+	}
+
+	fmt.Println("Litmus Deployment Status:")
+	fmt.Println("URL:", serviceURL)
+	fmt.Println("User: admin")
+	fmt.Println("Password:", password)
+}
+
+// openLitmus opens the URL associated with a specific instance in the browser
+// and includes the username and password in the URL.
+func openLitmus(projectID string) {
+	showStatus(projectID) // First, show the status so the user knows the credentials
+
+	serviceURL, _ := accessSecret(projectID, "litmus-service-url")
+	password, _ := accessSecret(projectID, "litmus-password")
+	URL := fmt.Sprintf("https://admin:%s@%s", password, serviceURL)
+	// Open the URL in the default browser
+	if err := exec.Command("open", URL).Start(); err != nil {
+		log.Fatalf("Error opening URL: %v", err)
+	}
+}
+
+// displayVersion prints the version of the Litmus CLI
+func displayVersion() {
+	fmt.Println("Litmus CLI version:", "1.0.0") // Update with your actual version
 }
 
 func executePayload(projectID, payload string) {
