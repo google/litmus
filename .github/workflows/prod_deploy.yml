@@ -39,10 +39,66 @@ jobs:
       run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.PROD_GCP_PROJECT }}
 
     - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:${{ github.sha }}
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:${{ github.sha }}
 
     - name: Push Docker latest tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:latest
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest
 
     - name: Deploy to Cloud Run
-      run: gcloud run jobs deploy litmus-worker --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:latest --region=europe-west1 --quiet
+      run: gcloud run jobs deploy litmus-api --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest --region=europe-west1 --quiet
+
+  api-build-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: 'auth'
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIP }}
+        service_account: ${{ secrets.PROD_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        access_token_lifetime: '300s'
+
+    # Install UI Dependencies
+    - name: Install UI Dependencies
+      working-directory: Litmus/api/ui
+      run: npm install
+
+    # Build Litmus UI
+    - name: Build Litmus UI
+      working-directory: Litmus/api/ui
+      run: npm run build
+
+    - name: Build Docker image
+      working-directory: ./api
+      run: docker build -t europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest -t europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:${{ github.sha }} .
+
+    - name: Configure Docker to use Artifact Registry
+      run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.PROD_GCP_PROJECT }}
+
+    - name: Push Docker SHA tagged image to Artifact Registry
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:${{ github.sha }}
+
+    - name: Push Docker latest tagged image to Artifact Registry
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest
+
+    - name: Deploy to Cloud Run
+      run: gcloud run deploy litmus-api --image=europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest --region=europe-west1 --quiet
+
+    # Optional: Output deployment URL
+    - name: Get Deployment URL
+      id: deploy-url
+      run: echo "::set-output name=url::$(gcloud run services describe litmus-api --region europe-west1 --format 'value(status.url)')"
+
+    # Optional: Print deployment URL
+    - name: Print Deployment URL
+      if: steps.deploy-url.outputs.url
+      run: echo "Deployed to: ${{ steps.deploy-url.outputs.url }}"
