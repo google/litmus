@@ -33,16 +33,16 @@ jobs:
 
     - name: Build Docker image
       working-directory: ./worker
-      run: docker build -t gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest -t gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }} .
+      run: docker build -t europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest -t europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }} .
 
     - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }}
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }}
 
     - name: Push Docker latest tagged image to Artifact Registry
-      run: docker push gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest
 
     - name: Deploy to Cloud Run
       run: gcloud run jobs deploy litmus-worker \
-        --image gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest \
+        --image europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest \
         --region europe-west1 \
         --quiet
