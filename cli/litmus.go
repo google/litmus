@@ -15,9 +15,13 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
 	"math/rand"
+	"net/http"
 	"os"
 	"os/exec"
 	"strings"
@@ -25,28 +29,49 @@ import (
 )
 
 func main() {
-	// Get project ID from command-line arguments (or hardcode it)
-	if len(os.Args) < 2 {
-		fmt.Println("Usage: go run deploy <project-id> [region] [env-var1=value1] [env-var2=value2] ...")
+	// Get command and parameters
+	if len(os.Args) < 3 {
+		fmt.Println("Usage: go run main.go <command> <project-id> [region] [env-var1=value1] [env-var2=value2] ...")
+		fmt.Println("Commands:")
+		fmt.Println("  deploy: Deploy the application")
+		fmt.Println("  execute: Execute a payload to the deployed endpoint")
 		return
 	}
-	projectID := os.Args[1]
+
+	command := os.Args[1]
+	projectID := os.Args[2]
 
 	// Optional region argument (defaults to "us-central1")
 	region := "us-central1"
-	if len(os.Args) > 2 {
-		region = os.Args[2]
+	if len(os.Args) > 3 {
+		region = os.Args[3]
 	}
 
 	// Extract environment variables from command-line arguments
 	envVars := make(map[string]string)
-	for i := 3; i < len(os.Args); i++ {
+	for i := 4; i < len(os.Args); i++ {
 		parts := strings.Split(os.Args[i], "=")
 		if len(parts) == 2 {
 			envVars[parts[0]] = parts[1]
 		}
 	}
 
+	switch command {
+	case "deploy":
+		deployApplication(projectID, region, envVars)
+	case "execute":
+		if len(os.Args) < 5 {
+			fmt.Println("Usage: go run main.go execute <project-id> <payload>")
+			return
+		}
+		payload := os.Args[4]
+		executePayload(projectID, payload)
+	default:
+		fmt.Println("Invalid command:", command)
+	}
+}
+
+func deployApplication(projectID, region string, envVars map[string]string) {
 	// --- Generate or use provided PASSWORD ---
 	if _, ok := envVars["PASSWORD"]; !ok {
 		// Generate a random password if not provided
@@ -160,7 +185,7 @@ func main() {
 		"--project", projectID,
 		"--region", region,
 		"--allow-unauthenticated",
-		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed
+		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed image
 		"--service-account", apiServiceAccount, // Use the created service account
 		// Add other required/optional flags for your Cloud Run service
 	)
@@ -188,7 +213,7 @@ func main() {
 		"gcloud", "run", "jobs", "create", "litmus-worker",
 		"--project", projectID,
 		"--region", region,
-		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed
+		"--image", "gcr.io/XXXXX/XXXXX", //Replace with your deployed image
 		"--service-account", workerServiceAccount, // Use the created service account
 		// Add other required/optional flags for your Cloud Run job
 	)
@@ -229,6 +254,38 @@ func main() {
 	// Extract and print the service URL
 	serviceURL := extractServiceURL(string(output2))
 	fmt.Println("Get started now by visiting: ", serviceURL)
+}
+
+func executePayload(projectID, payload string) {
+	// Get the service URL from the deployed service
+	getServiceURLCmd := exec.Command("gcloud", "run", "services", "describe", "litmus-api", "--project", projectID, "--region=us-central1", "--format=value(status.url)")
+	var out bytes.Buffer
+	getServiceURLCmd.Stdout = &out
+	if err := getServiceURLCmd.Run(); err != nil {
+		log.Fatalf("Error getting service URL: %v", err)
+	}
+	serviceURL := strings.TrimSpace(out.String())
+
+	// Send the payload to the endpoint
+	requestBody, err := json.Marshal(map[string]string{
+		"message": payload,
+	})
+	if err != nil {
+		log.Fatalf("Error marshaling JSON: %v", err)
+	}
+
+	resp, err := http.Post(serviceURL, "application/json", bytes.NewBuffer(requestBody))
+	if err != nil {
+		log.Fatalf("Error sending request: %v", err)
+	}
+	defer resp.Body.Close()
+
+	// Print the response
+	responseBody, err := io.ReadAll(resp.Body)
+	if err != nil {
+		log.Fatalf("Error reading response body: %v", err)
+	}
+	fmt.Println("Response:", string(responseBody))
 }
 
 // grantPermissions grants Vertex AI and Firestore permissions to the given service account

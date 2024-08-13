@@ -1,4 +1,4 @@
-# Cloud Run Deployment Script
+# Litmus CLI Deployment Script
 
 This script automates the deployment of a Cloud Run service and a Cloud Run job with optional environment variables. It handles enabling necessary APIs, checking for existing Firestore databases, and deploying the services and jobs.
 
@@ -12,7 +12,7 @@ This script automates the deployment of a Cloud Run service and a Cloud Run job 
 1. **Save the code:**  Save the provided code snippet as `deploy.go`.
 2. **Build and run the script:**
    ```bash
-   go build deploy.go
+   go build litmus.go
    ./deploy <project-id> [region] [env-var1=value1] [env-var2=value2] ...
    ```
    - Replace `<project-id>` with your Google Cloud project ID.
@@ -22,7 +22,7 @@ This script automates the deployment of a Cloud Run service and a Cloud Run job 
 ## Example
 
 ```bash
- ./deploy litmus-dev europe-west1 PASSWORD=test AI_DEFAULT_MODEL=gemini-1.5-flash 
+ ./litmus deploy litmus-dev europe-west1 PASSWORD=test AI_DEFAULT_MODEL=gemini-1.5-flash 
 ```
 
 This will deploy the Cloud Run services and jobs with the environment variables `DATABASE_URL` and `API_KEY` set to their respective values.
