@@ -39,10 +39,10 @@ jobs:
       run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.PROD_GCP_PROJECT }}
 
     - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:${{ github.sha }}
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:${{ github.sha }}
 
     - name: Push Docker latest tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest
+      run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/worker:latest
 
   api-build-push:
     runs-on: ubuntu-latest
