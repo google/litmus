@@ -1,0 +1,48 @@
+name: PROD - Build, Push & Deploy
+
+on:
+  push:
+    branches:
+      - main
+
+jobs:
+  worker-build-deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: 'auth'
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIP }}
+        service_account: ${{ secrets.PROD_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        access_token_lifetime: '300s'
+
+    - name: Set up Cloud SDK
+      uses: google-github-actions/setup-gcloud@v2
+      with:
+        project_id: ${{ secrets.PROD_GCP_PROJECT }}
+
+    - name: Build Docker image
+      working-directory: ./worker
+      run: docker build -t gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest -t gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }} .
+
+    - name: Push Docker SHA tagged image to Artifact Registry
+      run: docker push gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }}
+
+    - name: Push Docker latest tagged image to Artifact Registry
+      run: docker push gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest
+
+    - name: Deploy to Cloud Run
+      run: gcloud run jobs deploy litmus-worker \
+        --image gcr.io/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest \
+        --region europe-west1 \
+        --quiet
