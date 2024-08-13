@@ -52,6 +52,7 @@ func main() {
 		fmt.Println("Usage: go run litmus.go <command> [options] [flags]")
 		fmt.Println("Commands:")
 		fmt.Println("  deploy: Deploy the application")
+		fmt.Println("  destroy: Remove the application")
 		fmt.Println("  execute: Execute a payload to the deployed endpoint")
 		fmt.Println("  ls: List all runs")
 		fmt.Println("  open <runID>: Open the URL for a certain runID")

@@ -6,7 +6,7 @@ on:
       - dev
 
 jobs:
-  worker-build-deploy:
+  worker-build-push:
     runs-on: ubuntu-latest
 
     permissions:
@@ -44,5 +44,87 @@ jobs:
     - name: Push Docker latest tagged image to Artifact Registry
       run: docker push europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/worker:latest
 
-    - name: Deploy to Cloud Run
-      run: gcloud run jobs deploy litmus-worker --image=europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/worker:latest --region=europe-west1 --quiet
+  api-build-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: 'auth'
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIP }}
+        service_account: ${{ secrets.DEV_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        access_token_lifetime: '300s'
+
+    # Install UI Dependencies
+    - name: Install UI Dependencies
+      working-directory: ./api/ui
+      run: npm install
+
+    # Build Litmus UI
+    - name: Build Litmus UI
+      working-directory: ./api/ui
+      run: npm run build
+
+    - name: Build Docker image
+      working-directory: ./api
+      run: docker build -t europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/api:latest -t europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/api:${{ github.sha }} .
+
+    - name: Configure Docker to use Artifact Registry
+      run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.DEV_GCP_PROJECT }}
+
+    - name: Push Docker SHA tagged image to Artifact Registry
+      run: docker push europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/api:${{ github.sha }}
+
+    - name: Push Docker latest tagged image to Artifact Registry
+      run: docker push europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/api:latest
+
+  cli-build-store:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: 'auth'
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIP }}
+        service_account: ${{ secrets.DEV_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        access_token_lifetime: '300s'
+
+    # Install GO
+    - name: Set up Go
+      uses: actions/setup-go@v3
+      with:
+        go-version: '1.23' 
+
+    # Install Dependencies
+    - name: Install dependencies
+      working-directory: ./cli
+      run: |
+        go install
+
+    # Build the application
+    - name: Build application
+      run: |
+        go build litmus.go
+
+    # Upload binary to Google Cloud Storage
+    - name: Upload to Google Cloud Storage
+      run: |
+        gcloud storage cp litmus gs://litmus-cloud/litmus-dev

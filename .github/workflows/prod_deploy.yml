@@ -122,7 +122,7 @@ jobs:
     # Build the application
     - name: Build application
       run: |
-        go build -o litmus
+        go build litmus.go
 
     # Upload binary to Google Cloud Storage
     - name: Upload to Google Cloud Storage
