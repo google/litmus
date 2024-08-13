@@ -1,4 +1,4 @@
-name: Build and Deploy Worker to Cloud Run
+name: WORKER - Build, Push & Deploy
 
 on:
   push:
@@ -27,10 +27,10 @@ jobs:
 
     - name: Build Docker image
       working-directory: ./worker
-      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:latest -t gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:${{ GITHUB_SHA }} .
+      run: docker build -t gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:latest -t gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:${{ github.sha }} .
 
     - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:${{ GITHUB_SHA }}
+      run: docker push gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:${{ github.sha }}
 
     - name: Push Docker latest tagged image to Artifact Registry
       run: docker push gcr.io/${{ secrets.GCP_PROJECT }}/litmus-worker:latest
