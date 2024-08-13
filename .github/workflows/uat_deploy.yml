@@ -113,18 +113,9 @@ jobs:
       with:
         go-version: '1.23' 
 
-    # Install Dependencies
-    - name: Install dependencies
+    - name: Build & Deploy
       working-directory: ./cli
       run: |
         go install
-
-    # Build the application
-    - name: Build application
-      run: |
         go build litmus.go
-
-    # Upload binary to Google Cloud Storage
-    - name: Upload to Google Cloud Storage
-      run: |
         gcloud storage cp litmus gs://litmus-cloud/litmus-uat
