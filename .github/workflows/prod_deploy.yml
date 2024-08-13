@@ -35,6 +35,9 @@ jobs:
       working-directory: ./worker
       run: docker build -t europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:latest -t europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }} .
 
+    - name: Configure Docker to use Artifact Registry
+      run: gcloud auth configure-docker europe-docker.pkg.dev
+
     - name: Push Docker SHA tagged image to Artifact Registry
       run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus-worker:${{ github.sha }}
 
