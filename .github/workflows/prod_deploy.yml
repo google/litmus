@@ -6,7 +6,7 @@ on:
       - main
 
 jobs:
-  worker-build-deploy:
+  worker-build-push:
     runs-on: ubuntu-latest
 
     permissions:
@@ -44,7 +44,7 @@ jobs:
     - name: Push Docker latest tagged image to Artifact Registry
       run: docker push europe-docker.pkg.dev/${{ secrets.PROD_GCP_PROJECT }}/litmus/api:latest
 
-  api-build-deploy:
+  api-build-push:
     runs-on: ubuntu-latest
 
     permissions:
@@ -66,12 +66,12 @@ jobs:
 
     # Install UI Dependencies
     - name: Install UI Dependencies
-      working-directory: Litmus/api/ui
+      working-directory: ./api/ui
       run: npm install
 
     # Build Litmus UI
     - name: Build Litmus UI
-      working-directory: Litmus/api/ui
+      working-directory: ./api/ui
       run: npm run build
 
     - name: Build Docker image
