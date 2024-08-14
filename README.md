@@ -39,9 +39,9 @@ Litmus consists of three core components:
    
    - Install the Litmus CLI:
      - On Linux:
-     ```curl https://storage.googleapis.com/litmus-cloud/install/linux.sh | sh```
+     ```curl https://storage.googleapis.com/litmus-cloud/install/linux.sh | sudo sh```
      - On Mac:
-     ```curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sh```
+     ```curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sudo sh```
 
    - Run the deployment script with the following CLI command: 
      ```litmus deploy```
