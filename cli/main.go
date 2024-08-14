@@ -17,21 +17,23 @@ package main
 import (
 	"fmt"
 	"os"
+	"strings"
 
 	"github.com/google/litmus/cli/cmd"
+	"github.com/google/litmus/cli/utils"
 )
 
 func main() {
 	// Get default project ID
-	projectID, err := cmd.GetDefaultProjectID()
+	projectID, err := utils.GetDefaultProjectID()
 	if err != nil {
-		cmd.HandleGcloudError(err)
+		utils.HandleGcloudError(err)
 		return
 	}
 
 	// Get command and parameters
 	if len(os.Args) < 2 {
-		cmd.PrintUsage()
+		utils.PrintUsage()
 		return
 	}
 
@@ -62,7 +64,7 @@ func main() {
 			if i+1 < len(os.Args) {
 				runID = os.Args[i+1]
 				i++
-			} 
+			}
 			// No error here, as "open" without runID might be valid
 		case "run":
 			if i+1 < len(os.Args) {
@@ -102,7 +104,7 @@ func main() {
 		if runID != "" {
 			cmd.OpenRun(projectID, runID) // Open specific run
 		} else {
-			cmd.OpenLitmus(projectID)     // Open Litmus dashboard
+			cmd.OpenLitmus(projectID) // Open Litmus dashboard
 		}
 	case "run":
 		if runID == "" {
@@ -113,9 +115,9 @@ func main() {
 	case "status":
 		cmd.ShowStatus(projectID)
 	case "version":
-		cmd.DisplayVersion()
+		utils.DisplayVersion()
 	default:
 		fmt.Println("Invalid command:", command)
-		cmd.PrintUsage()
+		utils.PrintUsage()
 	}
 }

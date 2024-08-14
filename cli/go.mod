@@ -1,13 +1,14 @@
-module litmus
+module github.com/google/litmus/cli
 
 go 1.23
+
+require cloud.google.com/go/secretmanager v1.13.6
 
 require (
 	cloud.google.com/go/auth v0.8.0 // indirect
 	cloud.google.com/go/auth/oauth2adapt v0.2.3 // indirect
 	cloud.google.com/go/compute/metadata v0.5.0 // indirect
 	cloud.google.com/go/iam v1.1.12 // indirect
-	cloud.google.com/go/secretmanager v1.13.6 // indirect
 	github.com/felixge/httpsnoop v1.0.4 // indirect
 	github.com/go-logr/logr v1.4.2 // indirect
 	github.com/go-logr/stdr v1.2.2 // indirect

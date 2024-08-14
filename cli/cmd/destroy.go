@@ -18,8 +18,6 @@ import (
 	"fmt"
 	"log"
 	"os/exec"
-
-	"github.com/google/litmus/cli/utils"
 )
 
 // DestroyResources removes all resources created by the Litmus application.

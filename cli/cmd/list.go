@@ -20,6 +20,7 @@ import (
 	"log"
 	"net/http"
 
+	"github.com/google/litmus/cli/api"
 	"github.com/google/litmus/cli/utils"
 )
 
@@ -36,7 +37,7 @@ func ListRuns(projectID string) {
 	}
 	defer resp.Body.Close()
 
-	var runs []utils.RunInfo
+	var runs []api.RunInfo
 	if err := json.NewDecoder(resp.Body).Decode(&runs); err != nil {
 		log.Fatalf("Error decoding response: %v", err)
 	}
