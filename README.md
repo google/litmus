@@ -37,8 +37,11 @@ Litmus consists of three core components:
    - This is the easiest way to set up Litmus. 
    - Make sure you have the Google Cloud SDK installed and configured with the correct project.
    
-   - Install the Litmus CLI: 
+   - Install the Litmus CLI:
+     - On Linux:
      ```curl litmus.pso.dev | sudo sh```
+     - On Mac:
+     ```curl litmus.pso.dev/osx | sudo sh```
 
    - Run the deployment script with the following CLI command: 
      ```litmus deploy```
