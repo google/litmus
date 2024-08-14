@@ -122,7 +122,7 @@ jobs:
         sha256sum main > litmus.sha256
         gcloud storage cp main gs://litmus-cloud/prod/linux/litmus
         gcloud storage cp litmus.sha256 gs://litmus-cloud/prod/linux/litmus.sha256
-        env GOOS=darwin GOARCH=amd64 go build litmus.go
+        env GOOS=darwin GOARCH=amd64 go build main.go
         sha256sum main > litmus.sha256
         gcloud storage cp main gs://litmus-cloud/prod/osx/litmus
         gcloud storage cp litmus.sha256 gs://litmus-cloud/prod/osx/litmus.sha256
