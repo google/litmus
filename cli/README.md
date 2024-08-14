@@ -14,13 +14,13 @@ A command-line interface for deploying and managing Litmus, a tool for quickly b
 1. Clone this repository to your local machine:
 
    ```bash
-   git clone https://github.com/your-username/litmus.git
+   git clone https://github.com/google/litmus.git
    ```
 
 2. Navigate to the project directory:
 
    ```bash
-   cd litmus
+   cd litmus/cli
    ```
 
 3. Build the CLI:
