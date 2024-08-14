@@ -40,10 +40,10 @@ Litmus consists of three core components:
    - Install the Litmus CLI:
      - On Linux:
      ```curl https://storage.googleapis.com/litmus-cloud/install/linux.sh | sudo sh```
-     - Digest: [https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256)
+     - sha256: [https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256)
      - On Mac:
      ```curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sudo sh```
-     - Digest: [https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256)
+     - sha256: [https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256)
 
    - Run the deployment script with the following CLI command: 
      ```litmus deploy```
