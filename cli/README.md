@@ -21,7 +21,7 @@ Install binary:
 ```curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sudo sh```
 - sha256: [https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256)
 
-## Installation
+## Installation (Manual Build)
 
 1. Clone this repository to your local machine:
 
@@ -35,7 +35,13 @@ Install binary:
    cd litmus/cli
    ```
 
-3. Build the CLI:
+3. Install Go dependencies:
+
+   ```bash
+   go mod download
+   ```
+
+4. Build the CLI:
 
    ```bash
    go build
