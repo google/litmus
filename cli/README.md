@@ -1,50 +1,97 @@
-# Litmus CLI Deployment Script
+# Litmus CLI
 
-This script automates the deployment of a Cloud Run service and a Cloud Run job with optional environment variables. It handles enabling necessary APIs, checking for existing Firestore databases, and deploying the services and jobs.
+A command-line interface for deploying and managing Litmus, a tool for quickly building and testing LLMs.
 
-## Requirements
+## Prerequisites
 
-* Go 1.18 or later
-* `gcloud` CLI installed and authenticated
+- **Google Cloud SDK (gcloud)**: Ensure you have the Google Cloud SDK installed and authenticated.
+  - Install: [https://cloud.google.com/sdk/docs/install](https://cloud.google.com/sdk/docs/install)
+  - Authenticate: `gcloud auth login`
+- **Go 1.18 or higher**: Required for building and running the CLI.
+
+## Installation
+
+1. Clone this repository to your local machine:
+
+   ```bash
+   git clone https://github.com/your-username/litmus.git
+   ```
+
+2. Navigate to the project directory:
+
+   ```bash
+   cd litmus
+   ```
+
+3. Build the CLI:
+
+   ```bash
+   go build
+   ```
 
 ## Usage
 
-1. **Save the code:**  Save the provided code snippet as `deploy.go`.
-2. **Build and run the script:**
-   ```bash
-   go build litmus.go
-   ./deploy <project-id> [region] [env-var1=value1] [env-var2=value2] ...
-   ```
-   - Replace `<project-id>` with your Google Cloud project ID.
-   - Optionally provide the region (defaults to "us-central1").
-   - Add any environment variables you need in the format `env-var1=value1`.
+```
+Usage: go run main.go <command> [options] [flags] 
 
-## Example
+Commands:
+  open: Open the Web application in your browser
+  deploy: Deploy the application
+  destroy: Remove the application
+  status: Show the status of the Litmus deployment
+  version: Display the version of the Litmus CLI
+  execute <payload>: Execute a payload to the deployed endpoint
+  ls: List all runs
+  run <runID>: Open the URL for a certain runID 
 
-```bash
- ./litmus deploy litmus-dev europe-west1 PASSWORD=test AI_DEFAULT_MODEL=gemini-1.5-flash 
+Options:
+  --project <project-id>: Specify the project ID (overrides default)
+  --region <region>: Specify the region (defaults to 'us-central1')
 ```
 
-This will deploy the Cloud Run services and jobs with the environment variables `DATABASE_URL` and `API_KEY` set to their respective values.
+### Examples
 
-## Script Features
+- **Deploy Litmus:**
+  ```bash
+  go run main.go deploy
+  ```
 
-* **Automatic API Enabling:** Ensures required APIs (`artifactregistry`, `cloudbuild`, `run`, `firestore`) are enabled for your project.
-* **Firestore Database Management:** Checks for the existence of a default Firestore database and creates one if it doesn't exist.
-* **Environment Variable Injection:** Allows you to pass environment variable assignments as command-line arguments, which are automatically applied to both the service and the job.
-* **Progress Indicator:** Displays a progress animation while the deployment is in progress.
-* **URL Extraction:** Extracts and prints the URL of the deployed Cloud Run service.
-* **Error Handling:** Includes logging and error handling to catch potential issues during deployment.
+- **Deploy to a specific project and region:**
+  ```bash
+  go run main.go deploy --project my-project-id --region us-east1
+  ```
 
-## Customization
+- **Destroy the Litmus deployment:**
+  ```bash
+  go run main.go destroy 
+  ```
 
-* **Image Names:** Update the `--image` flags in the deployment commands to match your specific container images.
-* **Service and Job Names:** Modify the service and job names used in the `gcloud` commands to reflect your desired names.
-* **Environment Variables:** Adjust the environment variable assignments based on your application's requirements.
-* **Flags:** Add or remove additional flags to the `gcloud` commands as needed for your specific deployment configuration.
+- **Get deployment status:**
+  ```bash
+  go run main.go status 
+  ```
 
-## Notes
+- **Display CLI version:**
+  ```bash
+  go run main.go version
+  ```
 
-* Make sure your container images are pushed to a Google Container Registry (GCR) repository.
-* This script assumes that your Cloud Run service and job are configured to use the default service account (which has access to the required APIs).
-* For more complex deployment scenarios, consider using Google Cloud's Deployment Manager or Terraform.
+- **Execute a payload:**
+  ```bash
+  go run main.go execute "Hello, world!"
+  ```
+
+- **List all runs:**
+  ```bash
+  go run main.go ls 
+  ```
+
+- **Open a specific run:**
+  ```bash
+  go run main.go run <runID>
+  ```
+
+## Configuration
+
+- The CLI uses your default gcloud project configuration.
+- Use the `--project` flag to specify a different project.
