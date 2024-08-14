@@ -87,7 +87,7 @@ func DestroyResources(projectID, region string) {
 			log.Printf("\nError deleting Secret: %v. You might need to delete it manually.\n", err)
 		} else {
 			s.Stop()
-			fmt.Sprintf("Done! Deleted Secret '%s'.\n", secretID)
+			fmt.Printf("Done! Deleted Secret '%s'.\n", secretID)
 		}
 	}
 
@@ -109,7 +109,7 @@ func DestroyResources(projectID, region string) {
 			log.Printf("\nError deleting Service Account: %v. You might need to delete it manually.\n", err)
 		} else {
 			s.Stop()
-			fmt.Sprintf("Done! Deleted Service Account '%s'.\n", sa)
+			fmt.Printf("Done! Deleted Service Account '%s'.\n", sa)
 		}
 	}
 
