@@ -15,14 +15,25 @@
 package cmd
 
 import (
+	"bufio"
 	"fmt"
 	"log"
+	"os"
 	"os/exec"
+	"strings"
 )
 
 // DestroyResources removes all resources created by the Litmus application.
 func DestroyResources(projectID, region string) {
-	fmt.Println("Destroying resources in project:", projectID)
+	// --- Confirm deletion ---
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("\nThis will delete all Litmus resources in project '%s'. Are you sure you want to continue? (y/N): ", projectID)
+	confirmation, _ := reader.ReadString('\n')
+	confirmation = strings.TrimSpace(confirmation) // Remove leading/trailing whitespace
+	if strings.ToLower(confirmation) != "y" {
+		fmt.Println("Aborting destruction.")
+		return
+	}
 
 	// --- Delete Cloud Run service ---
 	fmt.Print("\nDeleting Cloud Run service 'litmus-api'... ")
