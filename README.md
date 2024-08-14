@@ -1,5 +1,9 @@
 # Litmus: HTTP Request and Response Testing Tool with User Interface & LLM Evaluation
 
+![DEV](https://github.com/google/litmus/actions/workflows/dev_deploy.yml/badge.svg)
+![UAT](https://github.com/google/litmus/actions/workflows/uat_deploy.yml/badge.svg)
+![PROD](https://github.com/google/litmus/actions/workflows/prod_deploy.yml/badge.svg)
+
 Litmus is a comprehensive tool designed for testing and evaluating HTTP Requests and Responses. It combines a powerful API, a robust worker service, and a user-friendly web interface to streamline the testing process. 
 
 ## Features
