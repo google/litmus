@@ -119,4 +119,6 @@ jobs:
       run: |
         go install
         go build litmus.go
-        gcloud storage cp litmus gs://litmus-cloud/litmus
+        gcloud storage cp litmus gs://litmus-cloud/prod/linux/litmus
+        env GOOS=darwin GOARCH=amd64 go build litmus.go
+        gcloud storage cp litmus gs://litmus-cloud/prod/mac/litmus
