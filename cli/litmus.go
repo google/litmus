@@ -23,8 +23,11 @@ import (
 	"log"
 	"math/rand"
 	"net/http"
+	"net/url"
 	"os"
 	"os/exec"
+	"regexp"
+	"runtime"
 	"strings"
 	"time"
 
@@ -496,18 +499,52 @@ func showStatus(projectID string) {
 	fmt.Println("Password:", password)
 }
 
-// openLitmus opens the URL associated with a specific instance in the browser
+func openbrowser(url string) {
+	var err error
+
+	switch runtime.GOOS {
+	case "linux":
+		err = exec.Command("xdg-open", url).Start()
+	case "windows":
+		err = exec.Command("rundll32", "url.dll,FileProtocolHandler", url).Start()
+	case "darwin":
+		err = exec.Command("open", url).Start()
+	default:
+		err = fmt.Errorf("unsupported platform")
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+
+}
+
+func removeAnsiEscapeSequences(text string) string {
+	re := regexp.MustCompile(`\x1b\[[0-9;]*m`)
+	return re.ReplaceAllString(text, "")
+}
+
+// openLitmus opens the URL associated with a specific runID in the browser
 // and includes the username and password in the URL.
 func openLitmus(projectID string) {
 	showStatus(projectID) // First, show the status so the user knows the credentials
 
 	serviceURL, _ := accessSecret(projectID, "litmus-service-url")
+	username := "admin"
 	password, _ := accessSecret(projectID, "litmus-password")
-	URL := fmt.Sprintf("https://admin:%s@%s", password, serviceURL)
-	// Open the URL in the default browser
-	if err := exec.Command("open", URL).Start(); err != nil {
-		log.Fatalf("Error opening URL: %v", err)
+
+	noAserviceURL := removeAnsiEscapeSequences(serviceURL)
+	// Parse the URL
+	parsedURL, err := url.Parse(noAserviceURL)
+	if err != nil {
+		panic(err)
 	}
+
+	// Set the username and password in the URL
+	parsedURL.User = url.UserPassword(username, password)
+
+	// Construct the final URL with credentials
+	finalURL := parsedURL.String()
+	openbrowser(finalURL)
 }
 
 // displayVersion prints the version of the Litmus CLI
