@@ -38,10 +38,10 @@ Litmus consists of three core components:
    - Make sure you have the Google Cloud SDK installed and configured with the correct project.
    
    - Install the Litmus CLI:
-     - On Linux:
+     - **Linux**:
      ```curl https://storage.googleapis.com/litmus-cloud/install/linux.sh | sudo sh```
      - sha256: [https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256)
-     - On Mac:
+     - **OSX**:
      ```curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sudo sh```
      - sha256: [https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256)
 
