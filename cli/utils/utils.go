@@ -287,7 +287,7 @@ func HandleGcloudError(err error) {
 
 // PrintUsage displays the help message for the Litmus CLI.
 func PrintUsage() {
-	fmt.Println("Usage: go run litmus.go <command> [options] [flags]")
+	fmt.Println("Usage: litmus <command> [options] [flags]")
 	fmt.Println("Commands:")
 	fmt.Println("  open: Open the Web application")
 	fmt.Println("  deploy: Deploy the application")
