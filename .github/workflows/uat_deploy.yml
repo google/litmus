@@ -113,9 +113,16 @@ jobs:
       with:
         go-version: '1.23' 
 
+    # Build & Deploy
     - name: Build & Deploy
       working-directory: ./cli
       run: |
         go install
-        go build litmus.go
-        gcloud storage cp litmus gs://litmus-cloud/litmus-uat
+        go build main.go
+        sha256sum main > litmus.sha256
+        gcloud storage cp main gs://litmus-cloud/uat/linux/litmus
+        gcloud storage cp litmus.sha256 gs://litmus-cloud/uat/linux/litmus.sha256
+        env GOOS=darwin GOARCH=amd64 go build main.go
+        sha256sum main > litmus.sha256
+        gcloud storage cp main gs://litmus-cloud/uat/osx/litmus
+        gcloud storage cp litmus.sha256 gs://litmus-cloud/uat/osx/litmus.sha256
