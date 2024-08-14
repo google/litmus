@@ -29,24 +29,6 @@ import (
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 )
 
-// ShowInProgress displays an in-progress animation until the command finishes.
-func ShowInProgress(cmd *exec.Cmd) {
-	done := make(chan struct{})
-	defer close(done)
-	go func() {
-		<-done
-	}()
-
-	for {
-		select {
-		case <-done:
-			return
-		case <-time.After(500 * time.Millisecond):
-			fmt.Print(".")
-		}
-	}
-}
-
 // GenerateRandomPassword generates a random password of the given length.
 func GenerateRandomPassword(length int) string {
 	rand.Seed(time.Now().UnixNano())
@@ -96,7 +78,7 @@ func CreateOrUpdateSecret(projectID, secretID, secretValue string) error {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			fmt.Printf("Creating secret %s\n", secretID)
+			fmt.Printf("Creating secret %s", secretID)
 			createSecretReq := &secretmanagerpb.CreateSecretRequest{
 				Parent:   fmt.Sprintf("projects/%s", projectID),
 				SecretId: secretID,

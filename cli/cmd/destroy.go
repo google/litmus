@@ -21,6 +21,9 @@ import (
 	"os"
 	"os/exec"
 	"strings"
+	"time"
+
+	"github.com/briandowns/spinner"
 )
 
 // DestroyResources removes all resources created by the Litmus application.
@@ -36,43 +39,55 @@ func DestroyResources(projectID, region string) {
 	}
 
 	// --- Delete Cloud Run service ---
-	fmt.Print("\nDeleting Cloud Run service 'litmus-api'... ")
+	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	s.Suffix = " Deleting Cloud Run service 'litmus-api'... "
+	s.Start()
 	deleteServiceCmd := exec.Command("gcloud", "run", "services", "delete", "litmus-api",
 		"--project", projectID,
 		"--region", region,
 		"--quiet",
 	)
 	if err := deleteServiceCmd.Run(); err != nil {
+		s.Stop()
 		log.Printf("Error deleting Cloud Run service: %v. You might need to delete it manually.\n", err)
 	} else {
-		fmt.Println("Done!")
+		s.Stop()
+		fmt.Println("Done! Deleted Cloud Run service 'litmus-api'.")
 	}
 
 	// --- Delete Cloud Run job ---
-	fmt.Print("\nDeleting Cloud Run job 'litmus-worker'... ")
+	s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+	s.Suffix = " Deleting Cloud Run job 'litmus-worker'... "
+	s.Start()
 	deleteJobCmd := exec.Command("gcloud", "run", "jobs", "delete", "litmus-worker",
 		"--project", projectID,
 		"--region", region,
 		"--quiet",
 	)
 	if err := deleteJobCmd.Run(); err != nil {
+		s.Stop()
 		log.Printf("\nError deleting Cloud Run job: %v. You might need to delete it manually.\n", err)
 	} else {
-		fmt.Println("Done!")
+		s.Stop()
+		fmt.Println("Done! Deleted Cloud Run job 'litmus-worker'.")
 	}
 
 	// --- Delete Secrets from Secret Manager ---
 	secretsToDelete := []string{"litmus-password", "litmus-service-url"}
 	for _, secretID := range secretsToDelete {
-		fmt.Printf("Deleting Secret '%s'... ", secretID)
+		s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		s.Suffix = fmt.Sprintf(" Deleting Secret '%s'... ", secretID)
+		s.Start()
 		deleteSecretCmd := exec.Command("gcloud", "secrets", "delete", secretID,
 			"--project", projectID,
 			"--quiet",
 		)
 		if err := deleteSecretCmd.Run(); err != nil {
+			s.Stop()
 			log.Printf("\nError deleting Secret: %v. You might need to delete it manually.\n", err)
 		} else {
-			fmt.Println("Done!")
+			s.Stop()
+			fmt.Println("Done! Deleted Secret '%s'.", secretID)
 		}
 	}
 
@@ -82,15 +97,19 @@ func DestroyResources(projectID, region string) {
 		fmt.Sprintf("%s-worker@%s.iam.gserviceaccount.com", projectID, projectID),
 	}
 	for _, sa := range serviceAccountsToDelete {
-		fmt.Printf("\nDeleting Service Account '%s'... ", sa)
+		s = spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		s.Suffix = fmt.Sprintf(" Deleting Service Account '%s'... ", sa)
+		s.Start()
 		deleteSaCmd := exec.Command("gcloud", "iam", "service-accounts", "delete", sa,
 			"--project", projectID,
 			"--quiet",
 		)
 		if err := deleteSaCmd.Run(); err != nil {
+			s.Stop()
 			log.Printf("\nError deleting Service Account: %v. You might need to delete it manually.\n", err)
 		} else {
-			fmt.Println("Done!")
+			s.Stop()
+			fmt.Println("Done! Deleted Service Account '%s'.", sa)
 		}
 	}
 
