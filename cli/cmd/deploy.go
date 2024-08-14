@@ -31,7 +31,7 @@ import (
 func DeployApplication(projectID, region string, envVars map[string]string) {
 	// --- Confirm deployment ---
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("\nThis will deploy Litmus resources to project '%s'. Are you sure you want to continue? (y/N): ", projectID)
+	fmt.Printf("\nThis will deploy Litmus resources in the project '%s'. Are you sure you want to continue? (y/N): ", projectID)
 	confirmation, _ := reader.ReadString('\n')
 	confirmation = strings.TrimSpace(confirmation) // Remove leading/trailing whitespace
 	if strings.ToLower(confirmation) != "y" {

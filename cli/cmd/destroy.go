@@ -30,7 +30,7 @@ import (
 func DestroyResources(projectID, region string) {
 	// --- Confirm deletion ---
 	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("\nThis will delete all Litmus resources in project '%s'. Are you sure you want to continue? (y/N): ", projectID)
+	fmt.Printf("\nThis will delete all Litmus resources in the project '%s'. Are you sure you want to continue? (y/N): ", projectID)
 	confirmation, _ := reader.ReadString('\n')
 	confirmation = strings.TrimSpace(confirmation) // Remove leading/trailing whitespace
 	if strings.ToLower(confirmation) != "y" {
@@ -87,7 +87,7 @@ func DestroyResources(projectID, region string) {
 			log.Printf("\nError deleting Secret: %v. You might need to delete it manually.\n", err)
 		} else {
 			s.Stop()
-			fmt.Println("Done! Deleted Secret '%s'.", secretID)
+			fmt.Sprintf("Done! Deleted Secret '%s'.\n", secretID)
 		}
 	}
 
@@ -109,7 +109,7 @@ func DestroyResources(projectID, region string) {
 			log.Printf("\nError deleting Service Account: %v. You might need to delete it manually.\n", err)
 		} else {
 			s.Stop()
-			fmt.Println("Done! Deleted Service Account '%s'.", sa)
+			fmt.Sprintf("Done! Deleted Service Account '%s'.\n", sa)
 		}
 	}
 
