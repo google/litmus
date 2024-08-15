@@ -15,11 +15,13 @@
 package utils
 
 import (
+	"bufio"
 	"context"
 	"encoding/json"
 	"fmt"
 	"log"
 	"math/rand"
+	"os"
 	"os/exec"
 	"regexp"
 	"strings"
@@ -63,7 +65,7 @@ func AccessSecret(projectID, secretID string) (string, error) {
 }
 
 // CreateOrUpdateSecret creates or updates a secret in Secret Manager.
-func CreateOrUpdateSecret(projectID, secretID, secretValue string) error {
+func CreateOrUpdateSecret(projectID, secretID, secretValue string, quiet bool) error {
 	ctx := context.Background()
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
@@ -78,7 +80,9 @@ func CreateOrUpdateSecret(projectID, secretID, secretValue string) error {
 
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			fmt.Printf("Creating secret %s", secretID)
+			if !quiet {
+				fmt.Printf("Creating secret %s", secretID)
+			}
 			createSecretReq := &secretmanagerpb.CreateSecretRequest{
 				Parent:   fmt.Sprintf("projects/%s", projectID),
 				SecretId: secretID,
@@ -287,4 +291,13 @@ func PrintUsage() {
 // DisplayVersion prints the version of the Litmus CLI.
 func DisplayVersion() {
 	fmt.Println("Litmus CLI version:", "1.0.0") // Update with your actual version
+}
+
+// ConfirmPrompt asks the user for confirmation with a yes/no question.
+func ConfirmPrompt(message string) bool {
+	reader := bufio.NewReader(os.Stdin)
+	fmt.Printf("%s (y/N): ", message)
+	response, _ := reader.ReadString('\n')
+	response = strings.TrimSpace(response) // Remove leading/trailing whitespace
+	return strings.ToLower(response) == "y"
 }
