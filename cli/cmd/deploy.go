@@ -15,10 +15,8 @@
 package cmd
 
 import (
-	"bufio"
 	"fmt"
 	"log"
-	"os"
 	"os/exec"
 	"strings"
 	"time"
@@ -28,17 +26,14 @@ import (
 )
 
 // DeployApplication deploys the Litmus application to Google Cloud.
-func DeployApplication(projectID, region string, envVars map[string]string) {
-	// --- Confirm deployment ---
-	reader := bufio.NewReader(os.Stdin)
-	fmt.Printf("\nThis will deploy Litmus resources in the project '%s'. Are you sure you want to continue? (y/N): ", projectID)
-	confirmation, _ := reader.ReadString('\n')
-	confirmation = strings.TrimSpace(confirmation) // Remove leading/trailing whitespace
-	if strings.ToLower(confirmation) != "y" {
-		fmt.Println("\nAborting deployment.")
-		return
+func DeployApplication(projectID, region string, envVars map[string]string, quiet bool) {
+	if !quiet {
+		// --- Confirm deployment ---
+		if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will deploy Litmus resources in the project '%s'. Are you sure you want to continue?", projectID)) {
+			fmt.Println("\nAborting deployment.")
+			return
+		}
 	}
-
 	// Enable required APIs
 	apisToEnable := []string{
 		"run.googleapis.com",
@@ -50,48 +45,57 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 
 	for _, api := range apisToEnable {
 		if !utils.IsAPIEnabled(api, projectID) {
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-			s.Suffix = fmt.Sprintf(" Enabling API %s... ", api)
-			s.Start()
+			if !quiet {
+				s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+				s.Suffix = fmt.Sprintf(" Enabling API %s... ", api)
+				s.Start()
+				defer s.Stop()
+			}
 			enableAPICmd := exec.Command("gcloud", "services", "enable", api, "--project", projectID)
 			if err := enableAPICmd.Run(); err != nil {
-				s.Stop() // Stop the spinner in case of error
 				log.Fatalf("Error enabling API %s: %v", api, err)
 			}
-			s.Stop()
-			fmt.Printf("\nDone! API %s enabled!", api)
-		} else {
+			if !quiet {
+				fmt.Printf("\nDone! API %s enabled!", api)
+			}
+		} else if !quiet {
 			fmt.Printf("\nAPI %s is already enabled.", api)
 		}
 	}
 
 	// Check if Firestore database exists
 	if !utils.FirestoreDatabaseExists(projectID) {
-		// Create default Firestore database
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-		s.Suffix = " Creating default Firestore database... "
-		s.Start()
+		if !quiet {
+			// Create default Firestore database
+			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			s.Suffix = " Creating default Firestore database... "
+			s.Start()
+			defer s.Stop()
+		}
 		createFirestoreCmd := exec.Command(
 			"gcloud", "firestore", "databases", "create",
 			"--project", projectID,
 			"--location", region,
 		)
 		if err := createFirestoreCmd.Run(); err != nil {
-			s.Stop() // Stop the spinner in case of error
 			log.Fatalf("\nError creating Firestore database: %v", err)
 		}
-		s.Stop()
-		fmt.Println("\nDone! Firestore created!")
-	} else {
+		if !quiet {
+			fmt.Println("\nDone! Firestore created!")
+		}
+	} else if !quiet {
 		fmt.Println("\nFirestore database already exists.")
 	}
 
 	// --- Service Account for API ---
 	apiServiceAccount := fmt.Sprintf("%s-api@%s.iam.gserviceaccount.com", projectID, projectID)
 	if !utils.ServiceAccountExists(projectID, apiServiceAccount) {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-		s.Suffix = fmt.Sprintf(" Creating service account for API: %s... ", apiServiceAccount)
-		s.Start()
+		if !quiet {
+			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			s.Suffix = fmt.Sprintf(" Creating service account for API: %s... ", apiServiceAccount)
+			s.Start()
+			defer s.Stop()
+		}
 		createServiceAccountCmd := exec.Command(
 			"gcloud", "iam", "service-accounts", "create",
 			fmt.Sprintf("%s-api", projectID),
@@ -99,21 +103,24 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 			"--display-name", "Litmus API Service Account",
 		)
 		if err := createServiceAccountCmd.Run(); err != nil {
-			s.Stop() // Stop the spinner in case of error
 			log.Fatalf("Error creating service account: %v\n", err)
 		}
-		s.Stop()
-		fmt.Printf("Done! Service account for API created: %s\n", apiServiceAccount)
-	} else {
+		if !quiet {
+			fmt.Printf("Done! Service account for API created: %s\n", apiServiceAccount)
+		}
+	} else if !quiet {
 		fmt.Printf("Service account for API already exists: %s (skipping)\n", apiServiceAccount)
 	}
 
 	// --- Service Account for Worker ---
 	workerServiceAccount := fmt.Sprintf("%s-worker@%s.iam.gserviceaccount.com", projectID, projectID)
 	if !utils.ServiceAccountExists(projectID, workerServiceAccount) {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-		s.Suffix = fmt.Sprintf(" Creating service account for Worker: %s... ", workerServiceAccount)
-		s.Start()
+		if !quiet {
+			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+			s.Suffix = fmt.Sprintf(" Creating service account for Worker: %s... ", workerServiceAccount)
+			s.Start()
+			defer s.Stop()
+		}
 		createWorkerServiceAccountCmd := exec.Command(
 			"gcloud", "iam", "service-accounts", "create",
 			fmt.Sprintf("%s-worker", projectID),
@@ -121,65 +128,73 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 			"--display-name", "Litmus Worker Service Account",
 		)
 		if err := createWorkerServiceAccountCmd.Run(); err != nil {
-			s.Stop() // Stop the spinner in case of error
+
 			log.Fatalf("Error creating service account: %v\n", err)
 		}
-		s.Stop()
-		fmt.Printf("Done! Service account for Worker created: %s\n", workerServiceAccount)
-	} else {
+		if !quiet {
+
+			fmt.Printf("Done! Service account for Worker created: %s\n", workerServiceAccount)
+		}
+	} else if !quiet {
 		fmt.Printf("Service account for Worker already exists: %s (skipping)\n", workerServiceAccount)
 	}
 
 	// --- Grant Vertex AI and Firestore permissions to API service account ---
-	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-	s.Suffix = " Granting permissions to API service account... "
-	s.Start()
-	if err := grantPermissions(apiServiceAccount, projectID); err != nil {
-		s.Stop() // Stop the spinner in case of error
+	if !quiet {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
+		s.Suffix = " Granting permissions to API service account... "
+		s.Start()
+		defer s.Stop()
+	}
+	if err := grantPermissions(apiServiceAccount, projectID, quiet); err != nil {
 		log.Fatalf("Error granting permissions to API service account: %v \n", err)
 	}
-	s.Stop()
-	fmt.Printf("Done! Granted permissions to API service account\n")
-
+	if !quiet {
+		fmt.Printf("Done! Granted permissions to API service account\n")
+	}
 	// --- Grant Vertex AI and Firestore permissions to Worker service account ---
-	s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-	s.Suffix = " Granting permissions to Worker service account... "
-	s.Start()
-	if err := grantPermissions(workerServiceAccount, projectID); err != nil {
-		s.Stop() // Stop the spinner in case of error
+	if !quiet {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+		s.Suffix = " Granting permissions to Worker service account... "
+		s.Start()
+		defer s.Stop()
+	}
+	if err := grantPermissions(workerServiceAccount, projectID, quiet); err != nil {
 		log.Fatalf("Error granting permissions to Worker service account: %v\n", err)
 	}
-	s.Stop()
-	fmt.Printf("Done! Granted permissions to Worker service account\n")
-
+	if !quiet {
+		fmt.Printf("Done! Granted permissions to Worker service account\n")
+	}
 	// --- Password and URL Management with Secret Manager ---
-	s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-	s.Suffix = " Getting or creating passwords... "
-	s.Start()
-
+	var password string
+	if !quiet {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+		s.Suffix = " Getting or creating passwords... "
+		s.Start()
+		defer s.Stop()
+	}
 	// Get or create passwords and store them in Secret Manager
 	password, err := utils.AccessSecret(projectID, "litmus-password")
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
 			// Generate and store password if it doesn't exist
 			password = utils.GenerateRandomPassword(16)
-			if err := utils.CreateOrUpdateSecret(projectID, "litmus-password", password); err != nil {
-				s.Stop() // Stop the spinner in case of error
+			if err := utils.CreateOrUpdateSecret(projectID, "litmus-password", password, quiet); err != nil {
 				log.Fatalf("Error storing password in Secret Manager: %v", err)
 			}
 		} else {
-			s.Stop() // Stop the spinner in case of error
 			log.Fatalf("Error accessing password in Secret Manager: %v", err)
 		}
 	}
 	envVars["PASSWORD"] = password
-	s.Stop()
 
 	// --- Deploy Cloud Run service with service account ---
-	s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-	s.Suffix = " Deploying Cloud Run service 'litmus-api'... "
-	s.Start()
-
+	if !quiet {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+		s.Suffix = " Deploying Cloud Run service 'litmus-api'... "
+		s.Start()
+		defer s.Stop()
+	}
 	// Construct the deploy command with --no-traffic flag for updates
 	deployServiceCmd := exec.Command(
 		"gcloud", "run", "deploy", "litmus-api",
@@ -208,17 +223,19 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 
 	output2, err := deployServiceCmd.CombinedOutput()
 	if err != nil {
-		s.Stop() // Stop the spinner in case of error
 		log.Fatalf("Error deploying Cloud Run service: %v\nOutput: %s\n", err, output2)
 	}
-	s.Stop()
-	fmt.Println("Done! Deployed API.")
-
+	if !quiet {
+		fmt.Println("Done! Deployed API.")
+	}
 	// If the service was updated, route traffic back to the latest revision
 	if strings.Contains(string(output2), "Routing traffic...") {
-		s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-		s.Suffix = " Routing traffic to the latest revision... "
-		s.Start()
+		if !quiet {
+			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+			s.Suffix = " Routing traffic to the latest revision... "
+			s.Start()
+			defer s.Stop()
+		}
 		routeTrafficCmd := exec.Command(
 			"gcloud", "run", "services", "update-traffic", "litmus-api",
 			"--project", projectID,
@@ -226,18 +243,20 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 			"--to-latest",
 		)
 		if err := routeTrafficCmd.Run(); err != nil {
-			s.Stop() // Stop the spinner in case of error
 			log.Fatalf("Error routing traffic to the latest revision: %v", err)
 		}
-		s.Stop()
-		fmt.Println("Done! Routed traffic to the latest revision.")
+		if !quiet {
+			fmt.Println("Done! Routed traffic to the latest revision.")
+		}
 	}
 
 	// --- Deploy Cloud Run job with service account ---
-	s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-	s.Suffix = " Deploying Cloud Run job 'litmus-worker'... "
-	s.Start()
-
+	if !quiet {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+		s.Suffix = " Deploying Cloud Run job 'litmus-worker'... "
+		s.Start()
+		defer s.Stop()
+	}
 	// Construct the deploy command (always create new)
 	deployJobCmd := exec.Command(
 		"gcloud", "run", "jobs", "deploy", "litmus-worker", // Always use "create"
@@ -264,17 +283,19 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 	}
 
 	if err := deployJobCmd.Run(); err != nil {
-		s.Stop() // Stop the spinner in case of error
 		log.Fatalf("Error deploying Cloud Run job: %v\n", err)
 	}
-	s.Stop()
-	fmt.Println("Done! Deployed Worker")
-
+	if !quiet {
+		fmt.Println("Done! Deployed Worker")
+	}
 	// --- Grant API permission to invoke Worker ---
 	if !utils.BindingExists(projectID, region, "litmus-worker", apiServiceAccount, "roles/run.invoker") {
-		s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-		s.Suffix = " Granting API permission to invoke Worker... "
-		s.Start()
+		if !quiet {
+			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+			s.Suffix = " Granting API permission to invoke Worker... "
+			s.Start()
+			defer s.Stop()
+		}
 		grantPermissionCmd := exec.Command(
 			"gcloud", "run", "jobs", "add-iam-policy-binding", "litmus-worker",
 			"--member", fmt.Sprintf("serviceAccount:%s", apiServiceAccount),
@@ -283,12 +304,12 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 			"--region", region,
 		)
 		if err := grantPermissionCmd.Run(); err != nil {
-			s.Stop() // Stop the spinner in case of error
 			log.Fatalf("Error granting permission: %v\n", err)
 		}
-		s.Stop()
-		fmt.Println("Done! Granting API permission to invoke Worker.\n")
-	} else {
+		if !quiet {
+			fmt.Println("Done! Granting API permission to invoke Worker.\n")
+		}
+	} else if !quiet {
 		fmt.Println("API permission to invoke Worker already exists.\n")
 	}
 
@@ -296,24 +317,26 @@ func DeployApplication(projectID, region string, envVars map[string]string) {
 	serviceURL := utils.ExtractServiceURL(string(output2))
 
 	// Store the service URL in Secret Manager
-	s = spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
-	s.Suffix = " Storing service URL... "
-	s.Start()
-	if err := utils.CreateOrUpdateSecret(projectID, "litmus-service-url", serviceURL); err != nil {
-		s.Stop() // Stop the spinner in case of error
+	if !quiet {
+		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
+		s.Suffix = " Storing service URL... "
+		s.Start()
+		defer s.Stop()
+	}
+	if err := utils.CreateOrUpdateSecret(projectID, "litmus-service-url", serviceURL, quiet); err != nil {
 		log.Fatalf("Error storing service URL in Secret Manager: %v", err)
 	}
-	s.Stop()
 
-	fmt.Println("\nAll deployments completed \n")
-
-	fmt.Println("Get started now by visiting: ", serviceURL)
-	fmt.Println("User: admin")
-	fmt.Println("Password: ", password)
+	if !quiet {
+		fmt.Println("\nAll deployments completed \n")
+		fmt.Println("Get started now by visiting: ", serviceURL)
+		fmt.Println("User: admin")
+		fmt.Println("Password: ", password)
+	}
 }
 
 // grantPermissions grants Vertex AI and Firestore permissions to the given service account.
-func grantPermissions(serviceAccount, projectID string) error {
+func grantPermissions(serviceAccount, projectID string, quiet bool) error {
 	roles := []string{
 		"roles/aiplatform.user",
 		"roles/datastore.user",
@@ -331,7 +354,7 @@ func grantPermissions(serviceAccount, projectID string) error {
 			if err := cmd.Run(); err != nil {
 				return fmt.Errorf("error granting role '%s': %v", role, err)
 			}
-		} else {
+		} else if !quiet {
 			fmt.Printf("Role '%s' already granted to service account.\n", role)
 		}
 	}

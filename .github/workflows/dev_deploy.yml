@@ -113,8 +113,8 @@ jobs:
       with:
         go-version: '1.23' 
 
-    # Build & Deploy
-    - name: Build & Deploy
+    # Build & Store
+    - name: Build & Store
       working-directory: ./cli
       run: |
         go install
@@ -126,3 +126,32 @@ jobs:
         sha256sum main > litmus.sha256
         gcloud storage cp main gs://litmus-cloud/dev/osx/litmus
         gcloud storage cp litmus.sha256 gs://litmus-cloud/dev/osx/litmus.sha256
+
+  deployment:
+    needs: [worker-build-push, api-build-push, cli-build-store]
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: 'auth'
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIP }}
+        service_account: ${{ secrets.DEV_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        access_token_lifetime: '300s'
+
+    # Deploy
+    - name: Deployment
+      working-directory: ./
+      run: |
+        wget https://storage.googleapis.com/litmus-cloud/dev/linux/litmus
+        chmod 755 ./litmus
+        ./litmus deploy --project litmusai-dev --quiet
