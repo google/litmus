@@ -144,7 +144,7 @@ jobs:
       uses: google-github-actions/auth@v2
       with:
         workload_identity_provider: ${{ secrets.WIP }}
-        service_account: ${{ secrets.DEV_SERVICE_ACCOUNT }}
+        service_account: ${{ secrets.PROD_SERVICE_ACCOUNT }}
         token_format: 'access_token'
         access_token_lifetime: '300s'
 
