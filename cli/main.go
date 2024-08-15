@@ -86,11 +86,20 @@ func main() {
 		}
 	}
 
+	// Check for --quiet flag
+	quiet := false
+	for _, arg := range os.Args {
+		if arg == "--quiet" {
+			quiet = true
+			break
+		}
+	}
+
 	switch command {
 	case "deploy":
-		cmd.DeployApplication(projectID, region, envVars)
+		cmd.DeployApplication(projectID, region, envVars, quiet) // Pass quiet flag here
 	case "destroy":
-		cmd.DestroyResources(projectID, region)
+		cmd.DestroyResources(projectID, region, quiet)
 	case "execute":
 		if len(os.Args) < 4 {
 			fmt.Println("Usage: go run main.go execute <payload>")

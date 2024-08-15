@@ -113,8 +113,8 @@ jobs:
       with:
         go-version: '1.23' 
 
-    # Build & Deploy
-    - name: Build & Deploy
+    # Build & Store
+    - name: Build & Store
       working-directory: ./cli
       run: |
         go install
@@ -126,3 +126,12 @@ jobs:
         sha256sum main > litmus.sha256
         gcloud storage cp main gs://litmus-cloud/dev/osx/litmus
         gcloud storage cp litmus.sha256 gs://litmus-cloud/dev/osx/litmus.sha256
+
+    # Deploy
+    - name: Deploy
+      working-directory: ./
+      run: |
+        go install
+        wget https://storage.googleapis.com/litmus-cloud/dev/linux/litmus
+        chmod 755 ./litmus
+        ./litmus deploy --project litmusai-dev --quiet
