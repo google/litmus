@@ -42,6 +42,7 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 		"iam.googleapis.com",
 		"aiplatform.googleapis.com",
 		"secretmanager.googleapis.com",
+		"cloudresourcemanager.googleapis.com",
 	}
 	for _, api := range apisToEnable {
 		if !utils.IsAPIEnabled(api, projectID) {
