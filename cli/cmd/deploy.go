@@ -34,6 +34,7 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 			return
 		}
 	}
+
 	// Enable required APIs
 	apisToEnable := []string{
 		"run.googleapis.com",
@@ -41,8 +42,8 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 		"iam.googleapis.com",
 		"aiplatform.googleapis.com",
 		"secretmanager.googleapis.com",
+		"cloudresourcemanager.googleapis.com",
 	}
-
 	for _, api := range apisToEnable {
 		if !utils.IsAPIEnabled(api, projectID) {
 			if !quiet {
@@ -52,8 +53,9 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 				defer s.Stop()
 			}
 			enableAPICmd := exec.Command("gcloud", "services", "enable", api, "--project", projectID)
-			if err := enableAPICmd.Run(); err != nil {
-				log.Fatalf("Error enabling API %s: %v", api, err)
+			output, err := enableAPICmd.CombinedOutput()
+			if err != nil {
+				log.Fatalf("Error enabling API %s: %v\nOutput: %s", api, err, output) // Print gcloud output
 			}
 			if !quiet {
 				fmt.Printf("\nDone! API %s enabled!", api)
@@ -77,8 +79,9 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 			"--project", projectID,
 			"--location", region,
 		)
-		if err := createFirestoreCmd.Run(); err != nil {
-			log.Fatalf("\nError creating Firestore database: %v", err)
+		output, err := createFirestoreCmd.CombinedOutput() // Capture gcloud output
+		if err != nil {
+			log.Fatalf("\nError creating Firestore database: %v\nOutput: %s", err, output)
 		}
 		if !quiet {
 			fmt.Println("\nDone! Firestore created!")
@@ -102,8 +105,9 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 			"--project", projectID,
 			"--display-name", "Litmus API Service Account",
 		)
-		if err := createServiceAccountCmd.Run(); err != nil {
-			log.Fatalf("Error creating service account: %v\n", err)
+		output, err := createServiceAccountCmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("Error creating service account: %v\nOutput: %s", err, output)
 		}
 		if !quiet {
 			fmt.Printf("Done! Service account for API created: %s\n", apiServiceAccount)
@@ -127,12 +131,11 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 			"--project", projectID,
 			"--display-name", "Litmus Worker Service Account",
 		)
-		if err := createWorkerServiceAccountCmd.Run(); err != nil {
-
-			log.Fatalf("Error creating service account: %v\n", err)
+		output, err := createWorkerServiceAccountCmd.CombinedOutput()
+		if err != nil {
+			log.Fatalf("Error creating service account: %v\nOutput: %s", err, output)
 		}
 		if !quiet {
-
 			fmt.Printf("Done! Service account for Worker created: %s\n", workerServiceAccount)
 		}
 	} else if !quiet {
@@ -282,8 +285,9 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 		deployJobCmd.Args[3] = "update"
 	}
 
-	if err := deployJobCmd.Run(); err != nil {
-		log.Fatalf("Error deploying Cloud Run job: %v\n", err)
+	output, err := deployJobCmd.CombinedOutput()
+	if err != nil {
+		log.Fatalf("Error deploying Cloud Run job: %v\nOutput: %s", err, output) // Print gcloud output
 	}
 	if !quiet {
 		fmt.Println("Done! Deployed Worker")
@@ -351,13 +355,13 @@ func grantPermissions(serviceAccount, projectID string, quiet bool) error {
 				"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
 				"--role", role,
 			)
-			if err := cmd.Run(); err != nil {
-				return fmt.Errorf("error granting role '%s': %v", role, err)
+			output, err := cmd.CombinedOutput() // Capture output here
+			if err != nil {
+				return fmt.Errorf("error granting role '%s': %v\nOutput: %s", role, err, output) // Include output in the error
 			}
 		} else if !quiet {
 			fmt.Printf("Role '%s' already granted to service account.\n", role)
 		}
 	}
-
 	return nil
 }
