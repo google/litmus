@@ -1,8 +1,10 @@
 package main
 
 import (
+	"bytes"
 	"context"
 	"io"
+	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -17,7 +19,7 @@ import (
 var (
 	projectID      = os.Getenv("PROJECT_ID")
 	firestoreDB    *firestore.Client
-	upstreamURLStr = os.Getenv("UPSTREAM_URL") // Env var for upstream URL
+	upstreamURLStr = "https://" + os.Getenv("UPSTREAM_URL")
 )
 
 type requestLog struct {
@@ -59,14 +61,32 @@ func main() {
 		handleRequest(w, r, proxy, upstreamURL)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8081", nil))
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.ReverseProxy, upstreamURL *url.URL) {
 	startTime := time.Now()
 	requestID := uuid.New().String()
 
-	logRequest(requestID, r, startTime, upstreamURL)
+	// Ensure Correct Protocol Scheme
+	if r.URL.Scheme == "" {
+		r.URL.Scheme = upstreamURL.Scheme
+	}
+
+	if r.URL.Host == "" {
+		r.URL.Host = upstreamURL.Host
+	}
+
+	requestBody, err := ioutil.ReadAll(r.Body)
+	if err != nil {
+		log.Printf("Error reading request body: %v", err)
+		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+		return
+	}
+	// Reset the request body for the proxy using io.NopCloser
+	r.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+
+	logRequest(requestID, r, startTime, upstreamURL, requestBody)
 
 	wrappedWriter := &statusRecorder{ResponseWriter: w}
 
@@ -74,17 +94,17 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	proxy.ServeHTTP(wrappedWriter, r)
 
 	endTime := time.Now()
-	logResponse(requestID, r, startTime, endTime, wrappedWriter)
+	logResponse(requestID, r, startTime, endTime, wrappedWriter, requestBody)
 }
 
-func logRequest(requestID string, r *http.Request, startTime time.Time, upstreamURL *url.URL) {
+func logRequest(requestID string, r *http.Request, startTime time.Time, upstreamURL *url.URL, requestBody []byte) {
 	requestLog := requestLog{
 		ID:          requestID,
 		Timestamp:   startTime,
 		Method:      r.Method,
 		RequestURI:  r.RequestURI,
 		UpstreamURL: upstreamURL.String(),
-		RequestSize: r.ContentLength,
+		RequestSize: int64(len(requestBody)), // Calculate size from the stored body
 	}
 	_, err := firestoreDB.Collection("requests").Doc(requestID).Set(context.Background(), requestLog)
 	if err != nil {
@@ -92,17 +112,26 @@ func logRequest(requestID string, r *http.Request, startTime time.Time, upstream
 	}
 }
 
-func logResponse(requestID string, r *http.Request, startTime time.Time, endTime time.Time, w *statusRecorder) {
-	responseSize, _ := io.Copy(io.Discard, r.Body)
+func logResponse(requestID string, r *http.Request, startTime time.Time, endTime time.Time, w *statusRecorder, requestBody []byte) {
+	responseSize := int64(len(requestBody))
 	responseLog := map[string]interface{}{
 		"responseStatus": w.status,
 		"responseSize":   responseSize,
 		"latency":        endTime.Sub(startTime).Milliseconds(),
 	}
+	// Correct Firestore Update
 	_, err := firestoreDB.Collection("requests").Doc(requestID).Update(context.Background(), []firestore.Update{
 		{
-			Path:  "",
-			Value: responseLog,
+			Path:  "responseStatus",
+			Value: responseLog["responseStatus"],
+		},
+		{
+			Path:  "responseSize",
+			Value: responseLog["responseSize"],
+		},
+		{
+			Path:  "latency",
+			Value: responseLog["latency"],
 		},
 	})
 	if err != nil {
