@@ -102,7 +102,7 @@ func main() {
 		cmd.DestroyResources(projectID, region, quiet)
 	case "execute":
 		if len(os.Args) < 4 {
-			fmt.Println("Usage: go run main.go execute <payload>")
+			fmt.Println("Usage: litmus execute <payload>")
 			return
 		}
 		payload := os.Args[3]
@@ -142,23 +142,22 @@ func main() {
 				utils.HandleGcloudError(err)
 			}
 		case "delete":
-			if len(os.Args) < 4 {
-				fmt.Println("Usage: go run main.go proxy delete <service_name>")
-				return
+			var serviceName string
+			if len(os.Args) >= 4 { // Check if a service name is provided
+				serviceName = os.Args[3]
 			}
-			serviceName := os.Args[3]
-			err := cmd.DeleteProxyService(projectID, serviceName, quiet)
+			err := cmd.DeleteProxyService(projectID, serviceName, region, quiet)
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
 		case "delete-all":
-			err := cmd.DeleteAllProxyServices(projectID, quiet)
+			err := cmd.DeleteAllProxyServices(projectID, region, quiet)
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
 		default:
 			fmt.Println("Invalid proxy subcommand:", os.Args[2])
-			fmt.Println("Usage: go run main.go proxy [deploy | list | delete <service_name> | delete-all]")
+			fmt.Println("Usage: litmus proxy [deploy --upstreamURL <upstreamURL> | list | delete <service_name> | delete-all]")
 		}
 	default:
 		fmt.Println("Invalid command:", command)
