@@ -17,7 +17,7 @@ module github.com/google/litmus/proxy
 go 1.23
 
 require (
-	cloud.google.com/go/firestore v1.16.0
+	cloud.google.com/go/logging v1.10.0
 	github.com/google/uuid v1.6.0
 )
 

@@ -18,7 +18,6 @@ import (
 	"bytes"
 	"context"
 	"io"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"net/http/httputil"
@@ -26,42 +25,42 @@ import (
 	"os"
 	"time"
 
-	"cloud.google.com/go/firestore"
+	"cloud.google.com/go/logging"
 	"github.com/google/uuid"
 )
 
 var (
 	projectID      = os.Getenv("PROJECT_ID")
-	firestoreDB    *firestore.Client
+	logger         *logging.Logger
 	upstreamURLStr = "https://" + os.Getenv("UPSTREAM_URL")
 	tracingHeader  = "X-Litmus-Request" // Customizable tracing header name
 )
 
 type requestLog struct {
-	ID             string      `firestore:"id"`
-	TracingID      string      `firestore:"tracingID"` // Store the tracing ID
-	Timestamp      time.Time   `firestore:"timestamp"`
-	Method         string      `firestore:"method"`
-	RequestURI     string      `firestore:"requestURI"`
-	UpstreamURL    string      `firestore:"upstreamURL"`
-	RequestHeaders http.Header `firestore:"requestHeaders"`
-	RequestBody    string      `firestore:"requestBody"`
-	RequestSize    int64       `firestore:"requestSize"`
-	ResponseStatus int         `firestore:"responseStatus"`
-	ResponseBody   string      `firestore:"responseBody"`
-	ResponseSize   int64       `firestore:"responseSize"`
-	Latency        int64       `firestore:"latency"`
+	ID             string      `json:"id"`
+	TracingID      string      `json:"tracingID"`
+	Timestamp      time.Time   `json:"timestamp"`
+	Method         string      `json:"method"`
+	RequestURI     string      `json:"requestURI"`
+	UpstreamURL    string      `json:"upstreamURL"`
+	RequestHeaders http.Header `json:"requestHeaders"`
+	RequestBody    string      `json:"requestBody"`
+	RequestSize    int64       `json:"requestSize"`
+	ResponseStatus int         `json:"responseStatus"`
+	ResponseBody   string      `json:"responseBody"`
+	ResponseSize   int64       `json:"responseSize"`
+	Latency        int64       `json:"latency"`
 }
 
 func main() {
-	// Initialize Firestore client
+	// Initialize Cloud Logging client
 	ctx := context.Background()
-	var err error
-	firestoreDB, err = firestore.NewClient(ctx, projectID)
+	logClient, err := logging.NewClient(ctx, projectID)
 	if err != nil {
-		log.Fatalf("Failed to create Firestore client: %v", err)
+		log.Fatalf("Failed to create Cloud Logging client: %v", err)
 	}
-	defer firestoreDB.Close()
+	defer logClient.Close()
+	logger = logClient.Logger("my-proxy-log") // Use a meaningful log name
 
 	// Validate UPSTREAM_URL
 	if upstreamURLStr == "" {
@@ -80,7 +79,7 @@ func main() {
 		handleRequest(w, r, proxy, upstreamURL)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.ReverseProxy, upstreamURL *url.URL) {
@@ -100,15 +99,20 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 		r.URL.Host = upstreamURL.Host
 	}
 
-	requestBody, err := ioutil.ReadAll(r.Body)
-	if err != nil {
+	// Create a new buffer to hold the request body
+	requestBodyBuffer := bytes.NewBuffer(nil)
+	// Copy the request body to the buffer
+	if _, err := io.Copy(requestBodyBuffer, r.Body); err != nil {
 		log.Printf("Error reading request body: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// Reset the request body for the proxy
-	r.Body = io.NopCloser(bytes.NewBuffer(requestBody))
+	// Get the byte slice from the buffer
+	requestBody := requestBodyBuffer.Bytes()
+
+	// Reset the request body for the proxy using the buffer
+	r.Body = io.NopCloser(requestBodyBuffer)
 
 	// Set the Host header to the upstream URL
 	r.Host = upstreamURL.Host
@@ -116,82 +120,44 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	// Add tracing ID to the request header for propagation
 	r.Header.Set(tracingHeader, tracingID)
 
-	logRequest(requestID, tracingID, r, startTime, upstreamURL, requestBody)
-
 	wrappedWriter := &statusRecorder{ResponseWriter: w}
-
-	// Print request going to the upstream server
-	reqDump, err := httputil.DumpRequest(r, true)
-	if err != nil {
-		log.Printf("Error dumping request: %v", err)
-	} else {
-		log.Printf("Upstream Request:\n%s", string(reqDump))
-	}
 
 	// Explicitly call the proxy's ServeHTTP
 	proxy.ServeHTTP(wrappedWriter, r)
 
-	// Read the response body from the buffer
-	responseBody := wrappedWriter.buf.Bytes()
-
 	endTime := time.Now()
-	logResponse(requestID, startTime, endTime, wrappedWriter, requestBody, responseBody)
 
+	// Log the combined request and response details
+	logRequestAndResponse(requestID, tracingID, r, startTime, endTime, upstreamURL, requestBody, wrappedWriter.buf.Bytes())
 }
 
-func logRequest(requestID, tracingID string, r *http.Request, startTime time.Time, upstreamURL *url.URL, requestBody []byte) {
-	// Store headers as a map for easier querying in Firestore
-	headerMap := make(map[string][]string)
-	for k, v := range r.Header {
-		headerMap[k] = v
-	}
-
+func logRequestAndResponse(requestID, tracingID string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte) {
 	requestLog := requestLog{
 		ID:             requestID,
-		TracingID:      tracingID, // Store the tracing ID
+		TracingID:      tracingID,
 		Timestamp:      startTime,
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
 		UpstreamURL:    upstreamURL.String(),
-		RequestHeaders: headerMap,
+		RequestHeaders: r.Header,
 		RequestBody:    string(requestBody),
 		RequestSize:    int64(len(requestBody)),
+		ResponseStatus: 0, // Placeholder - will be updated below
+		ResponseBody:   string(responseBody),
+		ResponseSize:   int64(len(responseBody)),
+		Latency:        endTime.Sub(startTime).Milliseconds(),
 	}
-	_, err := firestoreDB.Collection("requests").Doc(requestID).Set(context.Background(), requestLog)
-	if err != nil {
-		log.Printf("Failed to log request: %v", err)
-	}
-}
 
-func logResponse(requestID string, startTime time.Time, endTime time.Time, w *statusRecorder, requestBody []byte, responseBody []byte) {
-	responseSize := int64(len(requestBody))
-	responseLog := map[string]interface{}{
-		"responseStatus": w.status,
-		"responseBody":   string(responseBody),
-		"responseSize":   responseSize,
-		"latency":        endTime.Sub(startTime).Milliseconds(),
+	// Update ResponseStatus now that we have it
+	if rec, ok := r.Context().Value("statusRecorder").(*statusRecorder); ok {
+		requestLog.ResponseStatus = rec.status
 	}
-	// Correct Firestore Update
-	_, err := firestoreDB.Collection("requests").Doc(requestID).Update(context.Background(), []firestore.Update{
-		{
-			Path:  "responseStatus",
-			Value: responseLog["responseStatus"],
-		},
-		{
-			Path:  "responseBody",
-			Value: responseLog["responseBody"],
-		},
-		{
-			Path:  "responseSize",
-			Value: responseLog["responseSize"],
-		},
-		{
-			Path:  "latency",
-			Value: responseLog["latency"],
-		},
-	})
-	if err != nil {
-		log.Printf("Failed to log response: %v", err)
+
+	// Log the combined entry
+	if err := logger.LogSync(context.Background(), logging.Entry{
+		Payload: requestLog,
+	}); err != nil {
+		log.Printf("Failed to log request and response: %v", err)
 	}
 }
 
@@ -205,6 +171,7 @@ type statusRecorder struct {
 // Write reimplements the necessary methods to capture the response body
 func (rec *statusRecorder) Write(b []byte) (int, error) {
 	rec.buf.Write(b)
+	// Flush the buffer after writing
 	return rec.ResponseWriter.Write(b)
 }
 
