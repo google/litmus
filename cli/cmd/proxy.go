@@ -134,6 +134,10 @@ func ListProxyServices(projectID string, quiet bool) ([]ProxyService, error) {
 	jsonStr := re.FindString(string(output))
 
 	if jsonStr == "" {
+		if !quiet {
+			fmt.Println("No Litmus Proxy services found.")
+		}
+		return nil, nil
 		return nil, fmt.Errorf("error listing Cloud Run services: %v\nOutput: %s", err, output)
 	}
 
