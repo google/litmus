@@ -1,3 +1,17 @@
+// Copyright 2024 Google LLC
+//
+// Licensed under the Apache License, Version 2.0 (the "License");
+// you may not use this file except in compliance with the License.
+// You may obtain a copy of the License at
+//
+//     http://www.apache.org/licenses/LICENSE-2.0
+//
+// Unless required by applicable law or agreed to in writing, software
+// distributed under the License is distributed on an "AS IS" BASIS,
+// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+// See the License for the specific language governing permissions and
+// limitations under the License.
+
 package main
 
 import (
@@ -20,18 +34,23 @@ var (
 	projectID      = os.Getenv("PROJECT_ID")
 	firestoreDB    *firestore.Client
 	upstreamURLStr = "https://" + os.Getenv("UPSTREAM_URL")
+	tracingHeader  = "X-Litmus-Request" // Customizable tracing header name
 )
 
 type requestLog struct {
-	ID             string    `firestore:"id"`
-	Timestamp      time.Time `firestore:"timestamp"`
-	Method         string    `firestore:"method"`
-	RequestURI     string    `firestore:"requestURI"`
-	UpstreamURL    string    `firestore:"upstreamURL"`
-	RequestSize    int64     `firestore:"requestSize"`
-	ResponseStatus int       `firestore:"responseStatus"`
-	ResponseSize   int64     `firestore:"responseSize"`
-	Latency        int64     `firestore:"latency"`
+	ID             string      `firestore:"id"`
+	TracingID      string      `firestore:"tracingID"` // Store the tracing ID
+	Timestamp      time.Time   `firestore:"timestamp"`
+	Method         string      `firestore:"method"`
+	RequestURI     string      `firestore:"requestURI"`
+	UpstreamURL    string      `firestore:"upstreamURL"`
+	RequestHeaders http.Header `firestore:"requestHeaders"`
+	RequestBody    string      `firestore:"requestBody"`
+	RequestSize    int64       `firestore:"requestSize"`
+	ResponseStatus int         `firestore:"responseStatus"`
+	ResponseBody   string      `firestore:"responseBody"`
+	ResponseSize   int64       `firestore:"responseSize"`
+	Latency        int64       `firestore:"latency"`
 }
 
 func main() {
@@ -61,12 +80,16 @@ func main() {
 		handleRequest(w, r, proxy, upstreamURL)
 	})
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	log.Fatal(http.ListenAndServe(":8082", nil))
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.ReverseProxy, upstreamURL *url.URL) {
 	startTime := time.Now()
 	requestID := uuid.New().String()
+	tracingID := r.Header.Get(tracingHeader)
+	if tracingID == "" {
+		tracingID = uuid.New().String() // Generate if not provided
+	}
 
 	// Ensure Correct Protocol Scheme
 	if r.URL.Scheme == "" {
@@ -83,28 +106,56 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
-	// Reset the request body for the proxy using io.NopCloser
+
+	// Reset the request body for the proxy
 	r.Body = io.NopCloser(bytes.NewBuffer(requestBody))
 
-	logRequest(requestID, r, startTime, upstreamURL, requestBody)
+	// Set the Host header to the upstream URL
+	r.Host = upstreamURL.Host
+
+	// Add tracing ID to the request header for propagation
+	r.Header.Set(tracingHeader, tracingID)
+
+	logRequest(requestID, tracingID, r, startTime, upstreamURL, requestBody)
 
 	wrappedWriter := &statusRecorder{ResponseWriter: w}
+
+	// Print request going to the upstream server
+	reqDump, err := httputil.DumpRequest(r, true)
+	if err != nil {
+		log.Printf("Error dumping request: %v", err)
+	} else {
+		log.Printf("Upstream Request:\n%s", string(reqDump))
+	}
 
 	// Explicitly call the proxy's ServeHTTP
 	proxy.ServeHTTP(wrappedWriter, r)
 
+	// Read the response body from the buffer
+	responseBody := wrappedWriter.buf.Bytes()
+
 	endTime := time.Now()
-	logResponse(requestID, r, startTime, endTime, wrappedWriter, requestBody)
+	logResponse(requestID, startTime, endTime, wrappedWriter, requestBody, responseBody)
+
 }
 
-func logRequest(requestID string, r *http.Request, startTime time.Time, upstreamURL *url.URL, requestBody []byte) {
+func logRequest(requestID, tracingID string, r *http.Request, startTime time.Time, upstreamURL *url.URL, requestBody []byte) {
+	// Store headers as a map for easier querying in Firestore
+	headerMap := make(map[string][]string)
+	for k, v := range r.Header {
+		headerMap[k] = v
+	}
+
 	requestLog := requestLog{
-		ID:          requestID,
-		Timestamp:   startTime,
-		Method:      r.Method,
-		RequestURI:  r.RequestURI,
-		UpstreamURL: upstreamURL.String(),
-		RequestSize: int64(len(requestBody)), // Calculate size from the stored body
+		ID:             requestID,
+		TracingID:      tracingID, // Store the tracing ID
+		Timestamp:      startTime,
+		Method:         r.Method,
+		RequestURI:     r.RequestURI,
+		UpstreamURL:    upstreamURL.String(),
+		RequestHeaders: headerMap,
+		RequestBody:    string(requestBody),
+		RequestSize:    int64(len(requestBody)),
 	}
 	_, err := firestoreDB.Collection("requests").Doc(requestID).Set(context.Background(), requestLog)
 	if err != nil {
@@ -112,10 +163,11 @@ func logRequest(requestID string, r *http.Request, startTime time.Time, upstream
 	}
 }
 
-func logResponse(requestID string, r *http.Request, startTime time.Time, endTime time.Time, w *statusRecorder, requestBody []byte) {
+func logResponse(requestID string, startTime time.Time, endTime time.Time, w *statusRecorder, requestBody []byte, responseBody []byte) {
 	responseSize := int64(len(requestBody))
 	responseLog := map[string]interface{}{
 		"responseStatus": w.status,
+		"responseBody":   string(responseBody),
 		"responseSize":   responseSize,
 		"latency":        endTime.Sub(startTime).Milliseconds(),
 	}
@@ -124,6 +176,10 @@ func logResponse(requestID string, r *http.Request, startTime time.Time, endTime
 		{
 			Path:  "responseStatus",
 			Value: responseLog["responseStatus"],
+		},
+		{
+			Path:  "responseBody",
+			Value: responseLog["responseBody"],
 		},
 		{
 			Path:  "responseSize",
@@ -139,10 +195,17 @@ func logResponse(requestID string, r *http.Request, startTime time.Time, endTime
 	}
 }
 
-// statusRecorder remains the same
+// statusRecorder modified to capture the response body
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
+	buf    bytes.Buffer
+}
+
+// Write reimplements the necessary methods to capture the response body
+func (rec *statusRecorder) Write(b []byte) (int, error) {
+	rec.buf.Write(b)
+	return rec.ResponseWriter.Write(b)
 }
 
 func (rec *statusRecorder) WriteHeader(code int) {
