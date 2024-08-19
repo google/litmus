@@ -255,7 +255,16 @@ func GetDefaultProjectID() (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	// Trim any extra output before the project ID
 	projectID := strings.TrimSpace(string(output))
+	lines := strings.Split(projectID, "\n")
+	if len(lines) > 1 {
+		projectID = lines[len(lines)-1] // Take the last line
+	}
+
+	projectID = strings.TrimSpace(projectID) // Trim whitespace again
+
 	return projectID, nil
 }
 
@@ -283,6 +292,12 @@ func PrintUsage() {
 	fmt.Println("  execute: Execute a payload to the deployed endpoint")
 	fmt.Println("  ls: List all runs")
 	fmt.Println("  run <runID>: Open the URL for a certain runID")
+	fmt.Println("  proxy [subcommand]: Manage Litmus Proxy deployments")
+	fmt.Println("     Subcommands:")
+	fmt.Println("       deploy: Deploy a Litmus Proxy instance")
+	fmt.Println("       list: List deployed Litmus Proxy instances")
+	fmt.Println("       delete <service_name>: Delete a specific Litmus Proxy instance")
+	fmt.Println("       delete-all: Delete all Litmus Proxy instances")
 	fmt.Println("Options:")
 	fmt.Println("  --project <project-id>: Specify the project ID (overrides default)")
 	fmt.Println("  --region <region>: Specify the region (defaults to 'us-central1')")
@@ -300,4 +315,65 @@ func ConfirmPrompt(message string) bool {
 	response, _ := reader.ReadString('\n')
 	response = strings.TrimSpace(response) // Remove leading/trailing whitespace
 	return strings.ToLower(response) == "y"
+}
+
+// SelectUpstreamURL presents a list of upstream URLs to the user and lets them choose one.
+func SelectUpstreamURL() (string, error) {
+	upstreamURLs := []string{
+		"asia-east1-aiplatform.googleapis.com",
+		"asia-east2-aiplatform.googleapis.com",
+		"asia-northeast1-aiplatform.googleapis.com",
+		"asia-northeast2-aiplatform.googleapis.com",
+		"asia-northeast3-aiplatform.googleapis.com",
+		"asia-south1-aiplatform.googleapis.com",
+		"asia-southeast1-aiplatform.googleapis.com",
+		"asia-southeast2-aiplatform.googleapis.com",
+		"australia-southeast1-aiplatform.googleapis.com",
+		"australia-southeast2-aiplatform.googleapis.com",
+		"europe-central2-aiplatform.googleapis.com",
+		"europe-north1-aiplatform.googleapis.com",
+		"europe-southwest1-aiplatform.googleapis.com",
+		"europe-west1-aiplatform.googleapis.com",
+		"europe-west2-aiplatform.googleapis.com",
+		"europe-west3-aiplatform.googleapis.com",
+		"europe-west4-aiplatform.googleapis.com",
+		"europe-west6-aiplatform.googleapis.com",
+		"europe-west8-aiplatform.googleapis.com",
+		"europe-west9-aiplatform.googleapis.com",
+		"me-west1-aiplatform.googleapis.com",
+		"northamerica-northeast1-aiplatform.googleapis.com",
+		"northamerica-northeast2-aiplatform.googleapis.com",
+		"southamerica-east1-aiplatform.googleapis.com",
+		"southamerica-west1-aiplatform.googleapis.com",
+		"us-central1-aiplatform.googleapis.com",
+		"us-east1-aiplatform.googleapis.com",
+		"us-east4-aiplatform.googleapis.com",
+		"us-south1-aiplatform.googleapis.com",
+		"us-west1-aiplatform.googleapis.com",
+		"us-west2-aiplatform.googleapis.com",
+		"us-west3-aiplatform.googleapis.com",
+		"us-west4-aiplatform.googleapis.com",
+	}
+
+	fmt.Println("Available upstream URLs:")
+	for i, url := range upstreamURLs {
+		fmt.Printf("%d. %s\n", i+1, url)
+	}
+
+	var choice int
+	for {
+		fmt.Print("Enter the number of your choice: ")
+		_, err := fmt.Scanln(&choice)
+		if err != nil {
+			return "", fmt.Errorf("invalid input: %v", err)
+		}
+
+		if choice > 0 && choice <= len(upstreamURLs) {
+			break
+		}
+
+		fmt.Println("Invalid choice. Please enter a number from the list.")
+	}
+
+	return upstreamURLs[choice-1], nil
 }
