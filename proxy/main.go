@@ -80,7 +80,7 @@ func main() {
 		handleRequest(w, r, proxy, upstreamURL)
 	})
 
-	log.Fatal(http.ListenAndServe(":8082", nil))
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.ReverseProxy, upstreamURL *url.URL) {
