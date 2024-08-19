@@ -87,6 +87,39 @@ jobs:
     - name: Push Docker latest tagged image to Artifact Registry
       run: docker push europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/api:latest
 
+  proxy-build-push:
+    runs-on: ubuntu-latest
+
+    permissions:
+      contents: 'read'
+      id-token: 'write'
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Authenticate to Google Cloud
+      id: 'auth'
+      uses: google-github-actions/auth@v2
+      with:
+        workload_identity_provider: ${{ secrets.WIP }}
+        service_account: ${{ secrets.DEV_SERVICE_ACCOUNT }}
+        token_format: 'access_token'
+        access_token_lifetime: '300s'
+
+    - name: Build Docker image
+      working-directory: ./proxy
+      run: docker build -t europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/proxy:latest -t europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/proxy:${{ github.sha }} .
+
+    - name: Configure Docker to use Artifact Registry
+      run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.DEV_GCP_PROJECT }}
+
+    - name: Push Docker SHA tagged image to Artifact Registry
+      run: docker push europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/proxy:${{ github.sha }}
+
+    - name: Push Docker latest tagged image to Artifact Registry
+      run: docker push europe-docker.pkg.dev/${{ secrets.DEV_GCP_PROJECT }}/litmus/proxy:latest
+
   cli-build-store:
     runs-on: ubuntu-latest
 
