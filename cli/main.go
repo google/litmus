@@ -97,7 +97,7 @@ func main() {
 
 	switch command {
 	case "deploy":
-		cmd.DeployApplication(projectID, region, envVars, quiet) // Pass quiet flag here
+		cmd.DeployApplication(projectID, region, envVars, quiet)
 	case "destroy":
 		cmd.DestroyResources(projectID, region, quiet)
 	case "execute":
@@ -125,6 +125,16 @@ func main() {
 		cmd.ShowStatus(projectID)
 	case "version":
 		utils.DisplayVersion()
+	case "proxy":
+		if len(os.Args) < 3 {
+			fmt.Println("Usage: go run main.go proxy deploy <project_id> <region> <upstream_url>")
+			cmd.PrintUpstreamURLOptions() // Print available upstream URLs
+			return
+		}
+		projectID := os.Args[2]
+		region := os.Args[3]
+		upstreamURL := os.Args[4]
+		cmd.DeployProxy(projectID, region, upstreamURL, quiet)
 	default:
 		fmt.Println("Invalid command:", command)
 		utils.PrintUsage()
