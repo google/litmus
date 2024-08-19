@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -16,8 +15,9 @@ import (
 )
 
 var (
-	projectID   = os.Getenv("PROJECT_ID")
-	firestoreDB *firestore.Client
+	projectID      = os.Getenv("PROJECT_ID")
+	firestoreDB    *firestore.Client
+	upstreamURLStr = os.Getenv("UPSTREAM_URL") // Env var for upstream URL
 )
 
 type requestLog struct {
@@ -42,56 +42,48 @@ func main() {
 	}
 	defer firestoreDB.Close()
 
-	http.HandleFunc("/", handleRequest)
+	// Validate UPSTREAM_URL
+	if upstreamURLStr == "" {
+		log.Fatal("UPSTREAM_URL environment variable is not set")
+	}
+	upstreamURL, err := url.Parse(upstreamURLStr)
+	if err != nil {
+		log.Fatalf("Invalid UPSTREAM_URL: %v", err)
+	}
+
+	// Explicitly create a reverse proxy
+	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
+
+	// Custom handler to wrap the proxy
+	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		handleRequest(w, r, proxy, upstreamURL)
+	})
+
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
-func handleRequest(w http.ResponseWriter, r *http.Request) {
+func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.ReverseProxy, upstreamURL *url.URL) {
 	startTime := time.Now()
-
-	// Generate unique request ID
 	requestID := uuid.New().String()
 
-	// Log incoming request details
-	logRequest(requestID, r, startTime)
+	logRequest(requestID, r, startTime, upstreamURL)
 
-	// Proxy the request
-	upstreamURL := getUpstreamURL(r.Host)
-	if upstreamURL == nil {
-		http.Error(w, "Invalid upstream URL", http.StatusInternalServerError)
-		return
-	}
-
-	// Wrap the ResponseWriter to capture status code
 	wrappedWriter := &statusRecorder{ResponseWriter: w}
 
-	proxy := httputil.NewSingleHostReverseProxy(upstreamURL)
-	proxy.ServeHTTP(wrappedWriter, r) // Use the wrapped writer
+	// Explicitly call the proxy's ServeHTTP
+	proxy.ServeHTTP(wrappedWriter, r)
 
-	// Log outgoing response details
 	endTime := time.Now()
-	logResponse(requestID, r, startTime, endTime, wrappedWriter) // Pass the wrapped writer
+	logResponse(requestID, r, startTime, endTime, wrappedWriter)
 }
 
-func getUpstreamURL(host string) *url.URL {
-	// Replace this with your actual logic to determine the upstream URL
-	// based on the request host.
-	upstreamHost := fmt.Sprintf("%s-aiplatform.googleapis.com", host)
-	upstreamURL, err := url.Parse(fmt.Sprintf("https://%s", upstreamHost))
-	if err != nil {
-		return nil
-	}
-	return upstreamURL
-}
-
-func logRequest(requestID string, r *http.Request, startTime time.Time) {
-	// Log request details to Firestore
+func logRequest(requestID string, r *http.Request, startTime time.Time, upstreamURL *url.URL) {
 	requestLog := requestLog{
 		ID:          requestID,
 		Timestamp:   startTime,
 		Method:      r.Method,
 		RequestURI:  r.RequestURI,
-		UpstreamURL: r.Host,
+		UpstreamURL: upstreamURL.String(),
 		RequestSize: r.ContentLength,
 	}
 	_, err := firestoreDB.Collection("requests").Doc(requestID).Set(context.Background(), requestLog)
@@ -101,10 +93,9 @@ func logRequest(requestID string, r *http.Request, startTime time.Time) {
 }
 
 func logResponse(requestID string, r *http.Request, startTime time.Time, endTime time.Time, w *statusRecorder) {
-	// Log response details to Firestore
-	responseSize, _ := io.Copy(io.Discard, r.Body) // Handle the error if needed
+	responseSize, _ := io.Copy(io.Discard, r.Body)
 	responseLog := map[string]interface{}{
-		"responseStatus": w.status, // Get the captured status
+		"responseStatus": w.status,
 		"responseSize":   responseSize,
 		"latency":        endTime.Sub(startTime).Milliseconds(),
 	}
@@ -119,13 +110,12 @@ func logResponse(requestID string, r *http.Request, startTime time.Time, endTime
 	}
 }
 
-// statusRecorder captures the status code from WriteHeader
+// statusRecorder remains the same
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
 }
 
-// WriteHeader implements the ResponseWriter interface
 func (rec *statusRecorder) WriteHeader(code int) {
 	rec.status = code
 	rec.ResponseWriter.WriteHeader(code)
