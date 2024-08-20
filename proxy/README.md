@@ -59,22 +59,22 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
 
    Update your Vertex AI client initialization to utilize the proxy endpoint:
 
-   **Before (Vertex AI SDK):**
+   **Before:**
 
    ```python
-   from vertexai.preview import init
+   import vertexai
 
-   init(project=project, location=location)
+   vertexai.init(project=project, location=location)
    ```
 
    **After:**
 
    ```python
-   from vertexai.preview import init
+   import vertexai
 
-   proxy_endpoint = 'YOUR_PROXY_ENDPOINT' # Replace with the actual endpoint
+   proxy_endpoint = 'YOUR_PROXY_ENDPOINT' # Replace with the actual endpoint from step 1.
    
-   init(project=project, location=location, api_endpoint=proxy_endpoint, api_transport="rest") 
+   vertexai.init(project=project, location=location, api_endpoint=proxy_endpoint, api_transport="rest") 
    ```
 
 #### Additional Commands
