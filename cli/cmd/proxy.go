@@ -33,6 +33,7 @@ type ProxyService struct {
 	ProjectID   string
 	Region      string
 	UpstreamURL string
+	URL         string
 }
 
 // DeployProxy deploys a Litmus proxy to Google Cloud Run.
@@ -128,6 +129,9 @@ func ListProxyServices(projectID string, quiet bool) ([]ProxyService, error) {
 	)
 
 	output, err := cmd.CombinedOutput()
+	if err != nil {
+		return nil, fmt.Errorf("error listing Cloud Run services: %v\nOutput: %s", err, output)
+	}
 
 	// Use regular expression to extract JSON array
 	re := regexp.MustCompile(`(?s)\[\s*\{.*\}\s*\]`) // Match [{ ... }] with optional whitespace
@@ -138,7 +142,6 @@ func ListProxyServices(projectID string, quiet bool) ([]ProxyService, error) {
 			fmt.Println("No Litmus Proxy services found.")
 		}
 		return nil, nil
-		return nil, fmt.Errorf("error listing Cloud Run services: %v\nOutput: %s", err, output)
 	}
 
 	output = []byte(jsonStr) // Convert the extracted JSON string back to bytes
@@ -151,11 +154,13 @@ func ListProxyServices(projectID string, quiet bool) ([]ProxyService, error) {
 	var proxyServices []ProxyService
 	for _, service := range services {
 		metadata := service["metadata"].(map[string]interface{})
-
+		status := service["status"].(map[string]interface{})
+		address := status["url"].(string)
 		// Extract the name regardless of annotations
 		proxyServices = append(proxyServices, ProxyService{
 			Name:      metadata["name"].(string),
 			ProjectID: projectID,
+			URL:       address,
 			// Region and UpstreamURL are not needed for listing names
 		})
 	}
@@ -164,7 +169,7 @@ func ListProxyServices(projectID string, quiet bool) ([]ProxyService, error) {
 		if len(proxyServices) > 0 {
 			fmt.Println("Deployed Litmus Proxy services:")
 			for _, s := range proxyServices {
-				fmt.Printf("- %s\n", s.Name)
+				fmt.Printf("- %s: %s\n", s.Name, s.URL) // Print name and URL
 			}
 		} else {
 			fmt.Println("No Litmus Proxy services found.")
