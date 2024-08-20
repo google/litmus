@@ -17,6 +17,7 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -44,10 +45,10 @@ type requestLog struct {
 	RequestURI     string      `json:"requestURI"`
 	UpstreamURL    string      `json:"upstreamURL"`
 	RequestHeaders http.Header `json:"requestHeaders"`
-	RequestBody    string      `json:"requestBody"`
+	RequestBody    interface{} `json:"requestBody"`
 	RequestSize    int64       `json:"requestSize"`
 	ResponseStatus int         `json:"responseStatus"`
-	ResponseBody   string      `json:"responseBody"`
+	ResponseBody   interface{} `json:"responseBody"`
 	ResponseSize   int64       `json:"responseSize"`
 	Latency        int64       `json:"latency"`
 }
@@ -132,6 +133,21 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 }
 
 func logRequestAndResponse(requestID, tracingID string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte) {
+
+	// Attempt to unmarshal the request body
+	var requestBodyJSON interface{}
+	if err := json.Unmarshal(requestBody, &requestBodyJSON); err != nil {
+		// If unmarshaling fails, keep the raw string
+		requestBodyJSON = string(requestBody)
+	}
+
+	// Attempt to unmarshal the response body
+	var responseBodyJSON interface{}
+	if err := json.Unmarshal(responseBody, &responseBodyJSON); err != nil {
+		// If unmarshaling fails, keep the raw string
+		responseBodyJSON = string(responseBody)
+	}
+
 	requestLog := requestLog{
 		ID:             requestID,
 		TracingID:      tracingID,
@@ -140,10 +156,10 @@ func logRequestAndResponse(requestID, tracingID string, r *http.Request, startTi
 		RequestURI:     r.RequestURI,
 		UpstreamURL:    upstreamURL.String(),
 		RequestHeaders: r.Header,
-		RequestBody:    string(requestBody),
+		RequestBody:    requestBodyJSON, // Use the unmarshalled or raw request body
 		RequestSize:    int64(len(requestBody)),
-		ResponseStatus: 0, // Placeholder - will be updated below
-		ResponseBody:   string(responseBody),
+		ResponseStatus: 0,                // Placeholder - will be updated below
+		ResponseBody:   responseBodyJSON, // Use the unmarshalled or raw response body
 		ResponseSize:   int64(len(responseBody)),
 		Latency:        endTime.Sub(startTime).Milliseconds(),
 	}
