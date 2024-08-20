@@ -26,6 +26,7 @@ import (
 	"net/url"
 	"os"
 	"regexp"
+	"strconv"
 	"time"
 
 	"cloud.google.com/go/logging"
@@ -37,6 +38,8 @@ var (
 	logger         *logging.Logger
 	upstreamURLStr = "https://" + os.Getenv("UPSTREAM_URL")
 	tracingHeader  = "X-Litmus-Request" // Customizable tracing header name
+	// Default to NOT logging the Authorization header for security reasons
+	logAuthorizationHeader, _ = strconv.ParseBool(os.Getenv("LOG_AUTHORIZATION_HEADER"))
 	// Regex to match /litmus-context-<random-string>/ path prefix
 	contextPathRegex = regexp.MustCompile(`^/?(litmus-context-[a-zA-Z0-9\-]+)?(/.*)?$`)
 )
@@ -130,6 +133,15 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	// Add tracing ID to the request header for propagation
 	r.Header.Set(tracingHeader, tracingID)
 
+	// Copy request headers, potentially filtering out Authorization
+	sanitizedHeaders := make(http.Header)
+	for name, values := range r.Header {
+		if name == "Authorization" && !logAuthorizationHeader {
+			continue
+		}
+		sanitizedHeaders[name] = values
+	}
+
 	wrappedWriter := &statusRecorder{ResponseWriter: w}
 
 	// Explicitly call the proxy's ServeHTTP
@@ -160,10 +172,10 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	}
 
 	// Log the combined request and response details
-	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, requestBody, responseBody)
+	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, requestBody, responseBody, sanitizedHeaders)
 }
 
-func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte) {
+func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte, sanitizedHeaders http.Header) {
 
 	// Attempt to unmarshal the request body
 	var requestBodyJSON interface{}
@@ -187,8 +199,8 @@ func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.R
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
 		UpstreamURL:    upstreamURL.String(),
-		RequestHeaders: r.Header,
-		RequestBody:    requestBodyJSON, // Use the unmarshalled or raw request body
+		RequestHeaders: sanitizedHeaders, // Log the potentially filtered headers
+		RequestBody:    requestBodyJSON,  // Use the unmarshalled or raw request body
 		RequestSize:    int64(len(requestBody)),
 		ResponseStatus: 0,                // Placeholder - will be updated below
 		ResponseBody:   responseBodyJSON, // Use the unmarshalled or raw response body
