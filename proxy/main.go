@@ -24,6 +24,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"os"
+	"regexp"
 	"time"
 
 	"cloud.google.com/go/logging"
@@ -35,11 +36,14 @@ var (
 	logger         *logging.Logger
 	upstreamURLStr = "https://" + os.Getenv("UPSTREAM_URL")
 	tracingHeader  = "X-Litmus-Request" // Customizable tracing header name
+	// Regex to match /litmus-context-<random-string>/ path prefix
+	contextPathRegex = regexp.MustCompile(`^/?(litmus-context-[a-zA-Z0-9\-]+)?(/.*)?$`)
 )
 
 type requestLog struct {
 	ID             string      `json:"id"`
 	TracingID      string      `json:"tracingID"`
+	LitmusContext  string      `json:"litmusContext"`
 	Timestamp      time.Time   `json:"timestamp"`
 	Method         string      `json:"method"`
 	RequestURI     string      `json:"requestURI"`
@@ -61,7 +65,7 @@ func main() {
 		log.Fatalf("Failed to create Cloud Logging client: %v", err)
 	}
 	defer logClient.Close()
-	logger = logClient.Logger("my-proxy-log") // Use a meaningful log name
+	logger = logClient.Logger("my-proxy-log")
 
 	// Validate UPSTREAM_URL
 	if upstreamURLStr == "" {
@@ -88,8 +92,12 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	requestID := uuid.New().String()
 	tracingID := r.Header.Get(tracingHeader)
 	if tracingID == "" {
-		tracingID = uuid.New().String() // Generate if not provided
+		tracingID = uuid.New().String()
 	}
+
+	// Extract Litmus Context from path
+	litmusContext, newPath := extractLitmusContext(r.URL.Path)
+	r.URL.Path = newPath
 
 	// Ensure Correct Protocol Scheme
 	if r.URL.Scheme == "" {
@@ -129,10 +137,10 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	endTime := time.Now()
 
 	// Log the combined request and response details
-	logRequestAndResponse(requestID, tracingID, r, startTime, endTime, upstreamURL, requestBody, wrappedWriter.buf.Bytes())
+	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, requestBody, wrappedWriter.buf.Bytes())
 }
 
-func logRequestAndResponse(requestID, tracingID string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte) {
+func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte) {
 
 	// Attempt to unmarshal the request body
 	var requestBodyJSON interface{}
@@ -151,6 +159,7 @@ func logRequestAndResponse(requestID, tracingID string, r *http.Request, startTi
 	requestLog := requestLog{
 		ID:             requestID,
 		TracingID:      tracingID,
+		LitmusContext:  litmusContext,
 		Timestamp:      startTime,
 		Method:         r.Method,
 		RequestURI:     r.RequestURI,
@@ -194,4 +203,22 @@ func (rec *statusRecorder) Write(b []byte) (int, error) {
 func (rec *statusRecorder) WriteHeader(code int) {
 	rec.status = code
 	rec.ResponseWriter.WriteHeader(code)
+}
+
+func extractLitmusContext(path string) (string, string) {
+	matches := contextPathRegex.FindStringSubmatch(path)
+	// If there is a context
+	if len(matches) == 3 {
+		// Extract the context value and update the path
+		context := matches[1]
+		newPath := matches[2]
+
+		return context, newPath
+	}
+	// If there is no context
+	if len(matches) == 2 {
+		newPath := matches[1]
+		return "", newPath
+	}
+	return "", path // Return empty string if no match
 }
