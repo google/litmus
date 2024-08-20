@@ -72,7 +72,7 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
    ```python
    from vertexai.preview import init
 
-   proxy_endpoint = 'YOUR_PROXY_ENDPOINT' # Replace with the actual endpoint from step 1
+   proxy_endpoint = 'YOUR_PROXY_ENDPOINT' # Replace with the actual endpoint
    
    init(project=project, location=location, api_endpoint=proxy_endpoint, api_transport="rest") 
    ```
