@@ -16,10 +16,9 @@ package main
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
-	"encoding/base64"
 	"encoding/json"
-	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -67,7 +66,7 @@ func main() {
 		log.Fatalf("Failed to create Cloud Logging client: %v", err)
 	}
 	defer logClient.Close()
-	logger = logClient.Logger("my-proxy-log")
+	logger = logClient.Logger("litmus-proxy-log")
 
 	// Validate UPSTREAM_URL
 	if upstreamURLStr == "" {
@@ -138,8 +137,30 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 
 	endTime := time.Now()
 
+	// Handle gzip encoded response
+	var responseBody []byte
+	if wrappedWriter.Header().Get("Content-Encoding") == "gzip" {
+		gr, err := gzip.NewReader(bytes.NewReader(wrappedWriter.buf.Bytes()))
+		if err != nil {
+			log.Printf("Failed to create gzip reader: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		defer gr.Close()
+
+		var buf bytes.Buffer
+		if _, err := io.Copy(&buf, gr); err != nil {
+			log.Printf("Failed to decompress response body: %v", err)
+			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
+			return
+		}
+		responseBody = buf.Bytes()
+	} else {
+		responseBody = wrappedWriter.buf.Bytes()
+	}
+
 	// Log the combined request and response details
-	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, requestBody, wrappedWriter.buf.Bytes())
+	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, requestBody, responseBody)
 }
 
 func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte) {
@@ -153,12 +174,6 @@ func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.R
 
 	// Attempt to unmarshal the response body
 	var responseBodyJSON interface{}
-	fmt.Print(responseBody)
-	fmt.Print(string(responseBody))
-	fmt.Print(responseBody)
-	base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(responseBody)))
-	n, _ := base64.StdEncoding.Decode(base64Text, []byte(responseBody))
-	fmt.Println("base64Text:", string(base64Text[:n]))
 	if err := json.Unmarshal(responseBody, &responseBodyJSON); err != nil {
 		// If unmarshaling fails, keep the raw string
 		responseBodyJSON = string(responseBody)
