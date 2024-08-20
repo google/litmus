@@ -80,14 +80,14 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
 
    There is also the possibility to add a context which is inserted into the logs in the **litmusContext** field. 
    
-   The context is set by adding "/litmus-context-<YOUR CONTEXT ID>" to the end of the proxy endpoint as such:
+   The context is set by adding "/litmus-context-{YOUR CONTEXT ID}" to the end of the proxy endpoint as such:
 
    **Context Example:**
 
    ```python
    import vertexai
 
-   proxy_endpoint = 'YOUR_PROXY_ENDPOINT/litmus-context-<YOUR CONTEXT ID>'
+   proxy_endpoint = 'YOUR_PROXY_ENDPOINT/litmus-context-{YOUR CONTEXT ID}'
    
    vertexai.init(project=project, location=location, api_endpoint=proxy_endpoint, api_transport="rest") 
    ```
