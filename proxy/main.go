@@ -17,7 +17,9 @@ package main
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -151,6 +153,12 @@ func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.R
 
 	// Attempt to unmarshal the response body
 	var responseBodyJSON interface{}
+	fmt.Print(responseBody)
+	fmt.Print(string(responseBody))
+	fmt.Print(responseBody)
+	base64Text := make([]byte, base64.StdEncoding.DecodedLen(len(responseBody)))
+	n, _ := base64.StdEncoding.Decode(base64Text, []byte(responseBody))
+	fmt.Println("base64Text:", string(base64Text[:n]))
 	if err := json.Unmarshal(responseBody, &responseBodyJSON); err != nil {
 		// If unmarshaling fails, keep the raw string
 		responseBodyJSON = string(responseBody)
