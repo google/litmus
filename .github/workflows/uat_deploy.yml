@@ -190,3 +190,4 @@ jobs:
         ./litmus deploy --project litmusai-uat --quiet
         ./litmus proxy delete-all --project litmusai-uat --quiet
         ./litmus proxy deploy --upstreamURL us-central1-aiplatform.googleapis.com --project litmusai-uat --quiet
+        ./litmus analytics deploy --project litmusai-uat --quiet

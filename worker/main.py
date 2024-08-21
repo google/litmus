@@ -14,16 +14,18 @@
 
 import os
 import requests
+import json
 from google.cloud import firestore
 from datetime import datetime
 from util.assess import ask_llm_against_golden
 from google.cloud import logging
+from uuid import uuid4
 
 # setup logging
 # Instantiates a client
 logging_client = logging.Client()
 # The name of the log to write to
-log_name = "Litmus-worker"
+log_name = "litmus-core-log"
 # Selects the log to write to
 logger = logging_client.logger(log_name)
 # Writes the log entry
@@ -36,6 +38,13 @@ def execute_request(request_data):
     method = request_data.get("method", "POST")  # Default to POST
     body = request_data.get("body")
     headers = request_data.get("headers")
+    tracing_id = request_data.get("tracing_id")  # Retrieve tracing ID
+
+    # Add tracing ID to headers if it exists
+    if tracing_id:
+        headers["X-Litmus-Request"] = tracing_id
+
+    start_time = datetime.utcnow()  # Capture request start time
 
     try:
         if method == "POST":
@@ -50,8 +59,18 @@ def execute_request(request_data):
             raise ValueError(f"Unsupported HTTP method: {method}")
 
         response.raise_for_status()
+
+        end_time = datetime.utcnow()  # Capture request end time
+        log_request_and_response(
+            request_data, response, start_time, end_time
+        )  # Log request and response
+
         return response.json()
     except requests.exceptions.RequestException as e:
+        end_time = datetime.utcnow()  # Capture request end time
+        log_request_and_response(
+            request_data, None, start_time, end_time, error=str(e)
+        )  # Log error
         return {"status": "Failed", "error": str(e)}
 
 
@@ -80,11 +99,15 @@ def execute_tests_and_store_results(run_id, template_id):
     logger.log_text(f"Running {num_tests} tests")
 
     for i, test_case in enumerate(test_cases):
+        tracing_id = str(uuid4())  # Generate a unique tracing ID for each test case
+
         # Execute pre-request (if available)
         if test_case.get("pre_request"):
+            test_case["pre_request"]["tracing_id"] = tracing_id  # Add tracing ID
             execute_request(test_case["pre_request"])
 
         request_data = test_case.get("request")
+        request_data["tracing_id"] = tracing_id  # Add tracing ID
         golden_response = test_case.get("golden_response")
 
         try:
@@ -145,6 +168,7 @@ def execute_tests_and_store_results(run_id, template_id):
 
         # Execute post-request (if available)
         if test_case.get("post_request"):
+            test_case["post_request"]["tracing_id"] = tracing_id  # Add tracing ID
             execute_request(test_case["post_request"])
 
         # Store test result in Firestore
@@ -162,6 +186,35 @@ def execute_tests_and_store_results(run_id, template_id):
     # Update run status to "Completed"
     run_ref.update({"status": "Completed", "end_time": end_time})
     logger.log_text(f"Running tests completed")
+
+
+def log_request_and_response(request_data, response, start_time, end_time, error=None):
+    """Logs the request and response details."""
+
+    request_log = {
+        "id": str(uuid4()),
+        "tracingID": request_data.get("tracing_id"),
+        "timestamp": start_time.isoformat(),
+        "method": request_data.get("method"),
+        "requestURI": request_data.get("url"),
+        "requestHeaders": request_data.get("headers"),
+        "requestBody": request_data.get("body"),
+        "requestSize": len(json.dumps(request_data.get("body"))),
+        "latency": (end_time - start_time).total_seconds()
+        * 1000,  # Latency in milliseconds
+    }
+
+    if response:
+        request_log["responseStatus"] = response.status_code
+        try:
+            request_log["responseBody"] = response.json()
+        except ValueError:
+            request_log["responseBody"] = response.text
+        request_log["responseSize"] = len(response.content)
+    if error:
+        request_log["error"] = error
+
+    logger.log_struct(request_log)  # Log the structured data
 
 
 if __name__ == "__main__":

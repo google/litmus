@@ -92,7 +92,7 @@ limitations under the License.
                 <v-btn variant="flat" color="secondary" class="mt-2">Upload JSON</v-btn>
               </n-upload>
             </n-form-item>
-            <a href="" target="_blank">Click here for JSON Template</a>
+            <a href="https://storage.googleapis.com/litmus-cloud/assets/template.json" target="_blank">Click here for JSON Template</a>
           </n-tab-pane>
           <n-tab-pane name="Request Payload" tab="Request Payload">
             <!-- Request -->
