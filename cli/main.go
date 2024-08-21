@@ -125,6 +125,29 @@ func main() {
 		cmd.ShowStatus(projectID)
 	case "version":
 		utils.DisplayVersion()
+	case "analytics":
+		if len(os.Args) < 3 {
+			fmt.Println("Invalid analytics subcommand.")
+			fmt.Println("Usage: litmus analytics [deploy | delete]")
+			return
+		}
+
+		subcommand := os.Args[2]
+		switch subcommand {
+		case "deploy":
+			err := cmd.DeployAnalytics(projectID, region, quiet)
+			if err != nil {
+				utils.HandleGcloudError(err)
+			}
+		case "delete":
+			err := cmd.DeleteAnalytics(projectID, region, quiet)
+			if err != nil {
+				utils.HandleGcloudError(err)
+			}
+		default:
+			fmt.Println("Invalid analytics subcommand:", subcommand)
+			fmt.Println("Usage: litmus analytics [deploy | delete]")
+		}
 	case "proxy":
 		switch os.Args[2] {
 		case "deploy":
