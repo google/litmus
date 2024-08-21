@@ -350,8 +350,7 @@ func deleteBigQueryDataset(a Analytics, quiet bool) error {
 		"gcloud", "alpha", "bq", "datasets", "delete",
 		fmt.Sprintf("%s", a.DatasetName),
 		"--project", a.ProjectID,
-		"--recursive", // Use --recursive for recursive delete
-		"--force",     // Use --force to force deletion
+		"--quiet",
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil && !strings.Contains(string(output), "NOT_FOUND") {
