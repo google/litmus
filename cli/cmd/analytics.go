@@ -68,10 +68,10 @@ func DeployAnalytics(projectID, region string, quiet bool) error {
 		s.Start()
 		defer s.Stop()
 	}
-	// --- Create logging bucket ---
-	if err := createLoggingBucket(analytics, quiet); err != nil {
-		return fmt.Errorf("error creating logging bucket: %w", err)
-	}
+	// --- Create logging bucket --- DISABLED FOR NOW
+	//if err := createLoggingBucket(analytics, quiet); err != nil {
+	//	return fmt.Errorf("error creating logging bucket: %w", err)
+	//}
 
 	// --- Create BigQuery dataset ---
 	if err := createBigQueryDataset(analytics, quiet); err != nil {
@@ -83,8 +83,13 @@ func DeployAnalytics(projectID, region string, quiet bool) error {
 		return fmt.Errorf("error waiting for BigQuery dataset creation: %w", err)
 	}
 
-	// --- Create log sink ---
-	if err := createLogSink(analytics, quiet); err != nil {
+	// --- Create log sink for proxy ---
+	if err := createLogSink(analytics, quiet, "litmus-proxy-sink", "litmus-proxy-log"); err != nil {
+		return fmt.Errorf("error creating log sink: %w", err)
+	}
+
+	// --- Create log sink for api ---
+	if err := createLogSink(analytics, quiet, "litmus-core-sink", "litmus-core-log"); err != nil {
 		return fmt.Errorf("error creating log sink: %w", err)
 	}
 
@@ -148,49 +153,49 @@ func DeleteAnalytics(projectID, region string, quiet bool) error {
 		}
 	}
 
-	// --- Delete logging bucket ---
-	if err := deleteLoggingBucket(analytics, quiet); err != nil {
-		if !quiet {
-			fmt.Printf("Error deleting logging bucket: %v\n", err)
-		}
-	}
+	// --- Delete logging bucket --- DISABLED FOR NOW
+	// if err := deleteLoggingBucket(analytics, quiet); err != nil {
+	// 	if !quiet {
+	// 		fmt.Printf("Error deleting logging bucket: %v\n", err)
+	// 	}
+	// }
 	if !quiet {
 		fmt.Println("Done! Deleted Litmus Analytics.")
 	}
 	return nil
 }
 
-func createLoggingBucket(a Analytics, quiet bool) error {
-	// Check if bucket already exists
-	cmd := exec.Command(
-		"gsutil", "ls",
-		fmt.Sprintf("gs://%s", a.BucketName),
-	)
-	_, err := cmd.CombinedOutput()
-	if err == nil {
-		if !quiet {
-			fmt.Printf("Logging bucket 'gs://%s' already exists, skipping creation.\n", a.BucketName)
-		}
-		return nil
-	}
+// func createLoggingBucket(a Analytics, quiet bool) error {
+// 	// Check if bucket already exists
+// 	cmd := exec.Command(
+// 		"gsutil", "ls",
+// 		fmt.Sprintf("gs://%s", a.BucketName),
+// 	)
+// 	_, err := cmd.CombinedOutput()
+// 	if err == nil {
+// 		if !quiet {
+// 			fmt.Printf("Logging bucket 'gs://%s' already exists, skipping creation.\n", a.BucketName)
+// 		}
+// 		return nil
+// 	}
 
-	// Bucket doesn't exist, proceed with creation
-	cmd = exec.Command(
-		"gsutil", "mb",
-		"-l", a.Region,
-		"-p", a.ProjectID,
-		fmt.Sprintf("gs://%s", a.BucketName),
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil {
-		return fmt.Errorf("error creating logging bucket: %w\nOutput: %s", err, output)
-	}
+// 	// Bucket doesn't exist, proceed with creation
+// 	cmd = exec.Command(
+// 		"gsutil", "mb",
+// 		"-l", a.Region,
+// 		"-p", a.ProjectID,
+// 		fmt.Sprintf("gs://%s", a.BucketName),
+// 	)
+// 	output, err := cmd.CombinedOutput()
+// 	if err != nil {
+// 		return fmt.Errorf("error creating logging bucket: %w\nOutput: %s", err, output)
+// 	}
 
-	if !quiet {
-		fmt.Printf("Created logging bucket: gs://%s\n", a.BucketName)
-	}
-	return nil
-}
+// 	if !quiet {
+// 		fmt.Printf("Created logging bucket: gs://%s\n", a.BucketName)
+// 	}
+// 	return nil
+// }
 
 func createBigQueryDataset(a Analytics, quiet bool) error {
 	// Check if dataset already exists
@@ -261,10 +266,10 @@ func waitForBigQueryDatasetQuiet(a Analytics) error {
 	}
 }
 
-func createLogSink(a Analytics, quiet bool) error {
+func createLogSink(a Analytics, quiet bool, name string, filter string) error {
 	// Check if log sink exists
 	checkCmd := exec.Command( // Use a different variable name here
-		"gcloud", "logging", "sinks", "describe", "litmus-proxy-sink",
+		"gcloud", "logging", "sinks", "describe", name,
 		"--project", a.ProjectID,
 	)
 	_, err := checkCmd.CombinedOutput()
@@ -278,19 +283,19 @@ func createLogSink(a Analytics, quiet bool) error {
 		}
 
 		cmd = exec.Command(
-			"gcloud", "logging", "sinks", "update", "litmus-proxy-sink",
+			"gcloud", "logging", "sinks", "update", name,
 			fmt.Sprintf("bigquery.googleapis.com/projects/%s/datasets/%s", a.ProjectID, a.DatasetName),
 			"--project", a.ProjectID,
-			"--log-filter", "logName=projects/"+a.ProjectID+"/logs/litmus-proxy-log",
+			"--log-filter", "logName=projects/"+a.ProjectID+"/logs/"+filter,
 		)
 
 	} else {
 		// Log sink doesn't exist, create it
 		cmd = exec.Command(
-			"gcloud", "logging", "sinks", "create", "litmus-proxy-sink",
+			"gcloud", "logging", "sinks", "create", name,
 			fmt.Sprintf("bigquery.googleapis.com/projects/%s/datasets/%s", a.ProjectID, a.DatasetName),
 			"--project", a.ProjectID,
-			"--log-filter", "logName=projects/"+a.ProjectID+"/logs/litmus-proxy-log",
+			"--log-filter", "logName=projects/"+a.ProjectID+"/logs/"+filter,
 		)
 	}
 
@@ -320,7 +325,7 @@ func createLogSink(a Analytics, quiet bool) error {
 		return fmt.Errorf("error granting BigQuery Data Editor role: %w", err)
 	}
 	if !quiet {
-		fmt.Println("Created/Updated log sink: litmus-proxy-sink")
+		fmt.Println("Created/Updated log sink: " + name)
 	}
 	return nil
 }
