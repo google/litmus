@@ -200,9 +200,9 @@ func DeleteAnalytics(projectID, region string, quiet bool) error {
 func createBigQueryDataset(a Analytics, quiet bool) error {
 	// Check if dataset already exists
 	cmd := exec.Command(
-		"bq", "--project_id", a.ProjectID,
-		"show",
-		fmt.Sprintf("%s:%s", a.ProjectID, a.DatasetName),
+		"gcloud", "alpha", "bq", "datasets", "describe",
+		fmt.Sprintf("%s", a.DatasetName),
+		"--project", a.ProjectID,
 	)
 	_, err := cmd.CombinedOutput()
 	if err == nil {
@@ -214,10 +214,9 @@ func createBigQueryDataset(a Analytics, quiet bool) error {
 
 	// Dataset doesn't exist, proceed with creation
 	cmd = exec.Command(
-		"bq", "--project_id", a.ProjectID,
-		"mk",
-		"--dataset",
-		fmt.Sprintf("%s:%s", a.ProjectID, a.DatasetName),
+		"gcloud", "alpha", "bq", "datasets", "create",
+		fmt.Sprintf("%s", a.DatasetName),
+		"--project", a.ProjectID,
 	)
 	output, err := cmd.CombinedOutput()
 	if err != nil {
@@ -330,30 +329,32 @@ func createLogSink(a Analytics, quiet bool, name string, filter string) error {
 	return nil
 }
 
-func deleteLoggingBucket(a Analytics, quiet bool) error {
-	cmd := exec.Command(
-		"gsutil", "-m", "rm", "-r",
-		fmt.Sprintf("gs://%s", a.BucketName),
-	)
-	output, err := cmd.CombinedOutput()
-	if err != nil && !strings.Contains(string(output), "BucketNotFoundException") {
-		return fmt.Errorf("error deleting logging bucket: %w\nOutput: %s", err, output)
-	}
+// func deleteLoggingBucket(a Analytics, quiet bool) error {
+// 	cmd := exec.Command(
+// 		"gsutil", "-m", "rm", "-r",
+// 		fmt.Sprintf("gs://%s", a.BucketName),
+// 	)
+// 	output, err := cmd.CombinedOutput()
+// 	if err != nil && !strings.Contains(string(output), "BucketNotFoundException") {
+// 		return fmt.Errorf("error deleting logging bucket: %w\nOutput: %s", err, output)
+// 	}
 
-	if !quiet {
-		fmt.Printf("Deleted logging bucket: gs://%s\n", a.BucketName)
-	}
-	return nil
-}
+// 	if !quiet {
+// 		fmt.Printf("Deleted logging bucket: gs://%s\n", a.BucketName)
+// 	}
+// 	return nil
+// }
 
 func deleteBigQueryDataset(a Analytics, quiet bool) error {
 	cmd := exec.Command(
-		"bq", "--project_id", a.ProjectID,
-		"rm", "-r", "-f", // Use -r for recursive delete and -f to force deletion
-		fmt.Sprintf("%s:%s", a.ProjectID, a.DatasetName),
+		"gcloud", "alpha", "bq", "datasets", "delete",
+		fmt.Sprintf("%s", a.DatasetName),
+		"--project", a.ProjectID,
+		"--recursive", // Use --recursive for recursive delete
+		"--force",     // Use --force to force deletion
 	)
 	output, err := cmd.CombinedOutput()
-	if err != nil && !strings.Contains(string(output), "Not found: Dataset") {
+	if err != nil && !strings.Contains(string(output), "NOT_FOUND") {
 		return fmt.Errorf("error deleting BigQuery dataset: %w\nOutput: %s", err, output)
 	}
 
