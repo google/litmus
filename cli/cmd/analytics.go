@@ -54,13 +54,13 @@ func DeployAnalytics(projectID, region string, quiet bool) error {
 		DatasetName: "litmus_analytics",
 	}
 
-	if !quiet {
-		// --- Confirm deployment ---
-		if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will deploy Litmus analytics resources in project '%s' and region '%s'. Are you sure you want to continue?", analytics.ProjectID, analytics.Region)) {
-			fmt.Println("\nAborting deployment.")
-			return nil
-		}
-	}
+	// if !quiet {
+	// 	// --- Confirm deployment ---
+	// 	if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will deploy Litmus analytics resources in project '%s' and region '%s'. Are you sure you want to continue?", analytics.ProjectID, analytics.Region)) {
+	// 		fmt.Println("\nAborting deployment.")
+	// 		return nil
+	// 	}
+	// }
 
 	if !quiet {
 		fmt.Println("\nDeploying Litmus Analytics...")
@@ -121,13 +121,13 @@ func DeleteAnalytics(projectID, region string, quiet bool) error {
 		DatasetName: "litmus_analytics",
 	}
 
-	// --- Confirm deletion ---
-	if !quiet {
-		if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will delete Litmus analytics resources in project '%s' and region '%s'. Are you sure you want to continue?", analytics.ProjectID, analytics.Region)) {
-			fmt.Println("\nAborting deletion.")
-			return nil
-		}
-	}
+	// // --- Confirm deletion ---
+	// if !quiet {
+	// 	if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will delete Litmus analytics resources in project '%s' and region '%s'. Are you sure you want to continue?", analytics.ProjectID, analytics.Region)) {
+	// 		fmt.Println("\nAborting deletion.")
+	// 		return nil
+	// 	}
+	// }
 
 	if !quiet {
 		fmt.Println("\nDeleting Litmus Analytics...")
