@@ -78,10 +78,7 @@ func DeployAnalytics(projectID, region string, quiet bool) error {
 		return fmt.Errorf("error creating BigQuery dataset: %w", err)
 	}
 
-	// --- Wait for BigQuery dataset to be created ---
-	if err := waitForBigQueryDataset(analytics, quiet); err != nil {
-		return fmt.Errorf("error waiting for BigQuery dataset creation: %w", err)
-	}
+	time.Sleep(5 * time.Second)
 
 	// --- Create log sink for proxy ---
 	if err := createLogSink(analytics, quiet, "litmus-proxy-sink", "litmus-proxy-log"); err != nil {
