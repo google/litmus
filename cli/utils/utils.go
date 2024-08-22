@@ -304,7 +304,7 @@ func PrintUsage() {
 	fmt.Println("  litmus destroy --project my-project")
 	fmt.Println("  litmus execute my-payload.json")
 	fmt.Println("  litmus ls")
-	fmt.Println("  litmus open my-run-id")
+	fmt.Println("  litmus open")
 	fmt.Println("  litmus status")
 	fmt.Println("  litmus analytics deploy")
 	fmt.Println("  litmus proxy deploy --upstreamURL us-central1-aiplatform.googleapis.com")

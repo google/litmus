@@ -23,6 +23,7 @@ from datetime import datetime
 from util.settings import settings
 from google.cloud import logging
 import json
+from google.cloud import bigquery
 
 # setup logging
 # Instantiates a client
@@ -68,6 +69,7 @@ if not settings.disable_auth:
     users = {settings.auth_user: generate_password_hash(settings.auth_pass)}
 
 db = firestore.Client()
+bq_client = bigquery.Client()
 
 
 @auth.verify_password
@@ -473,6 +475,94 @@ def list_runs():
     runs.sort(key=lambda run: run["start_time"], reverse=True)
 
     return jsonify({"runs": runs})
+
+
+@app.route("/proxy_data", methods=["GET"])
+@auth.login_required
+def proxy_data():
+    """Queries BigQuery for proxy log data based on date and context."""
+    date = request.args.get("date")
+    context = request.args.get("context")
+
+    if not date:
+        return jsonify({"error": 'Missing "date" or "context" parameter'}), 400
+
+    query = f"""
+        SELECT jsonPayload
+        FROM `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+        ORDER BY jsonPayload.timestamp ASC
+        LIMIT 100
+    """
+
+    if context:
+        query = f"""
+            SELECT jsonPayload
+            FROM `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+            WHERE jsonPayload.litmuscontext = "{context}"
+            ORDER BY jsonPayload.timestamp ASC
+            LIMIT 100
+        """
+
+    try:
+        query_job = bq_client.query(query)
+        results = list(query_job.result())
+        return jsonify([row.jsonPayload for row in results])
+    except Exception as e:
+        return jsonify({"error": f"Error querying BigQuery: {str(e)}"}), 500
+
+
+@app.route("/proxy_agg", methods=["GET"])
+@auth.login_required
+def proxy_agg():
+    """Queries BigQuery for proxy log data based on date and context."""
+    date = request.args.get("date")
+    context = request.args.get("context")
+
+    if not date:
+        return jsonify({"error": 'Missing "date" parameter'}), 400
+
+    query = f"""
+        SELECT
+            jsonPayload.litmuscontext,
+            jsonPayload.requestheaders.x_goog_request_params,
+            sum(jsonPayload.responsebody.usagemetadata.totaltokencount) AS total_token_count,
+            sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
+            sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
+            avg(jsonPayload.latency) AS average_latency
+        FROM 
+            `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+        GROUP BY 1,2;
+    """
+
+    if context:
+        query = f"""
+            SELECT
+                jsonPayload.litmuscontext,
+                jsonPayload.requestheaders.x_goog_request_params,
+                sum(jsonPayload.responsebody.usagemetadata.totaltokencount) AS total_token_count,
+                sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
+                sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
+                avg(jsonPayload.latency) AS average_latency
+            FROM 
+                `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+            WHERE jsonPayload.litmuscontext = "{context}"
+            GROUP BY 1,2;
+        """
+
+    try:
+        query_job = bq_client.query(query)
+        results = list(query_job.result())
+
+        # Convert BigQuery Rows to dictionaries before JSON serialization
+        formatted_results = []
+        for row in results:
+            formatted_row = dict(row.items())
+            formatted_results.append(formatted_row)
+
+        return jsonify(formatted_results)
+
+    except Exception as e:
+        return jsonify({"error": f"Error querying BigQuery: {str(e)}"}), 500
 
 
 @app.route("/", defaults={"path": ""})
