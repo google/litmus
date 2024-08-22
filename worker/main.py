@@ -24,12 +24,17 @@ from uuid import uuid4
 # setup logging
 # Instantiates a client
 logging_client = logging.Client()
-# The name of the log to write to
-log_name = "litmus-core-log"
-# Selects the log to write to
-logger = logging_client.logger(log_name)
+
+# Define log names
+core_log_name = "litmus-core-log"
+worker_log_name = "litmus-worker-log"
+
+# Selects the logs to write to
+core_logger = logging_client.logger(core_log_name)
+worker_logger = logging_client.logger(worker_log_name)
+
 # Writes the log entry
-logger.log_text("### Litmus-worker starting ###")
+worker_logger.log_text("### Litmus-worker starting ###")
 
 
 def execute_request(request_data):
@@ -81,11 +86,11 @@ def execute_tests_and_store_results(run_id, template_id):
     run_data = run_ref.get().to_dict()
 
     if not run_data:
-        print(f"Error: Run ID '{run_id}' not found.")
+        worker_logger.log_text(f"Error: Run ID '{run_id}' not found.")
         return
 
     if not template_id:
-        print(f"Error: Template ID not found for run '{run_id}'")
+        worker_logger.log_text(f"Error: Template ID not found for run '{run_id}'")
         return
 
     # Get test cases from the subcollection
@@ -96,7 +101,7 @@ def execute_tests_and_store_results(run_id, template_id):
     run_ref.update({"status": "Running"})
     num_tests = len(test_cases)
     num_completed = 0
-    logger.log_text(f"Running {num_tests} tests")
+    worker_logger.log_text(f"Running {num_tests} tests")
 
     for i, test_case in enumerate(test_cases):
         tracing_id = str(uuid4())  # Generate a unique tracing ID for each test case
@@ -147,7 +152,7 @@ def execute_tests_and_store_results(run_id, template_id):
 
                 except Exception as e:
                     # Log the specific error from ask_llm_against_golden
-                    logger.log_text(
+                    worker_logger.log_text(
                         f"Error in ask_llm_against_golden: {str(e)}", severity="ERROR"
                     )
                     test_result = {
@@ -185,11 +190,11 @@ def execute_tests_and_store_results(run_id, template_id):
     end_time = datetime.utcnow()
     # Update run status to "Completed"
     run_ref.update({"status": "Completed", "end_time": end_time})
-    logger.log_text(f"Running tests completed")
+    worker_logger.log_text(f"Running tests completed")
 
 
 def log_request_and_response(request_data, response, start_time, end_time, error=None):
-    """Logs the request and response details."""
+    """Logs the request and response details to the core logger."""
 
     request_log = {
         "id": str(uuid4()),
@@ -214,7 +219,7 @@ def log_request_and_response(request_data, response, start_time, end_time, error
     if error:
         request_log["error"] = error
 
-    logger.log_struct(request_log)  # Log the structured data
+    core_logger.log_struct(request_log)  # Log the structured data to the core logger
 
 
 if __name__ == "__main__":
