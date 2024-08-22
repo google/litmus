@@ -22,11 +22,13 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/google/litmus/cli/analytics"
 	"github.com/google/litmus/cli/utils"
 )
 
 // DeployApplication deploys the Litmus application to Google Cloud.
 func DeployApplication(projectID, region string, envVars map[string]string, quiet bool) {
+	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 	if !quiet {
 		// --- Confirm deployment ---
 		if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will deploy Litmus resources in the project '%s'. Are you sure you want to continue?", projectID)) {
@@ -47,7 +49,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	for _, api := range apisToEnable {
 		if !utils.IsAPIEnabled(api, projectID) {
 			if !quiet {
-				s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 				s.Suffix = fmt.Sprintf(" Enabling API %s... ", api)
 				s.Start()
 				defer s.Stop()
@@ -69,7 +70,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	if !utils.FirestoreDatabaseExists(projectID) {
 		if !quiet {
 			// Create default Firestore database
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 			s.Suffix = " Creating default Firestore database... "
 			s.Start()
 			defer s.Stop()
@@ -94,7 +94,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	apiServiceAccount := fmt.Sprintf("%s-api@%s.iam.gserviceaccount.com", projectID, projectID)
 	if !utils.ServiceAccountExists(projectID, apiServiceAccount) {
 		if !quiet {
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 			s.Suffix = fmt.Sprintf(" Creating service account for API: %s... ", apiServiceAccount)
 			s.Start()
 			defer s.Stop()
@@ -120,7 +119,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	workerServiceAccount := fmt.Sprintf("%s-worker@%s.iam.gserviceaccount.com", projectID, projectID)
 	if !utils.ServiceAccountExists(projectID, workerServiceAccount) {
 		if !quiet {
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 			s.Suffix = fmt.Sprintf(" Creating service account for Worker: %s... ", workerServiceAccount)
 			s.Start()
 			defer s.Stop()
@@ -144,7 +142,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 
 	// --- Grant Vertex AI and Firestore permissions to API service account ---
 	if !quiet {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 		s.Suffix = " Granting permissions to API service account... "
 		s.Start()
 		defer s.Stop()
@@ -157,7 +154,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	}
 	// --- Grant Vertex AI and Firestore permissions to Worker service account ---
 	if !quiet {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 		s.Suffix = " Granting permissions to Worker service account... "
 		s.Start()
 		defer s.Stop()
@@ -171,7 +167,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	// --- Password and URL Management with Secret Manager ---
 	var password string
 	if !quiet {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 		s.Suffix = " Getting or creating passwords... "
 		s.Start()
 		defer s.Stop()
@@ -193,7 +188,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 
 	// --- Deploy Cloud Run service with service account ---
 	if !quiet {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 		s.Suffix = " Deploying Cloud Run service 'litmus-api'... "
 		s.Start()
 		defer s.Stop()
@@ -234,7 +228,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	// If the service was updated, route traffic back to the latest revision
 	if strings.Contains(string(output2), "Routing traffic...") {
 		if !quiet {
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 			s.Suffix = " Routing traffic to the latest revision... "
 			s.Start()
 			defer s.Stop()
@@ -255,7 +248,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 
 	// --- Deploy Cloud Run job with service account ---
 	if !quiet {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 		s.Suffix = " Deploying Cloud Run job 'litmus-worker'... "
 		s.Start()
 		defer s.Stop()
@@ -295,7 +287,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 	// --- Grant API permission to invoke Worker ---
 	if !utils.BindingExists(projectID, region, "litmus-worker", apiServiceAccount, "roles/run.invoker") {
 		if !quiet {
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 			s.Suffix = " Granting API permission to invoke Worker... "
 			s.Start()
 			defer s.Stop()
@@ -322,13 +313,22 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 
 	// Store the service URL in Secret Manager
 	if !quiet {
-		s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 		s.Suffix = " Storing service URL... "
 		s.Start()
 		defer s.Stop()
 	}
 	if err := utils.CreateOrUpdateSecret(projectID, "litmus-service-url", serviceURL, quiet); err != nil {
 		log.Fatalf("Error storing service URL in Secret Manager: %v", err)
+	}
+
+	if !quiet {
+		s.Suffix = " Setting up analytics... "
+		s.Start()
+		defer s.Stop()
+	}
+	// Deploy Analytics
+	if err := analytics.DeployAnalytics(projectID, region, true); err != nil {
+		utils.HandleGcloudError(err)
 	}
 
 	if !quiet {

@@ -179,8 +179,8 @@ func ListProxyServices(projectID string, quiet bool) ([]ProxyService, error) {
 	return proxyServices, nil
 }
 
-// DeleteProxyService deletes a deployed Litmus proxy Cloud Run service.
-func DeleteProxyService(projectID, serviceName, region string, quiet bool) error {
+// DestroyProxyService deletes a deployed Litmus proxy Cloud Run service.
+func DestroyProxyService(projectID, serviceName, region string, quiet bool) error {
 	if projectID == "" {
 		var err error
 		projectID, err = utils.GetDefaultProjectID()
@@ -266,8 +266,8 @@ func DeleteProxyService(projectID, serviceName, region string, quiet bool) error
 	return nil
 }
 
-// DeleteAllProxyServices deletes all deployed Litmus proxy Cloud Run services.
-func DeleteAllProxyServices(projectID, region string, quiet bool) error {
+// DestroyAllProxyServices deletes all deployed Litmus proxy Cloud Run services.
+func DestroyAllProxyServices(projectID, region string, quiet bool) error {
 	if projectID == "" {
 		var err error
 		projectID, err = utils.GetDefaultProjectID()
@@ -303,7 +303,7 @@ func DeleteAllProxyServices(projectID, region string, quiet bool) error {
 
 	// --- Iterate through services and delete them ---
 	for _, s := range services {
-		err := DeleteProxyService(projectID, s.Name, region, true)
+		err := DestroyProxyService(projectID, s.Name, region, true)
 		if err != nil {
 			return err
 		}

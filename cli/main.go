@@ -19,6 +19,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/google/litmus/cli/analytics"
 	"github.com/google/litmus/cli/cmd"
 	"github.com/google/litmus/cli/utils"
 )
@@ -128,28 +129,35 @@ func main() {
 	case "analytics":
 		if len(os.Args) < 3 {
 			fmt.Println("Invalid analytics subcommand.")
-			fmt.Println("Usage: litmus analytics [deploy | delete]")
+			fmt.Println("Usage: litmus analytics [deploy | destroy]") // Corrected typo: "destory" -> "destroy"
 			return
 		}
 
 		subcommand := os.Args[2]
 		switch subcommand {
 		case "deploy":
-			err := cmd.DeployAnalytics(projectID, region, quiet)
+			err := analytics.DeployAnalytics(projectID, region, quiet)
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
-		case "delete":
-			err := cmd.DeleteAnalytics(projectID, region, quiet)
+		case "destroy":
+			err := analytics.DestroyAnalytics(projectID, region, quiet)
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
 		default:
 			fmt.Println("Invalid analytics subcommand:", subcommand)
-			fmt.Println("Usage: litmus analytics [deploy | delete]")
+			fmt.Println("Usage: litmus analytics [deploy | destroy]")
 		}
 	case "proxy":
-		switch os.Args[2] {
+		if len(os.Args) < 3 {
+			fmt.Println("Invalid proxy subcommand.")
+			fmt.Println("Usage: litmus proxy [deploy --upstreamURL <upstreamURL> | list | destroy <service_name> | destroy-all]")
+			return
+		}
+
+		subcommand := os.Args[2]
+		switch subcommand {
 		case "deploy":
 			var upstreamURL string
 			if len(os.Args) >= 5 {
@@ -164,23 +172,23 @@ func main() {
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
-		case "delete":
+		case "destroy":
 			var serviceName string
 			if len(os.Args) >= 4 { // Check if a service name is provided
 				serviceName = os.Args[3]
 			}
-			err := cmd.DeleteProxyService(projectID, serviceName, region, quiet)
+			err := cmd.DestroyProxyService(projectID, serviceName, region, quiet)
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
-		case "delete-all":
-			err := cmd.DeleteAllProxyServices(projectID, region, quiet)
+		case "destroy-all":
+			err := cmd.DestroyAllProxyServices(projectID, region, quiet)
 			if err != nil {
 				utils.HandleGcloudError(err)
 			}
 		default:
-			fmt.Println("Invalid proxy subcommand:", os.Args[2])
-			fmt.Println("Usage: litmus proxy [deploy --upstreamURL <upstreamURL> | list | delete <service_name> | delete-all]")
+			fmt.Println("Invalid proxy subcommand:", subcommand)
+			fmt.Println("Usage: litmus proxy [deploy --upstreamURL <upstreamURL> | list | destroy <service_name> | destroy-all]")
 		}
 	default:
 		fmt.Println("Invalid command:", command)
