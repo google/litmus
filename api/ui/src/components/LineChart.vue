@@ -15,53 +15,70 @@ limitations under the License.
 -->
 
 <script lang="ts" setup>
-import { onMounted, ref } from "vue";
-import { Chart, registerables } from "chart.js";
+import { onMounted } from 'vue';
+import { Chart, registerables } from 'chart.js';
 
+// Register Chart.js components
 Chart.register(...registerables);
 
-
+// Interface for individual data points
 interface DataPoint {
+  // Using index signature to allow for flexible data structure
   [key: string]: any;
 }
 
+// Define props expected by this component
 const props = defineProps<{
+  // Array of data points to be displayed on the chart
   data: DataPoint[];
+  // Unique ID for the chart canvas element
   chartId: string;
+  // Key within each data point object to extract the value for the Y-axis
   responseKey: string;
 }>();
 
+// Configuration options for the Chart.js Line chart
 const chartOptions = {
   // Customize your chart options here
-  // Example:
+  // Example: Ensuring the Y-axis starts at zero
   scales: {
     y: {
-      beginAtZero: true,
-    },
-  },
+      beginAtZero: true
+    }
+  }
 };
 
+// Function executed when the component is mounted in the DOM
 onMounted(() => {
+  // Retrieve the canvas element where the chart will be rendered
   const ctx = document.getElementById(props.chartId) as HTMLCanvasElement;
-    const dataPoints = props.data.map((items: DataPoint) => ({
-        x: new Date(items.start_time),
-        y: items.data[props.responseKey], // Optional chaining
-    }));
-  const labels = dataPoints.map(items => items.x.toLocaleString());
 
+  // Transform the raw data into a format suitable for Chart.js
+  const dataPoints = props.data.map((items: DataPoint) => ({
+    // Extract the 'start_time' property from each data point and convert it to a Date object for the X-axis
+    x: new Date(items.start_time),
+    // Extract the value associated with the 'responseKey' from each data point for the Y-axis
+    y: items.data[props.responseKey] // Optional chaining handles cases where 'data' or 'responseKey' might be undefined
+  }));
+
+  // Extract and format X-axis labels from dataPoints
+  const labels = dataPoints.map((items) => items.x.toLocaleString());
+
+  // Create a new Chart.js Line chart instance
   new Chart(ctx, {
-    type: "line",
+    type: 'line',
     data: {
-      labels,
+      labels, // X-axis labels
       datasets: [
         {
-          label: props.responseKey, // Dynamic label based on responseKey
-          data: dataPoints,
+          // Label for the dataset, dynamically set to the value of 'responseKey'
+          label: props.responseKey,
+          data: dataPoints // Data points for the chart
           // Customize line style and color here
-        },
-      ],
+        }
+      ]
     },
-    options: chartOptions,
+    options: chartOptions // Apply the defined chart options
   });
 });
 </script>

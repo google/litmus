@@ -16,7 +16,11 @@
 import {
   ExperimentOutlined,
   AppstoreAddOutlined,
-  PlayCircleOutlined
+  PlayCircleOutlined,
+  LineChartOutlined,
+  DeploymentUnitOutlined,
+  QuestionOutlined,
+  DatabaseOutlined
 } from '@ant-design/icons-vue';
 
 export interface menu {
@@ -43,6 +47,11 @@ const sidebarItem: menu[] = [
     to: '/'
   },
   {
+    title: 'Compare Tests',
+    icon: LineChartOutlined,
+    to: '/compare-list'
+  },
+  {
     title: 'Start New Run',
     icon: PlayCircleOutlined,
     to: '/start'
@@ -52,6 +61,17 @@ const sidebarItem: menu[] = [
     title: 'Templates',
     icon: AppstoreAddOutlined,
     to: '/templates'
+  },
+  {
+    title: 'Proxies',
+    icon: DeploymentUnitOutlined,
+    to: '/proxies'
+  },
+  {
+    title: 'Help & FAQ',
+    icon: QuestionOutlined,
+    type: 'external',
+    to: 'https://google.github.io/litmus/'
   }
 ];
 

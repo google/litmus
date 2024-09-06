@@ -15,41 +15,67 @@ limitations under the License.
 -->
 
 <template>
-  <Breadcrumbs :title="page.title" :breadcrumbs="breadcrumbs"></Breadcrumbs>
+  <!-- 
+    Displays a list of Litmus Templates.
+
+    Templates are reusable test definitions used to verify the behavior 
+    of HTTP requests and responses, including those from LLMs. 
+  -->
+
+  <!-- Breadcrumbs component for page navigation -->
+  <Breadcrumbs :title="page.title"></Breadcrumbs>
+
+  <!-- Page container -->
   <div class="page">
+    <!-- 
+      Components list container with horizontal scrollbar.
+
+      The 'components-list' class applies specific styles to 
+      the container, including grid display properties 
+      and horizontal scrollbar. 
+    -->
     <div class="components-list">
-      <CardCodeExample title="Stripe">
-        <n-scrollbar x-scrollable style="width: 100%">
-          <Templates class="table-min-width" striped />
-        </n-scrollbar>
-      </CardCodeExample>
+      <!-- 
+        Naive UI Scrollbar component to enable horizontal 
+        scrolling for the templates table.
+
+        The 'x-scrollable' directive enables horizontal scrolling.
+      -->
+      <n-scrollbar x-scrollable style="width: 100%">
+        <!-- 
+          Templates table component with a minimum width class.
+
+          The 'Templates' component displays the table of Litmus templates.
+          The 'table-min-width' class sets a minimum width for the table
+          to ensure readability and prevent content from being truncated. 
+        -->
+        <Templates class="table-min-width" striped />
+      </n-scrollbar>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-import { NScrollbar } from "naive-ui";
-import Templates from "@/components/tables/Templates.vue";
-import { ref } from "vue";
-import Breadcrumbs from "@/components/shared/Breadcrumbs.vue";
+// Import necessary components and utilities
+import { NScrollbar } from 'naive-ui';
+import Templates from '@/components/tables/Templates.vue';
+import { ref } from 'vue';
+import Breadcrumbs from '@/components/shared/Breadcrumbs.vue';
 
-// component content
-const page = ref({ title: "Templates" });
-const breadcrumbs = ref([
-  {
-    title: "Templates",
-    disabled: true,
-    href: "#",
-  },
-]);
+// Page title data
+const page = ref({ title: 'Templates' });
 </script>
 
 <style scoped lang="scss">
+// Styles for components list container
 .components-list {
+  // Set grid template columns to none to use the default grid layout
   grid-template-columns: none;
 }
 
+// Styles for table minimum width
 .table-min-width {
+  // Set minimum width to 480px to prevent content truncation
   min-width: 480px;
 }
 </style>

@@ -41,8 +41,8 @@ limitations under the License.
   </v-app-bar>
 </template>
 <script setup lang="ts">
-import { useCustomizerStore } from "../../../stores/customizer";
-import { MenuFoldOutlined } from "@ant-design/icons-vue";
+import { useCustomizerStore } from '../../../stores/customizer';
+import { MenuFoldOutlined } from '@ant-design/icons-vue';
 
 const customizer = useCustomizerStore();
 </script>

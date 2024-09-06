@@ -24,54 +24,54 @@ limitations under the License.
 </template>
 
 <script setup lang="ts">
- import { NIconWrapper, NIcon } from "naive-ui";
- import { Icon, loadIcon, type IconifyIcon } from "@iconify/vue";
- import { computed, ref, watchEffect } from "vue";
+import { NIconWrapper, NIcon } from 'naive-ui';
+import { Icon, loadIcon, type IconifyIcon } from '@iconify/vue';
+import { computed, ref, watchEffect } from 'vue';
 
- const props = defineProps<{
-name?: string;
-size?: number;
-bgSize?: number;
-color?: string;
-bgColor?: string;
-borderRadius?: number;
-depth?: 1 | 2 | 3 | 4 | 5;
- }>();
+const props = defineProps<{
+  name?: string;
+  size?: number;
+  bgSize?: number;
+  color?: string;
+  bgColor?: string;
+  borderRadius?: number;
+  depth?: 1 | 2 | 3 | 4 | 5;
+}>();
 
- const useWrapper = computed(() => !!(props.bgColor || props.bgSize || props.borderRadius));
- const componentName = computed(() => (useWrapper.value ? NIconWrapper : NIcon));
+const useWrapper = computed(() => !!(props.bgColor || props.bgSize || props.borderRadius));
+const componentName = computed(() => (useWrapper.value ? NIconWrapper : NIcon));
 
- const options = computed(() => {
-const opt: Record<string, any> = {};
-if (useWrapper.value) {
-  if (props.bgSize !== undefined) opt.size = props.bgSize;
-  if (props.bgColor !== undefined) opt.color = props.bgColor;
-  if (props.borderRadius !== undefined) opt.borderRadius = props.borderRadius;
-  if (props.color !== undefined) opt.iconColor = props.color;
-} else {
-  if (props.color !== undefined) opt.color = props.color;
-  if (props.depth !== undefined) opt.depth = props.depth;
-  if (props.size !== undefined) opt.size = props.size;
-}
-return opt;
- });
+const options = computed(() => {
+  const opt: Record<string, any> = {};
+  if (useWrapper.value) {
+    if (props.bgSize !== undefined) opt.size = props.bgSize;
+    if (props.bgColor !== undefined) opt.color = props.bgColor;
+    if (props.borderRadius !== undefined) opt.borderRadius = props.borderRadius;
+    if (props.color !== undefined) opt.iconColor = props.color;
+  } else {
+    if (props.color !== undefined) opt.color = props.color;
+    if (props.depth !== undefined) opt.depth = props.depth;
+    if (props.size !== undefined) opt.size = props.size;
+  }
+  return opt;
+});
 
- const icon = ref<void | Required<IconifyIcon>>();
+const icon = ref<void | Required<IconifyIcon>>();
 
- const loadIconAsync = async (name: string) => {
-try {
-  const iconData = await loadIcon(name);
-  icon.value = iconData;
-} catch (error) {
-  console.error(`Failed to load icon ${name}`, error);
-}
- };
+const loadIconAsync = async (name: string) => {
+  try {
+    const iconData = await loadIcon(name);
+    icon.value = iconData;
+  } catch (error) {
+    console.error(`Failed to load icon ${name}`, error);
+  }
+};
 
- watchEffect(() => {
-if (props.name) {
-  loadIconAsync(props.name);
-} else {
-  icon.value = undefined;
-}
- });
+watchEffect(() => {
+  if (props.name) {
+    loadIconAsync(props.name);
+  } else {
+    icon.value = undefined;
+  }
+});
 </script>

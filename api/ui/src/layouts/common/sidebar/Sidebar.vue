@@ -34,12 +34,7 @@ limitations under the License.
         <template v-for="(item, i) in sidebarMenu" :key="i">
           <NavigationGroup v-if="item.header" :item="item" :key="i" />
           <v-divider v-else-if="item.divider" class="my-3" />
-          <NavigationCollapse
-            v-else-if="item.children"
-            :item="item"
-            :level="0"
-            class="leftPadding"
-          />
+          <NavigationCollapse v-else-if="item.children" :item="item" :level="0" class="leftPadding" />
           <NavigationItem v-else :item="item" />
         </template>
       </v-list>
@@ -48,14 +43,14 @@ limitations under the License.
 </template>
 
 <script setup lang="ts">
-import { shallowRef } from "vue";
-import { useCustomizerStore } from "../../../stores/customizer";
-import sidebarItems from "./sidebarItem";
+import { shallowRef } from 'vue';
+import { useCustomizerStore } from '../../../stores/customizer';
+import sidebarItems from './sidebarItem';
 
-import NavigationGroup from "./NavigationGroup.vue";
-import NavigationItem from "./NavigationItem.vue";
-import NavigationCollapse from "./NavigationCollapse.vue";
-import Logo from "../logo/logo.vue";
+import NavigationGroup from './NavigationGroup.vue';
+import NavigationItem from './NavigationItem.vue';
+import NavigationCollapse from './NavigationCollapse.vue';
+import Logo from '../logo/logo.vue';
 
 const customizer = useCustomizerStore();
 const sidebarMenu = shallowRef(sidebarItems);

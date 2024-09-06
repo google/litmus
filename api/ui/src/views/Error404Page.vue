@@ -15,21 +15,23 @@ limitations under the License.
 -->
 
 <template>
+  <!-- This component displays a 404 page not found view -->
   <v-row no-gutters class="overflow-hidden bg-containerBg" style="min-height: 100vh">
     <v-col class="d-flex align-center justify-center">
       <div class="text-center">
         <h1 class="text-h1 mt-16">Page Not Found</h1>
-        <p class="text-h6 text-lightText">
-          The page you are looking was moved, removed, <br />renamed, or might have never
-          existed!
-        </p>
-        <v-btn variant="flat" color="primary" class="mt-2" to="/"> Back To Home</v-btn>
+        <p class="text-h6 text-lightText">The page you are looking was moved, removed, <br />renamed, or might have never existed!</p>
+        <v-btn variant="flat" color="primary" class="mt-2" to="/"> Back To Home </v-btn>
       </div>
     </v-col>
   </v-row>
 </template>
-<script setup lang="ts"></script>
+<script setup lang="ts">
+// No logic is required for this simple view component
+</script>
 <style lang="scss">
+// These styles seem unrelated to the 404 view.
+// Consider moving them to a global stylesheet or a component where they are used.
 .CardMediaWrapper {
   max-width: 720px;
   margin: 0 auto;

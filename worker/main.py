@@ -12,46 +12,65 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import os
-import requests
+"""Worker module for Litmus, executing tests and storing results."""
+
 import json
-from google.cloud import firestore
+import os
 from datetime import datetime
-from util.assess import ask_llm_against_golden
-from google.cloud import logging
 from uuid import uuid4
 
-# setup logging
-# Instantiates a client
+import requests
+from google.cloud import firestore
+from google.cloud import logging
+
+from util.assess import ask_llm_against_golden
+
+# Setup logging
+# Instantiates a logging client
 logging_client = logging.Client()
 
 # Define log names
-core_log_name = "litmus-core-log"
-worker_log_name = "litmus-worker-log"
+CORE_LOG_NAME = "litmus-core-log"
+WORKER_LOG_NAME = "litmus-worker-log"
 
 # Selects the logs to write to
-core_logger = logging_client.logger(core_log_name)
-worker_logger = logging_client.logger(worker_log_name)
+core_logger = logging_client.logger(CORE_LOG_NAME)
+worker_logger = logging_client.logger(WORKER_LOG_NAME)
 
-# Writes the log entry
+# Writes a log entry indicating the worker is starting
 worker_logger.log_text("### Litmus-worker starting ###")
 
 
 def execute_request(request_data):
-    """Executes a given request and returns the response."""
+    """Executes a given HTTP request and returns the response.
+
+    Args:
+        request_data: A dictionary containing the request data, including:
+            - url (str): The URL to send the request to.
+            - method (str, optional): The HTTP method (default: 'POST').
+            - body (dict, optional): The request body.
+            - headers (dict, optional): The request headers.
+            - tracing_id (str, optional): A unique ID for tracing the request.
+
+    Returns:
+        dict: The JSON response from the server if successful.
+        dict: An error message if the request fails.
+    """
+
     url = request_data.get("url")
-    method = request_data.get("method", "POST")  # Default to POST
+    method = request_data.get("method", "POST")
     body = request_data.get("body")
     headers = request_data.get("headers")
-    tracing_id = request_data.get("tracing_id")  # Retrieve tracing ID
+    tracing_id = request_data.get("tracing_id")
 
-    # Add tracing ID to headers if it exists
+    # Add tracing ID to headers for tracking
     if tracing_id:
         headers["X-Litmus-Request"] = tracing_id
 
-    start_time = datetime.utcnow()  # Capture request start time
+    start_time = datetime.utcnow()
 
     try:
+        # Send the HTTP request based on the specified method
         if method == "POST":
             response = requests.post(url, json=body, headers=headers)
         elif method == "GET":
@@ -65,22 +84,28 @@ def execute_request(request_data):
 
         response.raise_for_status()
 
-        end_time = datetime.utcnow()  # Capture request end time
+        end_time = datetime.utcnow()
         log_request_and_response(
             request_data, response, start_time, end_time
-        )  # Log request and response
+        )  # Log the request and response
 
         return response.json()
     except requests.exceptions.RequestException as e:
-        end_time = datetime.utcnow()  # Capture request end time
+        end_time = datetime.utcnow()
         log_request_and_response(
             request_data, None, start_time, end_time, error=str(e)
-        )  # Log error
+        )  # Log the error
         return {"status": "Failed", "error": str(e)}
 
 
 def execute_tests_and_store_results(run_id, template_id):
-    """Executes tests from a template and stores results, updating progress."""
+    """Executes tests from a template and stores results, updating progress.
+
+    Args:
+        run_id (str): The ID of the test run.
+        template_id (str): The ID of the test template.
+    """
+
     db = firestore.Client()
     run_ref = db.collection("test_runs").document(run_id)
     run_data = run_ref.get().to_dict()
@@ -93,7 +118,7 @@ def execute_tests_and_store_results(run_id, template_id):
         worker_logger.log_text(f"Error: Template ID not found for run '{run_id}'")
         return
 
-    # Get test cases from the subcollection
+    # Retrieve test cases from Firestore
     test_cases_ref = db.collection(f"test_cases_{run_id}")
     test_cases = [doc.to_dict() for doc in test_cases_ref.stream()]
 
@@ -103,31 +128,39 @@ def execute_tests_and_store_results(run_id, template_id):
     num_completed = 0
     worker_logger.log_text(f"Running {num_tests} tests")
 
+    # Iterate through each test case
     for i, test_case in enumerate(test_cases):
-        tracing_id = str(uuid4())  # Generate a unique tracing ID for each test case
+        tracing_id = str(uuid4())  # Generate a unique tracing ID
 
-        # Execute pre-request (if available)
+        # Execute pre-request hook if defined
         if test_case.get("pre_request"):
-            test_case["pre_request"]["tracing_id"] = tracing_id  # Add tracing ID
+            test_case["pre_request"]["tracing_id"] = tracing_id
             execute_request(test_case["pre_request"])
 
         request_data = test_case.get("request")
-        request_data["tracing_id"] = tracing_id  # Add tracing ID
+        request_data["tracing_id"] = tracing_id
         golden_response = test_case.get("golden_response")
 
         try:
+            # Execute the main request
             actual_response = execute_request(request_data)
+            output_field = run_data.get("template_output_field")
+            template_llm_prompt = run_data.get("template_llm_prompt")
+            actual_filtered_response = filter_json(
+                actual_response, run_data.get("template_output_field")
+            )
 
-            # Compare with golden response
-            if golden_response:
-                # Exception handling for ask_llm_against_golden
+            # Compare with golden response if available
+            if golden_response and actual_filtered_response:
                 try:
+                    # Assess the actual response against the golden response using an LLM
                     llm_assessment = ask_llm_against_golden(
-                        statement=actual_response.get("output").get("text"),
-                        golden=golden_response.get("text"),
+                        statement=actual_filtered_response.get(output_field),
+                        golden=golden_response,
+                        prompt=template_llm_prompt,
                     )
 
-                    # Check if llm_assessment is valid
+                    # Evaluate LLM assessment results
                     if llm_assessment and "similarity" in llm_assessment:
                         if llm_assessment.get("similarity") > 0.5:
                             test_result = {
@@ -143,7 +176,7 @@ def execute_tests_and_store_results(run_id, template_id):
                                 "assessment": llm_assessment,
                             }
                     else:
-                        # Handle invalid llm_assessment
+                        # Handle invalid LLM assessment
                         test_result = {
                             "status": "Error",
                             "response": actual_response,
@@ -151,7 +184,7 @@ def execute_tests_and_store_results(run_id, template_id):
                         }
 
                 except Exception as e:
-                    # Log the specific error from ask_llm_against_golden
+                    # Log errors from the LLM assessment
                     worker_logger.log_text(
                         f"Error in ask_llm_against_golden: {str(e)}", severity="ERROR"
                     )
@@ -160,41 +193,105 @@ def execute_tests_and_store_results(run_id, template_id):
                         "response": actual_response,
                         "error": f"Error during LLM assessment: {str(e)}",
                     }
-            else:
-                # Handle case where golden response is missing
+            elif actual_filtered_response:
+                # Handle cases where no golden response is provided
                 test_result = {
                     "status": "Passed",
                     "response": actual_response,
                     "note": "No golden response available",
                 }
+            else:
+                test_result = {
+                    "status": "Failed",
+                    "response": actual_response,
+                    "note": "No response available",
+                }
 
         except requests.exceptions.RequestException as e:
             test_result = {"status": "Failed", "error": str(e)}
 
-        # Execute post-request (if available)
+        # Execute post-request hook if defined
         if test_case.get("post_request"):
-            test_case["post_request"]["tracing_id"] = tracing_id  # Add tracing ID
+            test_case["post_request"]["tracing_id"] = tracing_id
             execute_request(test_case["post_request"])
 
-        # Store test result in Firestore
+        # Store the test result in Firestore
         test_case_ref = db.collection(f"test_cases_{run_id}").document(
             f"test_case_{i+1}"
         )
         test_case_ref.update({"result": test_result})
+        test_case_ref.update({"tracing_id": tracing_id})
 
         num_completed += 1
 
-        # Update run progress
+        # Update the progress of the test run
         run_ref.update({"progress": f"{num_completed}/{num_tests}"})
 
     end_time = datetime.utcnow()
+
     # Update run status to "Completed"
     run_ref.update({"status": "Completed", "end_time": end_time})
     worker_logger.log_text(f"Running tests completed")
 
 
+def filter_json(data, filter_pathx):
+    """Filters a JSON structure based on the given path.
+
+    Args:
+        data (dict): The JSON data to filter.
+        filter_pathx (str): A comma-separated string representing the paths to the desired values.
+            Uses dot notation (e.g., "key1.key2.key3") and supports array indexing (e.g., "key1.key2[0].key3").
+
+    Returns:
+        dict: A dictionary containing the filtered values.
+    """
+
+    if not filter_pathx:
+        return data
+
+    filter_paths = filter_pathx.split(",")
+    new_data = {}
+
+    for filter_path in filter_paths:
+        keys = filter_path.split(".")
+        current_data = data
+
+        # Traverse the JSON structure based on the keys in the filter path
+        for key in keys:
+            if current_data is not None:
+                # Handle array indexing
+                if "[" in key and "]" in key:
+                    key, index = key.split("[", 1)[0], int(key.split("[", 1)[1][:-1])
+                    if 0 <= index < len(current_data) and key in current_data:
+                        current_data = current_data[key][index]
+                    else:
+                        current_data = None
+                        break
+                # Access the nested data using the key
+                elif key in current_data:
+                    current_data = current_data[key]
+                else:
+                    # Key not found, move to the next filter path
+                    current_data = None
+                    break
+
+        # If the traversal is successful, add the filtered value to new_data
+        if current_data is not None:
+            new_data[filter_path] = current_data
+
+    return new_data
+
+
 def log_request_and_response(request_data, response, start_time, end_time, error=None):
-    """Logs the request and response details to the core logger."""
+    """Logs details of an HTTP request and its response.
+
+    Args:
+        request_data (dict): The data of the request.
+        response (requests.Response, optional): The response object.
+        start_time (datetime): The time the request was sent.
+        end_time (datetime): The time the response was received.
+        error (str, optional): An error message, if any.
+    """
 
     request_log = {
         "id": str(uuid4()),
@@ -219,7 +316,7 @@ def log_request_and_response(request_data, response, start_time, end_time, error
     if error:
         request_log["error"] = error
 
-    core_logger.log_struct(request_log)  # Log the structured data to the core logger
+    core_logger.log_struct(request_log)
 
 
 if __name__ == "__main__":

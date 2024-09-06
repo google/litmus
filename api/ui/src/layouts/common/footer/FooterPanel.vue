@@ -21,12 +21,7 @@ limitations under the License.
         <p class="text-caption mb-0">{{ version }}</p>
       </v-col>
       <v-col class="text-right" cols="6">
-        <a
-          v-for="(item, i) in footerLink"
-          :key="i"
-          class="mx-2 text-caption text-darkText"
-          :href="item.url"
-        >
+        <a v-for="(item, i) in footerLink" :key="i" class="mx-2 text-caption text-darkText" :href="item.url">
           {{ item.title }}
         </a>
       </v-col>
@@ -34,24 +29,24 @@ limitations under the License.
   </v-footer>
 </template>
 <script setup lang="ts">
-import { computed, h, ref, toRefs, onMounted, shallowRef } from "vue";
+import { ref, onMounted, shallowRef } from 'vue';
 
 const footerLink = shallowRef([
   {
-    title: "Github",
-    url: "https://github.com/GoogleCloudPlatform/professional-services",
+    title: 'Github',
+    url: 'https://github.com/google/litmus'
   },
   {
-    title: "Privacy",
-    url: "https://cloud.google.com/terms/cloud-privacy-notice",
+    title: 'Privacy',
+    url: 'https://cloud.google.com/terms/cloud-privacy-notice'
   },
   {
-    title: "Terms",
-    url: "https://cloud.google.com/terms",
-  },
+    title: 'Terms',
+    url: 'https://cloud.google.com/terms'
+  }
 ]);
 
-let version = ref(null);
+const version = ref(null);
 
 onMounted(() => {
   get_version();
@@ -59,10 +54,10 @@ onMounted(() => {
 
 async function get_version() {
   const requestOptions = {
-    method: "GET",
+    method: 'GET'
   };
 
-  const response = await fetch("/version", requestOptions);
+  const response = await fetch('/version', requestOptions);
   const data = await response.json();
 
   version.value = data.version;

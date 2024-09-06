@@ -15,23 +15,42 @@ limitations under the License.
 -->
 
 <template>
+  <!-- Breadcrumb navigation for better user experience -->
+  <Breadcrumbs :title="page.title"></Breadcrumbs>
+
+  <!-- Container for the Add Template page -->
   <div class="edit-template-page">
+    <!-- EditTemplate component for adding a new template -->
+    <!-- Events are emitted upon closing the component or successful update -->
     <edit-template @close="handleClose" @updateSuccess="handleUpdateSuccess" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { useRoute, useRouter } from "vue-router";
-import EditTemplate from "@/components/EditTemplate.vue";
+import { useRouter } from 'vue-router';
+import EditTemplate from '@/components/EditTemplate.vue';
+import { ref } from 'vue';
+import Breadcrumbs from '@/components/shared/Breadcrumbs.vue';
 
-const route = useRoute();
+// Page title reactive reference
+const page = ref({ title: 'Add Template' });
+
+// Router instance for navigation
 const router = useRouter();
 
+/**
+ * Handles the close event emitted by EditTemplate component.
+ * Navigates back to the previous page in the history.
+ */
 const handleClose = () => {
-  router.back(); // Menuigate back to the previous page
+  router.back();
 };
 
+/**
+ * Handles the updateSuccess event emitted by EditTemplate component.
+ * Navigates to the 'templates' route upon successful template creation.
+ */
 const handleUpdateSuccess = () => {
-  router.push({ name: "templates" });
+  router.push({ name: 'templates' });
 };
 </script>
