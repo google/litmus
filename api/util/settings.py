@@ -1,4 +1,4 @@
-# Copyright 2023 Google, LLC.
+# Copyright 2024 Google, LLC.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -12,26 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""Centralized application settings for the Litmus API testing tool."""
+
 import os
 
-print("start settings")
 
+class Settings:
+    """
+    A class to store and manage configuration settings for the Litmus application.
 
-class settings:
+    Settings are loaded from environment variables or fall back to default values.
+    """
 
     # GCP Specific
-
-    project_id = os.environ.get("GCP_PROJECT", "<INSERT-PROJECT>")
-    region = os.environ.get("GCP_REGION", "us-central1")
+    project_id: str = os.environ.get("GCP_PROJECT", "<INSERT-PROJECT>")
+    """GCP Project ID. Defaults to "<INSERT-PROJECT>"."""
+    region: str = os.environ.get("GCP_REGION", "us-central1")
+    """GCP Region. Defaults to "us-central1"."""
 
     # AI Specific
-
-    ai_location = os.environ.get("AI_LOCATION", "global")
-    ai_default_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash")
-    ai_validation_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash")
+    ai_location: str = os.environ.get("AI_LOCATION", "global")
+    """Location for AI models. Defaults to "global"."""
+    ai_default_model: str = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash")
+    """Default AI Model. Defaults to "gemini-1.5-flash"."""
+    ai_validation_model: str = os.environ.get("AI_VALIDATION_MODEL", "gemini-1.5-flash")
+    """AI Model for validation of responses. Defaults to "gemini-1.5-flash"."""
 
     # Application general
+    disable_auth: bool = os.getenv("DISABLE_AUTH", "False") == "False"
+    """Flag to enable/disable authentication. 
+    Defaults to False (authentication enabled)
+    """
+    auth_user: str = os.environ.get("USERNAME", "admin")
+    """Username for authentication. Defaults to "admin"."""
+    auth_pass: str = os.environ.get("PASSWORD", "admin")
+    """Password for authentication. Defaults to "admin"."""
 
-    disable_auth = os.getenv("DISABLE_AUTH", "False") == "True"
-    auth_user = os.environ.get("USERNAME", "admin")
-    auth_pass = os.environ.get("PASSWORD", "admin")
+
+# Create an instance of the Settings class to access settings
+settings = Settings()

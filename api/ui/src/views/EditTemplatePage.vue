@@ -15,29 +15,45 @@ limitations under the License.
 -->
 
 <template>
+  <!-- Breadcrumb navigation for user orientation -->
+  <Breadcrumbs :title="page.title"></Breadcrumbs>
+
   <div class="edit-template-page">
-    <edit-template
-      :templateId="String(templateId)"
-      @close="handleClose"
-      @updateSuccess="handleUpdateSuccess"
-    />
+    <!-- EditTemplate component for template modification -->
+    <!-- Pass the templateId as a string prop -->
+    <edit-template :templateId="String(templateId)" @close="handleClose" @updateSuccess="handleUpdateSuccess" />
   </div>
 </template>
 
 <script lang="ts" setup>
-import { useRoute, useRouter } from "vue-router";
-import EditTemplate from "@/components/EditTemplate.vue";
+import { useRoute, useRouter } from 'vue-router';
+import EditTemplate from '@/components/EditTemplate.vue';
+import { ref } from 'vue';
+import Breadcrumbs from '@/components/shared/Breadcrumbs.vue';
 
+// Page title reactive reference
+const page = ref({ title: 'Edit Template' });
+
+// Get route information and router instance
 const route = useRoute();
 const router = useRouter();
 
+// Extract templateId from route parameters
 const templateId = route.params.templateId;
 
+/**
+ * Handles the close event from the EditTemplate component.
+ * Navigates back to the previous page in the history.
+ */
 const handleClose = () => {
-  router.back(); // Menuigate back to the previous page
+  router.back();
 };
 
+/**
+ * Handles the successful update event from the EditTemplate component.
+ * Redirects the user to the templates list page.
+ */
 const handleUpdateSuccess = () => {
-  router.push({ name: "templates" });
+  router.push({ name: 'templates' });
 };
 </script>

@@ -15,41 +15,37 @@ limitations under the License.
 -->
 
 <template>
-  <!-- Breadcrumbs for navigation -->
+  <!-- Breadcrumbs component for navigation -->
   <Breadcrumbs :title="page.title"></Breadcrumbs>
 
-  <!-- Page container -->
   <div class="page">
-    <!-- Container for the components list -->
     <div class="components-list">
-      <!-- Scrollbar for the Run component -->
+      <!-- Scrollbar component for better UX on smaller screens -->
       <n-scrollbar x-scrollable style="width: 100%">
-        <!-- Run component for submitting and viewing test runs -->
-        <run />
+        <!-- Templates component to display comparison results -->
+        <Templates class="table-min-width" striped />
       </n-scrollbar>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-// Import necessary components and libraries
 import { NScrollbar } from 'naive-ui';
-import Run from '@/components/SubmitRun.vue';
+import Templates from '@/components/tables/Compare.vue';
 import { ref } from 'vue';
 import Breadcrumbs from '@/components/shared/Breadcrumbs.vue';
 
-// Define a reactive object for the page title
-const page = ref({ title: 'Start New Run' });
+// Data for the page title
+const page = ref({ title: 'Compare Tests' });
 </script>
 
 <style scoped lang="scss">
-// Styles for the component list
+// Styles specific to this component
 .components-list {
-  // Use grid layout with no predefined columns
   grid-template-columns: none;
 }
 
-// Styles for the table minimum width (unused in this template)
+// Ensure a minimum width for the comparison table
 .table-min-width {
   min-width: 480px;
 }

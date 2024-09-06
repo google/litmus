@@ -12,7 +12,7 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-package cmd
+package analytics
 
 import (
 	"fmt"
@@ -96,8 +96,8 @@ func DeployAnalytics(projectID, region string, quiet bool) error {
 	return nil
 }
 
-// DeleteAnalytics deletes Litmus analytics resources.
-func DeleteAnalytics(projectID, region string, quiet bool) error {
+// DestroyAnalytics deletes Litmus analytics resources.
+func DestroyAnalytics(projectID, region string, quiet bool) error {
 	if projectID == "" {
 		var err error
 		projectID, err = utils.GetDefaultProjectID()

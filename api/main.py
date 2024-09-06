@@ -12,85 +12,93 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+"""This module defines the Flask application for Litmus, a tool for testing and monitoring LLMs."""
+import json
+import os
+from datetime import datetime
+
 from flask import Flask, jsonify, request, make_response
 from flask_compress import Compress
 from flask_httpauth import HTTPBasicAuth
-from werkzeug.security import generate_password_hash, check_password_hash
-from google.cloud import firestore
-import os
+from google.cloud import firestore, logging, bigquery
 from google.cloud import run_v2
-from datetime import datetime
-from util.settings import settings
-from google.cloud import logging
-import json
+from werkzeug.security import generate_password_hash, check_password_hash
 
-# setup logging
-# Instantiates a client
+from util.settings import settings
+
+# Setup logging
 logging_client = logging.Client()
-# The name of the log to write to
 log_name = "Litmus"
-# Selects the log to write to
 logger = logging_client.logger(log_name)
-# Writes the log entry
 logger.log_text("### Litmus starting ###")
 
-
-def invoke_job(project_id, region, job_id, run_id, template_id):
-    client = run_v2.JobsClient()
-    job_name = client.job_path(project_id, region, job_id)
-
-    override_spec = {
-        "container_overrides": [
-            {
-                "env": [
-                    {"name": "RUN_ID", "value": run_id},
-                    {"name": "TEMPLATE_ID", "value": template_id},
-                ]
-            }
-        ]
-    }
-
-    # Initialize the request
-    job_name = f"projects/{project_id}/locations/{region}/jobs/{job_id}"
-    request = run_v2.RunJobRequest(name=job_name, overrides=override_spec)
-
-    response = client.run_job(request=request)
-    return response
-    # Handle response (e.g., check for errors, get execution details)
-
-
+# Flask app initialization
 app = Flask(__name__, static_folder="ui/dist/", static_url_path="/")
 auth = HTTPBasicAuth()
 # Turn on compression
 Compress(app)
 
+# Authentication setup
 if not settings.disable_auth:
     users = {settings.auth_user: generate_password_hash(settings.auth_pass)}
 
+# Initialize Firestore and BigQuery clients
 db = firestore.Client()
+bq_client = bigquery.Client()
 
 
+# Authentication verification callback function
 @auth.verify_password
 def verify_password(username, password):
+    """Verifies user password for basic authentication.
+
+    Args:
+        username: Username provided in the request.
+        password: Password provided in the request.
+
+    Returns:
+        Username if authentication is successful, otherwise None.
+    """
     if not settings.disable_auth:
-        if username in users and check_password_hash(users.get(username), password):
-            return username
-    else:
-        return username
+        return (
+            username
+            if username in users and check_password_hash(users.get(username), password)
+            else None
+        )
+    return username  # Disable authentication
 
 
 @app.route("/version")
 @auth.login_required
 def version():
-    # Version
-    data = {"version": os.environ.get("VERSION", "0.0.0-alpha")}
-    return make_response(jsonify(data), 200)
+    """Returns the version of the application.
+
+    Returns:
+        JSON response containing the version number.
+    """
+    return make_response(
+        jsonify({"version": os.environ.get("VERSION", "0.0.0-alpha")}), 200
+    )
 
 
 @app.route("/submit_run", methods=["POST"])
 @auth.login_required
 def submit_run():
-    """Submits run with payload structure"""
+    """Submits a new test run.
+
+    Expects a JSON payload with:
+        - run_id: Unique identifier for the test run.
+        - template_id: Identifier for the test template.
+        - pre_request (optional): JSON object representing a pre-request to be executed.
+        - post_request (optional): JSON object representing a post-request to be executed.
+        - test_request: JSON object representing the test request.
+        - template_llm_prompt: The LLM prompt associated with the test template.
+        - template_input_field: The input field used in the test template.
+        - template_output_field: The output field used in the test template.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
 
     data = request.get_json()
     run_id = data.get("run_id")
@@ -98,7 +106,11 @@ def submit_run():
     pre_request = data.get("pre_request")
     post_request = data.get("post_request")
     test_request = data.get("test_request")
+    template_llm_prompt = data.get("template_llm_prompt")
+    template_input_field = data.get("template_input_field")
+    template_output_field = data.get("template_output_field")
 
+    # Input validation
     if not run_id or not template_id:
         return (
             jsonify({"error": "Missing 'run_id' or 'template_id' in request data"}),
@@ -106,12 +118,9 @@ def submit_run():
         )
 
     if not test_request:
-        return (
-            jsonify({"error": "Missing 'test_request' in request data"}),
-            400,
-        )
+        return jsonify({"error": "Missing 'test_request' in request data"}), 400
 
-    # Get test request template from Firestore
+    # Retrieve test template from Firestore
     template_ref = db.collection("test_templates").document(template_id)
     template_data = template_ref.get().to_dict()
 
@@ -121,26 +130,24 @@ def submit_run():
     # Generate test requests with payload structure and URL
     tests = []
     for i, request_item in enumerate(template_data.get("template_data", [])):
-        # Replace placeholders in test_request with values from request_item
-        test = {
-            "request": test_request,
-        }
+        test = {"request": test_request}
         if pre_request:
-            if not isinstance(pre_request, dict):
-                test["pre_request"] = json.loads(pre_request)
-            else:
-                test["pre_request"] = pre_request
+            test["pre_request"] = (
+                json.loads(pre_request)
+                if not isinstance(pre_request, dict)
+                else pre_request
+            )
         if post_request:
-            if not isinstance(post_request, dict):
-                test["post_request"] = json.loads(post_request)
-            else:
-                test["post_request"] = post_request
+            test["post_request"] = (
+                json.loads(post_request)
+                if not isinstance(post_request, dict)
+                else post_request
+            )
 
         json_string = json.dumps(test["request"])
 
         for key, value in request_item.items():
-
-            # Replace the value
+            # Replace placeholders in test_request with values from request_item
             json_string = json_string.replace(f"{{{key}}}", str(value))
 
             # Get the corresponding golden response from the template
@@ -148,18 +155,13 @@ def submit_run():
                 test["golden_response"] = value
 
         test["request"] = json.loads(json_string)
-
-        if not isinstance(test["request"], dict):
-            test["request"] = json.loads(test["request"])
-
         test["result"] = None
-
         tests.append(test)
 
     # Get current time for start timestamp
     start_time = datetime.utcnow()
 
-    # Create a document for the test run (using the provided run_id)
+    # Create a document for the test run
     run_ref = db.collection("test_runs").document(run_id)
     run_ref.set(
         {
@@ -167,19 +169,22 @@ def submit_run():
             "progress": "0/0",
             "template_id": template_id,
             "start_time": start_time,
+            "template_input_field": template_input_field,
+            "template_output_field": template_output_field,
+            "template_llm_prompt": template_llm_prompt,
         }
     )
 
-    # Store test cases in a subcollection (using the generated test requests)
+    # Store test cases in a subcollection
     test_cases_collection = db.collection(f"test_cases_{run_id}")
     for i, request_data in enumerate(tests):
         test_case_ref = test_cases_collection.document(f"test_case_{i+1}")
         test_case_ref.set(request_data)
 
-    project_id = settings.project_id
-    region = settings.region
-    job_id = "litmus-worker"
-    invoke_job(project_id, region, job_id, run_id, template_id)
+    # Invoke the Cloud Run job to execute the test run
+    invoke_job(
+        settings.project_id, settings.region, "litmus-worker", run_id, template_id
+    )
 
     return jsonify(
         {
@@ -188,18 +193,103 @@ def submit_run():
     )
 
 
+# Invoke Run
+@app.route("/invoke_run", methods=["POST"])
+@auth.login_required
+def invoke_run():
+    """Re-invokes an existing test run.
+
+    Expects a JSON payload with:
+        - run_id: Unique identifier for the test run.
+        - template_id: Identifier for the test template.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+
+    data = request.get_json()
+    run_id = data.get("run_id")
+    template_id = data.get("template_id")
+
+    # Input validation
+    if not run_id or not template_id:
+        return (
+            jsonify({"error": "Missing 'run_id' or 'template_id' in request data"}),
+            400,
+        )
+
+    # Update run status to "Not Started"
+    run_ref = db.collection("test_runs").document(run_id)
+    run_ref.update({"status": "Not Started", "progress": "0/0"})
+
+    # Invoke the Cloud Run job to execute the test run
+    invoke_job(
+        settings.project_id, settings.region, "litmus-worker", run_id, template_id
+    )
+
+    return jsonify(
+        {
+            "message": f"Test run '{run_id}' submitted successfully using template '{template_id}'"
+        }
+    )
+
+
+# Delete a run
+@app.route("/delete_run/<run_id>", methods=["DELETE"])
+@auth.login_required
+def delete_run(run_id):
+    """Deletes a test run from Firestore.
+
+    Args:
+        run_id: Unique identifier for the test run.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+
+    # Delete test cases from the subcollection
+    test_cases_collection = db.collection(f"test_cases_{run_id}")
+    for doc in test_cases_collection.stream():
+        doc.reference.delete()
+
+    # Delete the run document itself
+    run_ref = db.collection("test_runs").document(run_id)
+    if run_ref.get().exists:
+        run_ref.delete()
+        return jsonify({"message": f"Run '{run_id}' deleted successfully"})
+    return jsonify({"error": f"Run with ID '{run_id}' not found"}), 404
+
+
 # Templates: Add
 @app.route("/add_template", methods=["POST"])
 @auth.login_required
 def add_template():
-    """Adds a new test template to Firestore with responses and pre/post requests."""
+    """Adds a new test template to Firestore.
+
+    Expects a JSON payload with:
+        - template_id: Unique identifier for the test template.
+        - template_data: Array of test data objects.
+        - test_pre_request (optional): JSON object representing a pre-request to be executed.
+        - test_post_request (optional): JSON object representing a post-request to be executed.
+        - test_request: JSON object representing the test request.
+        - template_llm_prompt: The LLM prompt associated with the test template.
+        - template_input_field: The input field used in the test template.
+        - template_output_field: The output field used in the test template.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
     data = request.get_json()
     template_id = data.get("template_id")
     template_data = data.get("template_data")
     test_pre_request = data.get("test_pre_request")
     test_post_request = data.get("test_post_request")
     test_request = data.get("test_request")
+    template_llm_prompt = data.get("template_llm_prompt")
+    template_input_field = data.get("template_input_field")
+    template_output_field = data.get("template_output_field")
 
+    # Input validation
     if not template_id:
         return (
             jsonify(
@@ -222,7 +312,10 @@ def add_template():
             "template_data": template_data,
             "test_pre_request": test_pre_request if test_pre_request else None,
             "test_post_request": test_post_request if test_post_request else None,
+            "template_llm_prompt": template_llm_prompt if template_llm_prompt else None,
             "test_request": test_request,
+            "template_input_field": template_input_field,
+            "template_output_field": template_output_field,
         }
     )
     return jsonify({"message": f"Template '{template_id}' added successfully"})
@@ -232,14 +325,32 @@ def add_template():
 @app.route("/update_template", methods=["PUT"])
 @auth.login_required
 def update_template():
-    """Updates an existing test template in Firestore, including responses and pre/post requests."""
+    """Updates an existing test template in Firestore.
+
+    Expects a JSON payload with:
+        - template_id: Unique identifier for the test template.
+        - template_data (optional): Array of test data objects.
+        - test_pre_request (optional): JSON object representing a pre-request to be executed.
+        - test_post_request (optional): JSON object representing a post-request to be executed.
+        - test_request (optional): JSON object representing the test request.
+        - template_llm_prompt (optional): The LLM prompt associated with the test template.
+        - template_input_field (optional): The input field used in the test template.
+        - template_output_field (optional): The output field used in the test template.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
     data = request.get_json()
     template_id = data.get("template_id")
     template_data = data.get("template_data")
     test_pre_request = data.get("test_pre_request")
     test_post_request = data.get("test_post_request")
     test_request = data.get("test_request")
+    template_llm_prompt = data.get("template_llm_prompt")
+    template_input_field = data.get("template_input_field")
+    template_output_field = data.get("template_output_field")
 
+    # Input validation
     if not template_id:
         return jsonify({"error": "Missing 'template_id' in request data"}), 400
 
@@ -254,7 +365,10 @@ def update_template():
             template_data,
             test_pre_request,
             test_post_request,
+            template_llm_prompt,
             test_request,
+            template_input_field,
+            template_output_field,
         ]
     ):
         return jsonify({"error": "No fields provided for update"}), 400
@@ -266,8 +380,14 @@ def update_template():
         update_data["test_pre_request"] = test_pre_request
     if test_post_request is not None:
         update_data["test_post_request"] = test_post_request
+    if template_llm_prompt is not None:
+        update_data["template_llm_prompt"] = template_llm_prompt
     if test_request is not None:
         update_data["test_request"] = test_request
+    if template_input_field is not None:
+        update_data["template_input_field"] = template_input_field
+    if template_input_field is not None:
+        update_data["template_output_field"] = template_output_field
 
     template_ref.update(update_data)
     return jsonify({"message": f"Template '{template_id}' updated successfully"})
@@ -277,7 +397,14 @@ def update_template():
 @app.route("/delete_template/<template_id>", methods=["DELETE"])
 @auth.login_required
 def delete_template(template_id):
-    """Deletes a test template from Firestore."""
+    """Deletes a test template from Firestore.
+
+    Args:
+        template_id: Unique identifier for the test template.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
     template_ref = db.collection("test_templates").document(template_id)
     if not template_ref.get().exists:
         return jsonify({"error": f"Template with ID '{template_id}' not found"}), 404
@@ -289,7 +416,11 @@ def delete_template(template_id):
 @app.route("/templates", methods=["GET"])
 @auth.login_required
 def list_templates():
-    """Lists all available test template IDs."""
+    """Retrieves a list of all available test template IDs.
+
+    Returns:
+        JSON response containing an array of template IDs.
+    """
     templates_ref = db.collection("test_templates")
     template_ids = [doc.id for doc in templates_ref.stream()]
     return jsonify({"template_ids": template_ids})
@@ -299,7 +430,14 @@ def list_templates():
 @app.route("/templates/<template_id>", methods=["GET"])
 @auth.login_required
 def get_template(template_id):
-    """Retrieves a specific test template."""
+    """Retrieves details of a specific test template.
+
+    Args:
+        template_id: Unique identifier for the test template.
+
+    Returns:
+        JSON response containing template details.
+    """
     template_ref = db.collection("test_templates").document(template_id)
     template_data = template_ref.get().to_dict()
     if not template_data:
@@ -310,15 +448,20 @@ def get_template(template_id):
 @app.route("/run_status/<run_id>", methods=["GET"])
 @auth.login_required
 def get_run_status(run_id):
-    """Retrieves the status, progress, and detailed results (requests, responses) of a test run.
-    Allows filtering of specific JSON paths to retrieve desired values.
+    """Retrieves the status and detailed results of a test run.
+
+    Args:
+        run_id: Unique identifier for the test run.
+
+    Returns:
+        JSON response containing run status, progress, and test case details.
     """
     run_ref = db.collection("test_runs").document(run_id)
     run_data = run_ref.get().to_dict()
     if not run_data:
         return jsonify({"error": f"Run with ID '{run_id}' not found"}), 404
 
-    # Get test case details (including requests, responses, and golden answers)
+    # Get test case details
     test_cases_query = db.collection(f"test_cases_{run_id}")
     test_cases = []
     for doc in test_cases_query.stream():
@@ -329,7 +472,7 @@ def get_run_status(run_id):
         )
         filtered_response = filter_json(
             case_data.get("result"), request.args.get("response_filter")
-        )  # Assuming "result" holds the actual response
+        )
         filtered_golden_response = filter_json(
             case_data.get("golden_response"), request.args.get("golden_response_filter")
         )
@@ -340,6 +483,7 @@ def get_run_status(run_id):
                 "request": filtered_request,
                 "response": filtered_response,
                 "golden_response": filtered_golden_response,
+                "tracing_id": case_data.get("tracing_id"),
             }
         )
 
@@ -347,7 +491,36 @@ def get_run_status(run_id):
         {
             "status": run_data.get("status"),
             "progress": run_data.get("progress"),
+            "template_id": run_data.get("template_id"),
+            "template_input_field": run_data.get("template_input_field"),
+            "template_output_field": run_data.get("template_output_field"),
             "testCases": test_cases,  # Return the detailed test case data
+        }
+    )
+
+
+@app.route("/run_status_fields/<run_id>", methods=["GET"])
+@auth.login_required
+def get_run_status_fields(run_id):
+    """Retrieves specific fields from the status of a test run.
+
+    Args:
+        run_id: Unique identifier for the test run.
+
+    Returns:
+        JSON response containing run date, template ID, input/output fields.
+    """
+    run_ref = db.collection("test_runs").document(run_id)
+    run_data = run_ref.get().to_dict()
+    if not run_data:
+        return jsonify({"error": f"Run with ID '{run_id}' not found"}), 404
+
+    return jsonify(
+        {
+            "run_date": run_data.get("start_time"),
+            "template_id": run_data.get("template_id"),
+            "template_input_field": run_data.get("template_input_field"),
+            "template_output_field": run_data.get("template_output_field"),
         }
     )
 
@@ -355,7 +528,15 @@ def get_run_status(run_id):
 @app.route("/all_run_results/<template_id>", methods=["GET"])
 @auth.login_required
 def all_run_results(template_id):
-    """Retrieves filtered responses for all runs of a specified template."""
+    """Retrieves filtered responses for all runs of a specified template.
+
+    Args:
+        template_id: The ID of the test template.
+
+    Returns:
+        JSON response containing a dictionary of results, keyed by request filter value.
+        Each value is a list of responses sorted by start time, including run and time information.
+    """
 
     # Get all test runs for the given template
     runs_ref = db.collection("test_runs")
@@ -392,9 +573,10 @@ def all_run_results(template_id):
             )
 
             # Add results to the dictionary with the start_time and run_id included
-            request_key = str(
-                filtered_request[request.args.get("request_filter")]
-            )  # Use string representation for key
+            if request.args.get("request_filter") in filtered_request:
+                request_key = str(
+                    filtered_request[request.args.get("request_filter")]
+                )  # Use string representation for key
             if request_key not in results:
                 results[request_key] = []
             results[request_key].append(
@@ -402,7 +584,7 @@ def all_run_results(template_id):
                     "start_time": run["start_time"],
                     "end_time": run["end_time"],
                     "run_id": run_id,
-                    "data": filtered_response,  # Assuming "value" holds the actual response
+                    "data": filtered_response,
                 }
             )
 
@@ -419,8 +601,9 @@ def filter_json(data, filter_pathx):
 
     Args:
         data: The JSON data to filter.
-        filter_pathx: A string representing the path to the desired values.
-                     Uses dot notation (e.g., "key1.key2.key3")
+        filter_pathx: A comma-separated string representing the paths to the desired values.
+                    Uses dot notation (e.g., "key1.key2.key3") and supports
+                    array indexing (e.g., "key1.key2[0].key3").
 
     Returns:
         A dictionary containing the filtered values.
@@ -437,11 +620,20 @@ def filter_json(data, filter_pathx):
         current_data = data
         for key in keys:
             if current_data is not None:
-                if key in current_data:
+                # Check for array indexing
+                if "[" in key and "]" in key:
+                    key, index = key.split("[", 1)[0], int(key.split("[", 1)[1][:-1])
+                    current_data = (
+                        current_data[key][index]
+                        if 0 <= index < len(current_data) and key in current_data
+                        else None
+                    )
+                elif key in current_data:
                     current_data = current_data[key]
                 else:
                     # Key not found, move to the next path
-                    break  # This is the key change
+                    current_data = None
+                    break
 
         # If we reached the end of the keys, add the current_data to new_data
         if current_data is not None:
@@ -453,7 +645,11 @@ def filter_json(data, filter_pathx):
 @app.route("/runs", methods=["GET"])
 @auth.login_required
 def list_runs():
-    """Lists all test runs with their IDs and status, sorted by start time."""
+    """Lists all test runs with their details, sorted by start time.
+
+    Returns:
+        JSON response containing an array of run details.
+    """
     runs_ref = db.collection("test_runs")
     runs = []
     for doc in runs_ref.stream():
@@ -475,12 +671,238 @@ def list_runs():
     return jsonify({"runs": runs})
 
 
+@app.route("/proxy_data", methods=["GET"])
+@auth.login_required
+def proxy_data():
+    """Retrieves proxy log data from BigQuery.
+
+    Expects query parameters:
+        - date: Date of the log data (format: YYYY-MM-DD).
+        - context (optional): Litmus context to filter the results.
+        - flatten (optional): Whether to flatten the JSON structure of the results (default: False).
+
+    Returns:
+        JSON response containing the proxy log data.
+    """
+    date = request.args.get("date")
+    context = request.args.get("context")
+
+    # Get the 'flatten' flag from query parameters
+    flatten_results = request.args.get(
+        "flatten", default=False, type=lambda v: v.lower() == "true"
+    )
+
+    # Input validation
+    if not date:
+        return jsonify({"error": 'Missing "date" or "context" parameter'}), 400
+
+    query = f"""
+        SELECT jsonPayload
+        FROM `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+        ORDER BY jsonPayload.timestamp ASC
+        LIMIT 100
+    """
+
+    if context:
+        query = f"""
+            SELECT jsonPayload
+            FROM `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+            WHERE jsonPayload.litmuscontext = "{context}"
+            ORDER BY jsonPayload.timestamp ASC
+            LIMIT 100
+        """
+
+    try:
+        query_job = bq_client.query(query)
+        results = list(query_job.result())
+
+        # Flatten the results if requested
+        if flatten_results:
+            processed_results = []
+            for row in results:
+                flattened_row = flatten_json(row.jsonPayload)
+                processed_results.append(flattened_row)
+        else:
+            # Return data as is if not flattening
+            processed_results = [row.jsonPayload for row in results]
+
+        return jsonify(processed_results)
+    except Exception as e:
+        return jsonify({"error": f"Error querying BigQuery: {str(e)}"}), 500
+
+
+@app.route("/proxy_agg", methods=["GET"])
+@auth.login_required
+def proxy_agg():
+    """Retrieves aggregated proxy log data from BigQuery.
+
+    Expects query parameters:
+        - date: Date of the log data (format: YYYY-MM-DD).
+        - context (optional): Litmus context to filter the results.
+
+    Returns:
+        JSON response containing the aggregated proxy log data.
+    """
+    date = request.args.get("date")
+    context = request.args.get("context")
+
+    # Input validation
+    if not date:
+        return jsonify({"error": 'Missing "date" parameter'}), 400
+
+    query = f"""
+        SELECT
+            jsonPayload.litmuscontext,
+            jsonPayload.requestheaders.x_goog_request_params,
+            sum(jsonPayload.responsebody.usagemetadata.totaltokencount) AS total_token_count,
+            sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
+            sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
+            avg(jsonPayload.latency) AS average_latency
+        FROM 
+            `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+        GROUP BY 1,2;
+    """
+
+    if context:
+        query = f"""
+            SELECT
+                jsonPayload.litmuscontext,
+                jsonPayload.requestheaders.x_goog_request_params,
+                sum(jsonPayload.responsebody.usagemetadata.totaltokencount) AS total_token_count,
+                sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
+                sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
+                avg(jsonPayload.latency) AS average_latency
+            FROM 
+                `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
+            WHERE jsonPayload.litmuscontext = "{context}"
+            GROUP BY 1,2;
+        """
+
+    try:
+        query_job = bq_client.query(query)
+        results = list(query_job.result())
+
+        # Convert BigQuery Rows to dictionaries before JSON serialization
+        formatted_results = []
+        for row in results:
+            formatted_row = dict(row.items())
+            formatted_results.append(formatted_row)
+
+        return jsonify(formatted_results)
+
+    except Exception as e:
+        return jsonify({"error": f"Error querying BigQuery: {str(e)}"}), 500
+
+
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 @auth.login_required
 def catch_all(path):
+    """Catches all undefined routes and serves the index.html file."""
     return app.send_static_file("index.html")
 
 
+@app.route("/list_proxy_services", methods=["GET"])
+@auth.login_required
+def list_proxy_services():
+    """Retrieves a list of deployed Litmus proxy Cloud Run services.
+
+    Returns:
+        JSON response containing an array of proxy service details.
+    """
+    project_id = settings.project_id
+    region = settings.region
+
+    client = run_v2.ServicesClient()
+
+    request = run_v2.ListServicesRequest(
+        parent=f"projects/{project_id}/locations/{region}"
+    )
+    try:
+        page_result = client.list_services(request=request)
+        services = list(page_result)
+
+        proxy_services = []
+        for service in services:
+            if "aiplatform-litmus" in service.name:
+                # Extract just the service name from the full path
+                name = service.name.split("/")[-1]
+                uri = service.uri
+                created = datetime.fromtimestamp(service.create_time.timestamp())
+                updated = datetime.fromtimestamp(service.update_time.timestamp())
+                proxy_services.append(
+                    {
+                        "name": name,
+                        "project_id": project_id,
+                        "region": region,
+                        "uri": uri,
+                        "created": created,
+                        "updated": updated,
+                    }
+                )
+
+        return jsonify(proxy_services)
+
+    except Exception as e:
+        return jsonify({"error": f"Error listing Cloud Run services: {str(e)}"}), 500
+
+
+def flatten_json(data, parent_key="", sep="_"):
+    """
+    Recursively flattens a nested JSON structure into a single-level dictionary.
+
+    Args:
+        data: The JSON data to flatten.
+        parent_key: The key prefix for nested objects (used in recursive calls).
+        sep: The separator to use between nested keys.
+
+    Returns:
+        A flattened dictionary.
+    """
+    items = []
+    if isinstance(data, dict):
+        for k, v in data.items():
+            new_key = f"{parent_key}{sep}{k}" if parent_key else k
+            items.extend(flatten_json(v, new_key, sep=sep).items())
+    elif isinstance(data, list):
+        for i, v in enumerate(data):
+            new_key = f"{parent_key}{sep}{i}" if parent_key else str(i)
+            items.extend(flatten_json(v, new_key, sep=sep).items())
+    else:
+        items.append((parent_key, data))
+    return dict(items)
+
+
+def invoke_job(project_id, region, job_id, run_id, template_id):
+    """Invokes a Cloud Run job with specified parameters.
+
+    Args:
+        project_id: Google Cloud project ID.
+        region: Google Cloud region.
+        job_id: Cloud Run job ID.
+        run_id: Unique identifier for the test run.
+        template_id: Identifier for the test template.
+    """
+    client = run_v2.JobsClient()
+    job_name = client.job_path(project_id, region, job_id)
+
+    override_spec = {
+        "container_overrides": [
+            {
+                "env": [
+                    {"name": "RUN_ID", "value": run_id},
+                    {"name": "TEMPLATE_ID", "value": template_id},
+                ]
+            }
+        ]
+    }
+
+    # Initialize the request
+    job_name = f"projects/{project_id}/locations/{region}/jobs/{job_id}"
+    request = run_v2.RunJobRequest(name=job_name, overrides=override_spec)
+
+    client.run_job(request=request)
+
+
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))
+    app.run(debug=False, host="0.0.0.0", port=int(os.environ.get("PORT", 8080)))

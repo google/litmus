@@ -21,39 +21,51 @@ const MainRoutes = {
   component: () => import('@/layouts/common/Layout.vue'),
   children: [
     {
-      path: "/",
-      name: "tests",
-      component: () => import("@/views/TestListView.vue"),
-      meta: { title: "Tests" }
+      path: '/',
+      name: 'tests',
+      component: () => import('@/views/TestListView.vue'),
+      meta: { title: 'Tests' }
     },
     {
-      path: "/start",
-      name: "submitrun",
-      component: () => import("@/views/SubmitRunView.vue"),
-      meta: { title: "SubmitRun" }
+      path: '/start',
+      name: 'submitrun',
+      component: () => import('@/views/SubmitRunView.vue'),
+      meta: { title: 'SubmitRun' }
     },
     {
-      path: "/templates",
-      name: "templates",
-      component: () => import("@/views/TemplateListView.vue"),
-      meta: { title: "Templates" }
+      path: '/templates',
+      name: 'templates',
+      component: () => import('@/views/TemplateListView.vue'),
+      meta: { title: 'Templates' }
     },
     {
-      path: "/compare/:templateId",
-      name: "compare",
-      component: () => import("../views/CompareRuns.vue"),
-      props: true, // Allow passing templateId as a prop
+      path: '/proxies',
+      name: 'proxies',
+      component: () => import('@/views/ProxiesListView.vue'),
+      meta: { title: 'Proxies' }
+    },
+    {
+      path: '/compare-list',
+      name: 'compare-list',
+      component: () => import('@/views/CompareListView.vue'),
+      meta: { title: 'Compare List' }
+    },
+    {
+      path: '/compare/:templateId',
+      name: 'compare',
+      component: () => import('../views/CompareRuns.vue'),
+      props: true // Allow passing templateId as a prop
     },
     {
       path: '/edit-template/:templateId',
       name: 'editTemplate',
-      component: () => import("@/views/EditTemplatePage.vue"),
-      props: true, // Allow passing templateId as a prop
+      component: () => import('@/views/EditTemplatePage.vue'),
+      props: true // Allow passing templateId as a prop
     },
     {
       path: '/add-template',
       name: 'addTemplate',
-      component: () => import("@/views/AddTemplatePage.vue"),
+      component: () => import('@/views/AddTemplatePage.vue')
     },
     {
       path: '/runs/:runId', // Dynamic route for run details

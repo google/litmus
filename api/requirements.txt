@@ -7,3 +7,4 @@ google-cloud-logging
 requests
 uuid
 gunicorn
+bigquery

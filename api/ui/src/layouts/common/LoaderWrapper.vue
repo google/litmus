@@ -15,8 +15,8 @@ limitations under the License.
 -->
 
 <script setup lang="ts">
-import { storeToRefs } from "pinia";
-import { useUIStore } from "@/stores/ui";
+import { storeToRefs } from 'pinia';
+import { useUIStore } from '@/stores/ui';
 
 const uiStore = useUIStore();
 const { isLoading } = storeToRefs(uiStore);
@@ -27,7 +27,7 @@ const { isLoading } = storeToRefs(uiStore);
     :class="{
       'page-loader': true,
       loading: isLoading,
-      hidden: !isLoading,
+      hidden: !isLoading
     }"
   >
     <div class="bar" />
@@ -43,7 +43,10 @@ const { isLoading } = storeToRefs(uiStore);
   z-index: 10000000;
   pointer-events: none;
   opacity: 0;
-  transition: width 1350ms ease-in-out, opacity 350ms linear, left 50ms ease-in-out;
+  transition:
+    width 1350ms ease-in-out,
+    opacity 350ms linear,
+    left 50ms ease-in-out;
 }
 
 .bar {

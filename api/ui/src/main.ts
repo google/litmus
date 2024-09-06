@@ -33,7 +33,6 @@ const i18n = createI18n({
   silentFallbackWarn: true
 });
 
-
 const app = createApp(App);
 app.use(router);
 app.use(createPinia());

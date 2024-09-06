@@ -12,166 +12,76 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from vertexai.preview.generative_models import (
-    GenerativeModel,
-    Tool,
-    grounding,
-    GenerationConfig,
-)
+"""This module defines the function ask_llm_against_golden() which calls a large language model (LLM) 
+to compare two statements. The function is intended for use in applications that need to assess 
+the similarity and consistency of different pieces of text, such as comparing user responses 
+to expected answers or evaluating the quality of generated text."""
+
 import vertexai
+from vertexai.generative_models import GenerativeModel, GenerationConfig
 from datetime import datetime
 from zoneinfo import ZoneInfo
-from util.docsnsnips import cleanup_json, strip_references
-from util.settings import settings
 import json
 
-print("start assess")
+from util.docsnsnips import cleanup_json, strip_references
+from util.settings import settings
 
+print("Initializing assessment module...")
+
+# Initialize Vertex AI with project and location settings
 vertexai.init(project=settings.project_id, location=settings.location)
+
+# Load the specified LLM
 model = GenerativeModel(settings.ai_default_model)
+
+# Configure generation parameters for the LLM
 config = GenerationConfig(
-    temperature=0.0, top_p=0.8, top_k=38, candidate_count=1, max_output_tokens=1000
+    temperature=0.0,  # Control the randomness of the generated text (0.0 = deterministic)
+    top_p=0.8,  # Control the diversity of the generated text
+    top_k=38,  # Limit the vocabulary size for generation
+    candidate_count=1,  # Generate only one candidate response
+    max_output_tokens=1000,  # Set the maximum number of tokens for the generated response
 )
 
 
-def ask_llm_against_golden(statement, golden):
-    """Calls the llm with custom prompt to compare a statement against the golden statement.
-    Returns a dictionary with the results of this comparison. The result states whether the statement
-    - is an answer at all
-    - contradicts the golden statement
-    - is equivalent (i.e. contains the same information as golden)
-    - has additional information
-    - is missing some information
-    - is similar in structure to golden (0...1.0)
-    Statements can be similar even if the information is contradictory (such as different figures for same topic).
-    They can be dissimilar even if the information contained is the same.
+def ask_llm_against_golden(statement, golden, prompt):
+    """
+    Compares a statement against a golden statement using a large language model (LLM).
+
+    This function sends a prompt to the LLM, asking it to compare the given statement
+    against a "best-known" (golden) statement. The LLM's response is then parsed to
+    extract information about the comparison, such as whether the statements are
+    contradictory, equivalent, or share similarities.
 
     Args:
         statement (str): The statement to be assessed.
         golden (str): The golden response to compare against.
+        prompt (str): The prompt to guide the LLM's comparison.
 
     Returns:
-        dict: {
-            'answered': bool,
-            'contradictory': bool,
-            'contradictory_explanation': str,
-            'equivalent': bool,
-            'equivalent_explanation': str,
-            'addlinfo': bool,
-            'addlinfo_explanation': str,
-            'missinginfo': bool,
-            'missinginfo_explanation': str,
-            'similarity': float,
-            'similarity_explanation': float
-            }
+        dict: A dictionary containing the results of the comparison, including:
+            - 'answered': Whether the statement is a valid response.
+            - 'contradictory': Whether the statement contradicts the golden statement.
+            - 'contradictory_explanation': Explanation of the contradiction.
+            - 'equivalent': Whether the statement is equivalent to the golden statement.
+            - 'equivalent_explanation': Explanation of the equivalence.
+            - 'addlinfo': Whether the statement contains additional information.
+            - 'addlinfo_explanation': Explanation of the additional information.
+            - 'missinginfo': Whether the statement is missing information.
+            - 'missinginfo_explanation': Explanation of the missing information.
+            - 'similarity': Similarity score between the statements (0-1).
+            - 'similarity_explanation': Explanation of the similarity score.
+            - 'error': Error message if something goes wrong.
     """
-    # Prepare for prompting
+
+    # Get current time in Berlin timezone
     current_time = datetime.now(tz=ZoneInfo("Europe/Berlin"))
 
+    # Construct the prompt for the LLM
     llm_prompt = f"""
 Today is {current_time.strftime('%A, %B %-d %Y')}. The current time is {current_time.strftime('%-H:%M')}.
-You are a thorough quality inspector. Your task is to compare a statement about some topic to a golden response. The statement and the response can have different formats. Both statement and response are in German. You inspect the statement and the response to find out:
-- has the question been answered at all?
-- does the statement contradict the response?
-- is the statement content-wise equivalent to the response, even it might have additional information?
-- does the statement have additional information not contained in the response?
-- is the statement missing information that is contained in the response?
-- to what degree is the structure and wording of the statement similar to the response, even if content may be different?
-Statements that are similar are estimated closer to 1 and statements that have different structure or wording are estimated closer to 0.
-You MUST provide your output in JSON format. Do not provide any additional output.
-This is what the JSON should look like:
-{{
-    "answered": 'true' if the question has been answered at all and 'false' if it has not,
-    "contradictory": 'true' if the statement contradicts the response and 'false' if they agree,
-    "contradictory_explanation": "explanation of how the statement contradicts the response if they don't agree",
-    "equivalent": 'true' if the statement has equivalent information to the response and 'false' if the information differs,
-    "equivalent_explanation": "explanation of how the two statements are different when they are not equivalent",
-    "addlinfo": 'true' if the statement contains additional information compared to the response and 'false' if there is no additional information,
-    "addlinfo_explanation": "explanation about the additional information if it present",
-    "missinginfo": 'true' if the statement is missing information present in the response and 'false' if no information is missing,
-    "missinginfo_explanation": "explanation about any missing information",
-    "similarity": "provide a fractional numeric value between 0 and 1 that estimates the similarity of the statement to the response",
-    "similarity_explanation": "explanation for the choice of value for the similarity attribute"
-}}
 
-
-Here is an example:
-Statement: Der Fussballer B war 2011 und 2012 Fussballer des Jahres.
-Golden response: 2010 und 2012 war B Fussballer des Jahres.
-
-Comparison result:
-{{
-    "answered": true,
-    "contradictory": true,
-    "contradictory_explanation": "There is a contradiction because the years are different",
-    "equivalent": false,
-    "equivalent_explanation": "The years are different",
-    "addlinfo": false,
-    "addlinfo_explanation": "No additional information present",
-    "missinginfo": false,
-    "missinginfo_explanation": "No information is missing",
-    "similarity": 0.8,
-    "similarity_explanation": "The structure is similar but the facts are different"
-}}
-
-
-Here is another example:
-Statement: Die Polizei im Kanton A wurde gestern wegen einer Unruhestörung zu einem Privathaus gerufen.
-Best-known response: Aufgrund einer Unruhestörung rückte die Polizei gestern im Kanton A aus.
-
-Comparison result:
-{{
-    "answered": true,
-    "contradictory": false,
-    "contradictory_explanation": "There is no contradiction",
-    "equivalent": true,
-    "equivalent_explanation": "Both statement and response mention the same incident",
-    "addlinfo": true,
-    "addlinfo_explanation": "The statement mentions the private house, the best-known response does not",
-    "missinginfo": false,
-    "missinginfo_explanation": "Nothing is missing",
-    "similarity": 0.6,
-    "similarity_explanation": "The information is similar but the wording is different"
-}}
-
-
-Here is another example:
-Statement: C ist seit 2010 CEO von D.
-Best-known response: C wurde 2010 zum CEO von D ernannt.
-
-Comparison result:
-{{
-    "answered": true,
-    "contradictory": false,
-    "contradictory_explanation": "There is no contradiction",
-    "equivalent": true,
-    "equivalent_explanation": "Both statement and response mention the same facts",
-    "addlinfo": false,
-    "addlinfo_explanation": "No additional information present",
-    "missinginfo": true,
-    "missinginfo_explanation": "No information is missing",
-    "similarity": 0.8,
-    "similarity_explanation": "The structure is similar but the wording is different"
-}}
-
-Here is another example:
-Statement: Diese Frage kann ich nicht beantworten.
-Best-known response: Die Stadt X wurde 1833 gegründet.
-
-Comparison result:
-{{
-    "answered": false,
-    "contradictory": true,
-    "contradictory_explanation": "There is a contradiction because there is a possible answer",
-    "equivalent": false,
-    "equivalent_explanation": "The question has not been answered",
-    "addlinfo": false,
-    "addlinfo_explanation": "No additional information present",
-    "missinginfo": true,
-    "missinginfo_explanation": "The facts from the golden response are missing",
-    "similarity": 0,
-    "similarity_explanation": "There is no answer provided"
-}}
+{prompt}
 
 Here is your task:
 Statement: {strip_references(statement)}
@@ -179,32 +89,32 @@ Best-known response: {strip_references(golden)}
 
 Comparison result:
 """
-    # Get LLM response
-    # print('---------------------------')
-    # print(LLM_PROMPT)
+
     try:
+        # Send the prompt to the LLM and get the response
         responses = model.generate_content(
             llm_prompt, stream=False, generation_config=config
         )
+
+        # Check if the LLM finished generating the response successfully
         if responses.candidates[0].finish_reason == 1:
             result = responses.text
         else:
             result = "{'error': 'no response from LLM'}"
     except Exception as exc:
-        print(exc)
+        print(f"Error calling LLM: {exc}")
         result = "{'error': 'exception calling LLM'}"
+
+    # Clean up the LLM response and parse it as JSON
     comparison = cleanup_json(str(result))
-    # print('---------------------------')
-    # print(result)
-    # print('---------------------------')
-    # print(comparison)
-    # print('---------------------------')
+
     try:
         comparison = json.loads(comparison)
     except:
         print(f"ERROR - llm response parsing failed for {comparison}")
         comparison = {"error": "llm response parsing failed"}
+
     return comparison
 
 
-print("done assess")
+print("Assessment module ready.")

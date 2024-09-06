@@ -40,13 +40,13 @@ limitations under the License.
   </n-message-provider>
 </template>
 <script setup lang="ts">
-import { RouterView } from "vue-router";
-import LoaderWrapper from "./LoaderWrapper.vue";
-import SidebarVue from "./sidebar/Sidebar.vue";
-import HeaderVue from "./header/Header.vue";
-import FooterPanel from "./footer/FooterPanel.vue";
-import { NMessageProvider, useMessage } from "naive-ui";
-import { defineComponent } from "vue";
+import { RouterView } from 'vue-router';
+import LoaderWrapper from './LoaderWrapper.vue';
+import SidebarVue from './sidebar/Sidebar.vue';
+import HeaderVue from './header/Header.vue';
+import FooterPanel from './footer/FooterPanel.vue';
+import { NMessageProvider, useMessage } from 'naive-ui';
+import { defineComponent } from 'vue';
 
 // content
 defineComponent({
@@ -54,9 +54,9 @@ defineComponent({
     const message = useMessage();
     return {
       warning() {
-        message.warning("...");
-      },
+        message.warning('...');
+      }
     };
-  },
+  }
 });
 </script>
