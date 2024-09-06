@@ -16,118 +16,132 @@ limitations under the License.
 
 <template>
   <div>
-    <n-table class="table-min-width" striped>
-      <thead>
-        <tr>
-          <th>Template ID</th>
-          <th>Actions</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr v-for="templateId in templateIds" :key="templateId">
-          <td>{{ templateId }}</td>
-          <td>
-            <v-btn
-              variant="flat"
-              color="secondary"
-              class="mt-2"
-              @click="navigateToComparePage(templateId)"
-              >View Statistics</v-btn
-            >
-            &nbsp;
-            <v-btn
-              variant="flat"
-              color="primary"
-              class="mt-2"
-              @click="navigateToEditPage(templateId)"
-              >Edit</v-btn
-            >
-            &nbsp;
-            <v-btn
-              variant="flat"
-              color="accent"
-              class="mt-2"
-              @click="deleteTemplate(templateId)"
-              >Delete</v-btn
-            >
-          </td>
-        </tr>
-      </tbody>
-    </n-table>
+    <!-- Spin Loading indicator while data is being fetched -->
+    <n-spin :show="show">
+      <!-- Table to display UI Templates -->
+      <n-table class="table-min-width" striped>
+        <thead>
+          <tr>
+            <th>Template ID</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody>
+          <!-- Iterate over templateIds to display each template -->
+          <tr v-for="templateId in templateIds" :key="templateId">
+            <!-- Display template ID -->
+            <td>{{ templateId }}</td>
+            <td>
+              <!-- Edit button to navigate to Edit Template page -->
+              <v-btn variant="flat" color="primary" class="mt-2" @click="navigateToEditPage(templateId)">Edit</v-btn>
+               
+              <!-- Delete button to delete a template -->
+              <v-btn variant="flat" color="accent" class="mt-2" @click="deleteTemplate(templateId)">Delete</v-btn>
+            </td>
+          </tr>
+        </tbody>
+      </n-table>
+    </n-spin>
+    <!-- Divider for visual separation -->
+    <n-divider />
+    <!-- Space component for spacing -->
+    <n-space>
+      <!-- Button to open Add Template Modal -->
+      <v-btn variant="flat" color="primary" class="mt-2" @click="openAddTemplateModal">Add Template</v-btn>
+    </n-space>
   </div>
-  <n-divider />
-  <n-space>
-    <v-btn variant="flat" color="primary" class="mt-2" @click="openAddTemplateModal"
-      >Add Template</v-btn
-    >
-  </n-space>
 </template>
 
 <script lang="ts" setup>
-import {
-  NTable,
-  NButton,
-  NModal,
-  useMessage,
-  NPopconfirm,
-  NDivider,
-  NSpace,
-} from "naive-ui";
-import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
+import { NTable, useMessage, NDivider, NSpace, NSpin } from 'naive-ui';
+import { ref, onMounted } from 'vue';
+import { useRouter } from 'vue-router';
 
+// Define a ref to store template IDs, initialized as an empty array
 const templateIds = ref<string[]>([]);
+// Access the message instance from Naive UI
 const message = useMessage();
 
+// Access the router instance for navigation
 const router = useRouter();
+// Define a ref to control the loading spinner visibility
+const show = ref(false);
 
+/**
+ * Navigates to the Edit Template page with the given templateId.
+ * @param {string} templateId - The ID of the template to edit.
+ */
 const navigateToEditPage = (templateId: string) => {
-  router.push({ name: "editTemplate", params: { templateId } });
+  router.push({ name: 'editTemplate', params: { templateId } });
 };
 
-const navigateToComparePage = (templateId: string) => {
-  router.push({ name: "compare", params: { templateId } });
-};
-
+/**
+ * Navigates to the Add Template page.
+ */
 const openAddTemplateModal = () => {
-  router.push({ name: "addTemplate" });
+  router.push({ name: 'addTemplate' });
 };
 
+/**
+ * Deletes a UI Template with the given templateId.
+ * @param {string} templateId - The ID of the template to delete.
+ */
 const deleteTemplate = async (templateId: string) => {
+  // Show the loading spinner
+  show.value = true;
   try {
+    // Send a DELETE request to the backend to delete the template
     const response = await fetch(`/delete_template/${templateId}`, {
-      method: "DELETE",
-      // ... add authentication headers if needed
+      method: 'DELETE'
     });
+
     if (response.ok) {
-      // Template deleted successfully
-      // Update the UI to remove the template from the list
-      // ...
+      // If the deletion was successful, fetch the updated list of templates
       fetchTemplates();
-      message.success("Template deleted successfully"); // Assuming you have a message component
+      // Show a success message
+      message.success('Template deleted successfully');
     } else {
-      // Handle error
+      // If there was an error, parse the error data from the response
       const errorData = await response.json();
+      // Show an error message with the error details
       message.error(`Error deleting template: ${errorData.error}`);
+      // Hide the loading spinner
+      show.value = false;
     }
   } catch (error) {
-    // Handle unexpected errors
-    console.error("Error deleting template:", error);
-    message.error("An unexpected error occurred while deleting the template.");
+    // Log any unexpected errors during the deletion process
+    console.error('Error deleting template:', error);
+    // Show a generic error message
+    message.error('An unexpected error occurred while deleting the template.');
+    // Hide the loading spinner
+    show.value = false;
   }
 };
 
+/**
+ * Fetches the list of UI Templates from the backend.
+ */
 const fetchTemplates = () => {
-  fetch("/templates")
+  // Show the loading spinner
+  show.value = true;
+  // Fetch the templates from the backend API
+  fetch('/templates')
     .then((response) => response.json())
     .then((data) => {
+      // Update the templateIds ref with the fetched data
       templateIds.value = data.template_ids;
+      // Hide the loading spinner after data is fetched
+      show.value = false;
     })
     .catch((error) => {
-      console.error("Error fetching templates:", error);
+      // Log any errors encountered while fetching templates
+      console.error('Error fetching templates:', error);
+      // Hide the loading spinner in case of an error
+      show.value = false;
     });
 };
 
+// Fetch templates when the component is mounted
 onMounted(() => {
   fetchTemplates();
 });

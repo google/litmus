@@ -21,11 +21,13 @@ import (
 	"time"
 
 	"github.com/briandowns/spinner"
+	"github.com/google/litmus/cli/analytics"
 	"github.com/google/litmus/cli/utils"
 )
 
 // DestroyResources removes all resources created by the Litmus application.
 func DestroyResources(projectID, region string, quiet bool) {
+	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	if !quiet {
 		if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will delete all Litmus resources in the project '%s'. Are you sure you want to continue?", projectID)) {
 			fmt.Println("Aborting destruction.")
@@ -62,15 +64,14 @@ func DestroyResources(projectID, region string, quiet bool) {
 		}
 
 		if !quiet {
-			s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
-			s.Suffix = fmt.Sprintf(" Deleting %s '%s'... ", resourceType, resourceName)
+			s.Suffix = fmt.Sprintf(" Removing %s '%s'... ", resourceType, resourceName)
 			s.Start()
 			defer s.Stop()
 		}
 
 		if err := cmd.Run(); err != nil {
 			if !quiet {
-				log.Printf("Error deleting %s: %v. You might need to delete it manually.\n", resourceType, err)
+				log.Printf("Error removing %s: %v. You might need to remove it manually.\n", resourceType, err)
 			}
 		} else if !quiet {
 			fmt.Printf("Done! Deleted %s '%s'.\n", resourceType, resourceName)
@@ -96,6 +97,15 @@ func DestroyResources(projectID, region string, quiet bool) {
 	}
 	for _, sa := range serviceAccountsToDelete {
 		deleteResource("serviceAccount", sa)
+	}
+	if !quiet {
+		s.Suffix = " Removing analytics... "
+		s.Start()
+		defer s.Stop()
+	}
+	// Destroy Analytics
+	if err := analytics.DestroyAnalytics(projectID, region, true); err != nil {
+		utils.HandleGcloudError(err)
 	}
 
 	if !quiet {

@@ -20,20 +20,15 @@ limitations under the License.
       <v-card elevation="0" variant="text">
         <v-row no-gutters class="align-center">
           <v-col sm="12">
-            <v-breadcrumbs
-              :items="props.breadcrumbs"
-              class="text-h6 pa-1 font-weight-medium mb-0"
-            >
+            <!-- <v-breadcrumbs :items="props.breadcrumbs" class="text-h6 pa-1 font-weight-medium mb-0">
               <template v-slot:divider>
                 <div class="d-flex align-center">/</div>
               </template>
               <template v-slot:prepend>
-                <router-link to="/" class="text-lightText text-h6 text-decoration-none">
-                  Home
-                </router-link>
+                <router-link to="/" class="text-lightText text-h6 text-decoration-none"> Home </router-link>
                 <div class="d-flex align-center px-2">/</div>
               </template>
-            </v-breadcrumbs>
+            </v-breadcrumbs> -->
             <h3 class="text-h3 mt-1 mb-0">{{ props.title }}</h3>
           </v-col>
         </v-row>
@@ -46,7 +41,7 @@ const props = defineProps({
   title: String,
   /* eslint-disable @typescript-eslint/no-explicit-any */
   breadcrumbs: Array as any,
-  icon: String,
+  icon: String
 });
 </script>
 <style lang="scss">

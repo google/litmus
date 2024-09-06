@@ -15,42 +15,39 @@ limitations under the License.
 -->
 
 <template>
-  <!-- Breadcrumbs for navigation -->
+  <!-- Breadcrumb navigation for better orientation within the application -->
   <Breadcrumbs :title="page.title"></Breadcrumbs>
 
-  <!-- Page container -->
+  <!-- Main content area of the page -->
   <div class="page">
-    <!-- Container for the components list -->
+    <!-- Container for the list of proxies, allowing horizontal scrolling -->
     <div class="components-list">
-      <!-- Scrollbar for the Run component -->
       <n-scrollbar x-scrollable style="width: 100%">
-        <!-- Run component for submitting and viewing test runs -->
-        <run />
+        <!-- Proxies component to display the list of proxies -->
+        <Proxies class="table-min-width" striped />
       </n-scrollbar>
     </div>
   </div>
 </template>
 
 <script lang="ts" setup>
-// Import necessary components and libraries
 import { NScrollbar } from 'naive-ui';
-import Run from '@/components/SubmitRun.vue';
+import Proxies from '@/components/tables/Proxies.vue';
 import { ref } from 'vue';
 import Breadcrumbs from '@/components/shared/Breadcrumbs.vue';
 
-// Define a reactive object for the page title
-const page = ref({ title: 'Start New Run' });
+// Data for the page title, used by the Breadcrumbs component
+const page = ref({ title: 'Proxies' });
 </script>
 
 <style scoped lang="scss">
-// Styles for the component list
 .components-list {
-  // Use grid layout with no predefined columns
+  // Ensure the list takes up the full width and adjusts for columns
   grid-template-columns: none;
 }
 
-// Styles for the table minimum width (unused in this template)
 .table-min-width {
+  // Set a minimum width for the Proxies table to ensure readability
   min-width: 480px;
 }
 </style>

@@ -17,13 +17,7 @@ limitations under the License.
 <template>
   <v-list-group no-action>
     <template v-slot:activator="{ props }">
-      <v-list-item
-        v-bind="props"
-        :value="item.title"
-        rounded
-        class="mb-1"
-        color="primary"
-      >
+      <v-list-item v-bind="props" :value="item.title" rounded class="mb-1" color="primary">
         <template v-slot:prepend>
           <component :is="item.icon" class="iconClass" :level="level"></component>
         </template>
@@ -41,8 +35,8 @@ limitations under the License.
 </template>
 
 <script setup>
-import NavigationItem from "./NavigationItem.vue";
-import NavigationCollapse from "./NavigationCollapse.vue";
+import NavigationItem from './NavigationItem.vue';
+import NavigationCollapse from './NavigationCollapse.vue';
 
 const props = defineProps({ item: Object, level: Number });
 </script>

@@ -16,113 +16,138 @@ limitations under the License.
 
 <template>
   <div class="add-update-template">
+    <!-- Form to manage Litmus test templates -->
     <n-form ref="formRef" :model="templateData" :rules="rules" label-placement="top">
+      <!-- Template ID Input -->
       <n-form-item label="Template ID" path="template_id">
-        <n-input
-          v-model:value="templateData.template_id"
-          placeholder="Enter Template ID"
-          :disabled="editMode"
-        />
+        <n-input v-model:value="templateData.template_id" placeholder="Enter Template ID" :disabled="editMode" />
       </n-form-item>
+
+      <!-- Main Content Card: Test Cases, Request Payloads, LLM Prompts -->
       <n-card>
         <n-tabs type="line" animated>
+          <!-- Test Cases Tab -->
           <n-tab-pane name="Test Cases" tab="Test Cases">
-            <!-- Test Requests -->
-            <!-- Data Items -->
+            <!-- Test Data Items -->
             <n-form-item>
               <n-collapse>
-                <n-collapse-item
-                  v-for="(item, index) in templateData.template_data"
-                  :key="index"
-                  :title="item.query"
-                >
+                <n-collapse-item v-for="(item, index) in templateData.template_data" :key="index" :title="item.query">
                   <div class="data-item">
+                    <!-- Query Input -->
                     <n-form-item label="Query" :path="`template_data.${index}.query`">
                       <n-input v-model:value="item.query" placeholder="Enter Query" />
                     </n-form-item>
-                    <n-form-item
-                      label="Response"
-                      :path="`template_data.${index}.response`"
-                    >
-                      <n-input
-                        v-model:value="item.response"
-                        type="textarea"
-                        placeholder="Enter Response"
-                      />
+                    <!-- Expected Response Input -->
+                    <n-form-item label="Response" :path="`template_data.${index}.response`">
+                      <n-input v-model:value="item.response" type="textarea" placeholder="Enter Response" />
                     </n-form-item>
+                    <!-- Filter Input -->
                     <n-form-item label="Filter" :path="`template_data.${index}.filter`">
-                      <n-input
-                        v-model:value="item.filter"
-                        placeholder="Enter Filter (comma-separated)"
-                      />
+                      <n-input v-model:value="item.filter" placeholder="Enter Filter (comma-separated)" />
                     </n-form-item>
+                    <!-- Source Input -->
                     <n-form-item label="Source" :path="`template_data.${index}.source`">
                       <n-input v-model:value="item.source" placeholder="Enter Source" />
                     </n-form-item>
+                    <!-- Block Toggle Switch -->
                     <n-form-item label="Block" :path="`template_data.${index}.block`">
                       <n-switch v-model:value="item.block" />
                     </n-form-item>
-                    <n-form-item
-                      label="Category"
-                      :path="`template_data.${index}.category`"
-                    >
-                      <n-input
-                        v-model:value="item.category"
-                        placeholder="Enter Category"
-                      />
+                    <!-- Category Input -->
+                    <n-form-item label="Category" :path="`template_data.${index}.category`">
+                      <n-input v-model:value="item.category" placeholder="Enter Category" />
                     </n-form-item>
-                    <v-btn
-                      variant="flat"
-                      color="accent"
-                      class="mt-2"
-                      @click="removeItem(index)"
-                      >Delete</v-btn
-                    >
+                    <!-- Delete Test Case Button -->
+                    <v-btn variant="flat" color="accent" class="mt-2" @click="removeItem(index)"> Delete </v-btn>
                   </div>
                 </n-collapse-item>
               </n-collapse>
             </n-form-item>
-            <n-form-item>
-              <v-btn variant="flat" color="secondary" class="mt-2" @click="addItem"
-                >Add Test Case</v-btn
-              >
-            </n-form-item>
-            <n-form-item>
-              <n-upload @before-upload="handleFileUpload">
-                <v-btn variant="flat" color="secondary" class="mt-2">Upload JSON</v-btn>
-              </n-upload>
-            </n-form-item>
-            <a href="https://storage.googleapis.com/litmus-cloud/assets/template.json" target="_blank">Click here for JSON Template</a>
+
+            <!-- Add Test Case and Upload JSON Buttons -->
+            <n-space>
+              <n-form-item>
+                <v-btn variant="flat" color="secondary" class="mt-2" @click="addItem"> Add Test Case </v-btn>
+              </n-form-item>
+              <n-form-item>
+                <n-upload @before-upload="handleFileUpload">
+                  <v-btn variant="flat" color="secondary" class="mt-2"> Upload JSON </v-btn>
+                </n-upload>
+              </n-form-item>
+            </n-space>
+            <!-- Link to JSON Template -->
+            <a href="https://storage.googleapis.com/litmus-cloud/assets/template.json" target="_blank"> Click here for JSON Template </a>
           </n-tab-pane>
+
+          <!-- Request Payload Tab -->
           <n-tab-pane name="Request Payload" tab="Request Payload">
-            <!-- Request -->
-            <json-editor-vue
-              v-model="templateData.test_request"
-              mode="text"
-            ></json-editor-vue>
-            The following tokens are available: {query} , {response} , {filter} , {source}
-            , {block} , {category}
+            <!-- Test Request Button -->
+            <n-space justify="end" size="large">
+              <v-btn variant="flat" color="secondary" class="mt-2" @click="testRequest"> Test Request </v-btn>
+            </n-space>
+            <n-divider />
+            <!-- JSON Editor for Request Payload -->
+            <json-editor-vue v-model="templateData.test_request" mode="text"></json-editor-vue>
+            <!-- Available Tokens Information -->
+            The following tokens are available: {query} , {response} , {filter} , {source} , {block} , {category}
           </n-tab-pane>
+
+          <!-- Pre-Request (Optional) Tab -->
           <n-tab-pane name="Pre-Request (Optional)" tab="Pre-Request (Optional)">
-            <!-- Test Pre-Request (Optional) -->
-            <json-editor-vue
-              v-model="templateData.test_pre_request"
-              mode="text"
-            ></json-editor-vue>
+            <!-- JSON Editor for Pre-Request Payload -->
+            <json-editor-vue v-model="templateData.test_pre_request" mode="text"></json-editor-vue>
           </n-tab-pane>
+
+          <!-- Post-Request (Optional) Tab -->
           <n-tab-pane name="Post-Request (Optional)" tab="Post-Request (Optional)">
-            <!-- Test Post-Request (Optional) -->
-            <json-editor-vue
-              v-model="templateData.test_post_request"
-              mode="text"
-            ></json-editor-vue>
+            <!-- JSON Editor for Post-Request Payload -->
+            <json-editor-vue v-model="templateData.test_post_request" mode="text"></json-editor-vue>
+          </n-tab-pane>
+
+          <!-- LLM Evaluation Prompt (Optional) Tab -->
+          <n-tab-pane name="LLM Evaluation Prompt (Optional)" tab="LLM Evaluation Prompt (Optional)">
+            <!-- Textarea for LLM Evaluation Prompt -->
+            <n-input
+              v-model:value="templateData.template_llm_prompt"
+              type="textarea"
+              :autosize="{
+                minRows: 3
+              }"
+            />
           </n-tab-pane>
         </n-tabs>
       </n-card>
+
+      <!-- Input and Output Field Selection Card -->
+      <n-card>
+        <n-space justify="space-around" size="large">
+          <!-- Input Field Selection -->
+          <strong>Input Field</strong>
+          <n-button @click="showInputUI = true" dashed>
+            {{ templateData.template_input_field }}
+          </n-button>
+          <n-drawer v-model:show="showInputUI" :width="500" placement="left">
+            <n-drawer-content title="Input" closable>
+              <JsonTreeView :json="templateData.test_request" :maxDepth="10" @selected="onSelectedInput" />
+            </n-drawer-content>
+          </n-drawer>
+
+          <!-- Output Field Selection -->
+          <strong>Output Field</strong>
+          <n-button @click="testRequest" dashed>
+            {{ templateData.template_output_field }}
+          </n-button>
+          <n-drawer v-model:show="showOutputUI" :width="500" placement="left">
+            <n-drawer-content title="Output" closable>
+              <JsonTreeView :json="test_response" :maxDepth="10" @selected="onSelectedOutput" />
+            </n-drawer-content>
+          </n-drawer>
+        </n-space>
+      </n-card>
+
+      <!-- Submit/Update Template Button -->
       <n-form-item>
-        <v-btn variant="flat" color="primary" class="mt-2" @click="submitForm">
-          {{ editMode ? "Update" : "Add" }} Template</v-btn
-        >
+        <v-btn variant="flat" color="primary" class="mt-2" @click="submitForm"> {{ editMode ? 'Update' : 'Add' }} Template </v-btn>
       </n-form-item>
     </n-form>
   </div>
@@ -130,14 +155,9 @@ limitations under the License.
 
 <script lang="ts" setup>
 import {
-  NList,
-  NListItem,
-  NThing,
-  NIcon,
   NSwitch,
   NCollapse,
   NCollapseItem,
-  NCollapseTransition,
   NUpload,
   NForm,
   NFormItem,
@@ -146,12 +166,19 @@ import {
   NTabs,
   NCard,
   NTabPane,
-} from "naive-ui";
-import type { UploadFileInfo } from "naive-ui";
-import { ref, onMounted, onUnmounted, watch } from "vue";
-import { useRoute, useRouter } from "vue-router";
-import JsonEditorVue from "json-editor-vue";
+  NDrawer,
+  NDrawerContent,
+  NSpace,
+  NDivider,
+  useMessage
+} from 'naive-ui';
+import type { UploadFileInfo } from 'naive-ui';
+import { ref, onMounted, onUnmounted } from 'vue';
+import JsonEditorVue from 'json-editor-vue';
+import { JsonTreeView } from 'json-tree-view-vue3';
+import 'json-tree-view-vue3/dist/style.css';
 
+// Interface for Test Data Items
 interface DataItem {
   query: string;
   response: string;
@@ -161,105 +188,132 @@ interface DataItem {
   category: string;
 }
 
-interface PayloadItem {
-  body: {};
-  headers: {};
-  method: string;
-  url: string;
+// Type for Primitive Data Types
+type PrimitiveTypes = string | number | boolean | null;
+
+// Interface for Selected Data in JSON Tree View
+interface SelectedData {
+  key: string;
+  value: PrimitiveTypes;
+  path: string;
 }
 
+// Interface for Template Data Structure
 interface TemplateData {
   template_id: string;
   test_pre_request?: [];
   test_post_request?: [];
-  test_request?: PayloadItem;
+  test_request?: string;
   template_data: DataItem[];
+  template_input_field: string;
+  template_output_field: string;
+  template_llm_prompt: string;
 }
 
-const emit = defineEmits(["close"]);
-const route = useRoute();
-const router = useRouter();
+// Emits 'close' event to parent component
+const emit = defineEmits(['close']);
+
+// Refs for Form, Loading State, UI Elements
 const formRef = ref();
 const loading = ref(false);
-const templateData = ref<TemplateData>({
-  template_id: "",
-  template_data: [],
-} as TemplateData);
-const editMode = ref(false);
-const templateIdInput = ref<HTMLElement | null>(null);
+const showInputUI = ref(false);
+const showOutputUI = ref(false);
 
+// Naive UI Message Instance
+const message = useMessage();
+
+// Test Response Data
+let test_response: string = '';
+
+// Template Data Object with Default Values
+const templateData = ref<TemplateData>({
+  template_id: '',
+  template_data: [],
+  test_request: '',
+  template_input_field: '',
+  template_output_field: '',
+  template_llm_prompt: ''
+});
+
+// Edit Mode Flag
+const editMode = ref(false);
+
+// Form Validation Rules
 const rules = {
   template_id: {
     required: true,
-    message: "Please enter a Template ID",
-    trigger: ["blur", "input"],
-  },
+    message: 'Please enter a Template ID',
+    trigger: ['blur', 'input']
+  }
   // ... add validation rules for other fields
 };
 
+/**
+ * Handles file uploads, validating for JSON format and structure.
+ * @param data - Upload event data including file and fileList.
+ */
 const handleFileUpload = (data: { file: UploadFileInfo; fileList: UploadFileInfo[] }) => {
-  // Access the uploaded file information
   const fileData = data.file;
-  const fileName = fileData.name;
   const fileType = fileData.type;
 
-  // Check if the file is a JSON file
-  if (fileType === "application/json") {
+  if (fileType === 'application/json') {
     if (fileData.file) {
-      const file = fileData.file; // Assuming fileData.file contains the File object
+      const file = fileData.file;
       const reader = new FileReader();
       reader.onload = (e) => {
         try {
           const jsonData = JSON.parse(e.target?.result as string);
-          // Validate the JSON structure if needed
           if (validateJsonStructure(jsonData)) {
             templateData.value.template_data = jsonData;
           } else {
-            console.error("Invalid JSON structure");
-            // Handle the error (e.g., display an error message)
+            console.error('Invalid JSON structure');
           }
         } catch (error) {
-          console.error("Error parsing JSON:", error);
-          // Handle the error (e.g., display an error message)
+          console.error('Error parsing JSON:', error);
         }
       };
-      reader.readAsText(file); // Read the file as text
+      reader.readAsText(file);
     } else {
-      // Handle the case where the file is undefined (e.g., display an error message)
-      console.warn("No file selected");
+      console.warn('No file selected');
     }
   } else {
-    console.warn("Uploaded file is not a JSON file");
+    console.warn('Uploaded file is not a JSON file');
   }
 };
 
+/**
+ * Validates the structure of the uploaded JSON data.
+ * @param data - The parsed JSON data.
+ * @returns True if the structure is valid, otherwise false.
+ */
 const validateJsonStructure = (data: any[]) => {
-  // Check if data is an array
   if (!Array.isArray(data)) {
     return false;
   }
-  // Check if each item has the required properties
   return data.every((item) => {
     return (
-      typeof item.query === "string" &&
-      typeof item.response === "string" &&
+      typeof item.query === 'string' &&
+      typeof item.response === 'string' &&
       Array.isArray(item.filter) &&
-      typeof item.source === "string" &&
-      typeof item.block === "string" && // Assuming block is a string "yes" or "no"
-      typeof item.category === "string"
+      typeof item.source === 'string' &&
+      typeof item.block === 'string' &&
+      typeof item.category === 'string'
     );
   });
 };
 
+/**
+ * Fetches a template by ID from the API.
+ * @param templateId - The ID of the template to fetch.
+ */
 const getTemplate = async (templateId: string) => {
   try {
     const response = await fetch(`/templates/${templateId}`);
     if (!response.ok) {
-      throw new Error("Template not found");
+      throw new Error('Template not found');
     }
     const data = await response.json();
     templateData.value = data;
-    console.log(data);
     if (props.templateId) {
       templateData.value.template_id = props.templateId;
     }
@@ -267,92 +321,252 @@ const getTemplate = async (templateId: string) => {
       templateData.value.template_data = [];
     }
     editMode.value = true;
-  } catch (error) {
-    // Handle error (e.g., display error message, redirect)
-  }
+  } catch (error) {}
 };
 
+/**
+ * Submits the form data to the API, either creating or updating a template.
+ */
 const submitForm = async () => {
   loading.value = true;
 
   try {
-    // Prepare data for API (assuming filter is a comma-separated string)
     const dataToSend = {
       ...templateData.value,
       template_data: templateData.value.template_data.map((item) => ({
         ...item,
-        filter: typeof item.filter === "string" ? item.filter.split(",") : [], // Convert filter string to array
-      })),
+        filter: typeof item.filter === 'string' ? item.filter.split(',') : []
+      }))
     };
 
-    const response = await fetch(editMode.value ? "/update_template" : "/add_template", {
-      method: editMode.value ? "PUT" : "POST",
+    const response = await fetch(editMode.value ? '/update_template' : '/add_template', {
+      method: editMode.value ? 'PUT' : 'POST',
       headers: {
-        "Content-Type": "application/json",
-        // Add authentication headers if needed
+        'Content-Type': 'application/json'
       },
-      body: JSON.stringify(dataToSend),
+      body: JSON.stringify(dataToSend)
     });
 
     if (!response.ok) {
-      throw new Error("Failed to submit form");
+      throw new Error('Failed to submit form');
     }
 
     const responseData = await response.json();
-    console.log("Form submitted successfully:", responseData);
-
-    // ... handle success (e.g., display success message, redirect)
+    console.log('Form submitted successfully:', responseData);
   } catch (error) {
-    console.error("Error submitting form:", error);
-    // ... handle error
+    console.error('Error submitting form:', error);
   } finally {
     loading.value = false;
-    emit("close");
+    emit('close');
   }
 };
 
+/**
+ * Adds a new empty test case item to the template data.
+ */
 const addItem = () => {
   templateData.value.template_data.push({
-    query: "Enter your query",
-    response: "",
-    filter: "",
-    source: "",
+    query: 'Enter your query',
+    response: '',
+    filter: '',
+    source: '',
     block: false,
-    category: "",
+    category: ''
   });
 };
 
+/**
+ * Sends a test request based on the provided payload in the template data.
+ */
+const testRequest = async () => {
+  const reqString = templateData.value.test_request;
+
+  if (typeof reqString === 'string') {
+    try {
+      const req = JSON.parse(reqString);
+
+      const response = await fetch(req.url, {
+        method: req.method,
+        headers: req.headers,
+        body: JSON.stringify(req.body)
+      });
+
+      if (response.ok) {
+        const resptemp = await response.json();
+        test_response = JSON.stringify(resptemp);
+        showOutputUI.value = true;
+      } else {
+        message.error('Error: ' + response.status + ' ' + response.statusText);
+      }
+    } catch (parseError) {
+      console.error('Error parsing JSON:', parseError);
+      message.error('Invalid JSON format in Request Payload');
+    }
+  } else {
+    console.error('test_request is undefined');
+    message.error('Request Payload is empty');
+  }
+};
+
+/**
+ * Handles the selection of an input field from the JSON Tree View.
+ * @param event - Selection event data.
+ */
+const onSelectedInput = (event: SelectedData) => {
+  showInputUI.value = false;
+  templateData.value.template_input_field = event.path.substring(2);
+};
+
+/**
+ * Handles the selection of an output field from the JSON Tree View.
+ * @param event - Selection event data.
+ */
+const onSelectedOutput = (event: SelectedData) => {
+  showOutputUI.value = false;
+  templateData.value.template_output_field = event.path.substring(2);
+};
+
+// Props Definition
 const props = defineProps({
   templateId: {
     type: String,
-    required: false,
-  },
+    required: false
+  }
 });
 
+/**
+ * Removes a test case item from the template data by index.
+ * @param index - The index of the item to remove.
+ */
 const removeItem = (index: number) => {
   templateData.value.template_data.splice(index, 1);
 };
 
+// Lifecycle Hook: onMounted
 onMounted(() => {
   if (props.templateId) {
     getTemplate(props.templateId);
   } else {
-    // Initialize for a new template
     templateData.value = {
-      template_id: "",
+      template_id: '',
       template_data: [],
-      test_request: {
-        body: { query: "{query}" },
+      test_request: JSON.stringify({
+        body: { query: '{query}' },
         headers: {
-          "Content-Type": "application/json",
+          'Content-Type': 'application/json'
         },
-        method: "POST",
-        url: "https://example.com/request",
-      },
+        method: 'POST',
+        url: 'https://example.com/request' // Placeholder URL
+      }),
+      template_llm_prompt: `You are a thorough quality inspector. Your task is to compare a statement about some topic to a golden response. The statement and the response can have different formats. Both statement and response are in German. You inspect the statement and the response to find out:
+- has the question been answered at all?
+- does the statement contradict the response?
+- is the statement content-wise equivalent to the response, even it might have additional information?
+- does the statement have additional information not contained in the response?
+- is the statement missing information that is contained in the response?
+- to what degree is the structure and wording of the statement similar to the response, even if content may be different?
+Statements that are similar are estimated closer to 1 and statements that have different structure or wording are estimated closer to 0.
+You MUST provide your output in JSON format. Do not provide any additional output.
+This is what the JSON should look like:
+{
+    "answered": 'true' if the question has been answered at all and 'false' if it has not,
+    "contradictory": 'true' if the statement contradicts the response and 'false' if they agree,
+    "contradictory_explanation": "explanation of how the statement contradicts the response if they don't agree",
+    "equivalent": 'true' if the statement has equivalent information to the response and 'false' if the information differs,
+    "equivalent_explanation": "explanation of how the two statements are different when they are not equivalent",
+    "addlinfo": 'true' if the statement contains additional information compared to the response and 'false' if there is no additional information,
+    "addlinfo_explanation": "explanation about the additional information if it present",
+    "missinginfo": 'true' if the statement is missing information present in the response and 'false' if no information is missing,
+    "missinginfo_explanation": "explanation about any missing information",
+    "similarity": "provide a fractional numeric value between 0 and 1 that estimates the similarity of the statement to the response",
+    "similarity_explanation": "explanation for the choice of value for the similarity attribute"
+}
+
+
+Here is an example:
+Statement: Der Fussballer B war 2011 und 2012 Fussballer des Jahres.
+Golden response: 2010 und 2012 war B Fussballer des Jahres.
+
+Comparison result:
+{
+    "answered": true,
+    "contradictory": true,
+    "contradictory_explanation": "There is a contradiction because the years are different",
+    "equivalent": false,
+    "equivalent_explanation": "The years are different",
+    "addlinfo": false,
+    "addlinfo_explanation": "No additional information present",
+    "missinginfo": false,
+    "missinginfo_explanation": "No information is missing",
+    "similarity": 0.8,
+    "similarity_explanation": "The structure is similar but the facts are different"
+}
+
+
+Here is another example:
+Statement: Die Polizei im Kanton A wurde gestern wegen einer Unruhestörung zu einem Privathaus gerufen.
+Best-known response: Aufgrund einer Unruhestörung rückte die Polizei gestern im Kanton A aus.
+
+Comparison result:
+{
+    "answered": true,
+    "contradictory": false,
+    "contradictory_explanation": "There is no contradiction",
+    "equivalent": true,
+    "equivalent_explanation": "Both statement and response mention the same incident",
+    "addlinfo": true,
+    "addlinfo_explanation": "The statement mentions the private house, the best-known response does not",
+    "missinginfo": false,
+    "missinginfo_explanation": "Nothing is missing",
+    "similarity": 0.6,
+    "similarity_explanation": "The information is similar but the wording is different"
+}
+
+
+Here is another example:
+Statement: C ist seit 2010 CEO von D.
+Best-known response: C wurde 2010 zum CEO von D ernannt.
+
+Comparison result:
+{
+    "answered": true,
+    "contradictory": false,
+    "contradictory_explanation": "There is no contradiction",
+    "equivalent": true,
+    "equivalent_explanation": "Both statement and response mention the same facts",
+    "addlinfo": false,
+    "addlinfo_explanation": "No additional information present",
+    "missinginfo": true,
+    "missinginfo_explanation": "No information is missing",
+    "similarity": 0.8,
+    "similarity_explanation": "The structure is similar but the wording is different"
+}
+
+Here is another example:
+Statement: Diese Frage kann ich nicht beantworten.
+Best-known response: Die Stadt X wurde 1833 gegründet.
+
+Comparison result:
+{
+    "answered": false,
+    "contradictory": true,
+    "contradictory_explanation": "There is a contradiction because there is a possible answer",
+    "equivalent": false,
+    "equivalent_explanation": "The question has not been answered",
+    "addlinfo": false,
+    "addlinfo_explanation": "No additional information present",
+    "missinginfo": true,
+    "missinginfo_explanation": "The facts from the golden response are missing",
+    "similarity": 0,
+    "similarity_explanation": "There is no answer provided"
+}`,
+      template_input_field: 'INCOMPLETE',
+      template_output_field: 'INCOMPLETE'
     };
   }
 });
 
+// Lifecycle Hook: onUnmounted
 onUnmounted(() => {
   // ... Perform any cleanup if necessary
 });
