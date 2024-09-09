@@ -6,7 +6,9 @@ This repository contains the code for the Litmus API, a service that manages and
 - **Manage test templates:** Create, update, delete, and list test templates in Firestore, defining the structure and parameters of test runs.
 - **Retrieve test run status and results:** Get the status, progress, and detailed results (requests, responses) of a test run.
 - **Filter results:** Filter responses from test runs based on specific JSON paths.
-- **Retrieve results for all runs of a template:**  Gather filtered responses from all runs of a specified template, sorted by start time.
+- **Retrieve results for all runs of a template:** Gather filtered responses from all runs of a specified template, sorted by start time.
+- **Retrieve and aggregate proxy data:** Access detailed or aggregated logs from a BigQuery table containing proxy logs.
+- **List Proxy Services:** View and manage deployed proxy services for logging LLM interactions.
 
 **Features:**
 
@@ -14,13 +16,15 @@ This repository contains the code for the Litmus API, a service that manages and
 - **Cloud Run Job Invocation:** Uses Google Cloud Run to execute test runs using a dedicated worker job.
 - **Authorization:** Implements basic authentication to protect API endpoints.
 - **CORS Support:** Enables cross-origin requests from web applications.
-- **Compression:**  Uses GZIP compression to optimize API responses.
-- **Filter JSON Paths:**  Provides functionality to filter responses based on specific JSON paths for easier analysis.
+- **Compression:** Uses GZIP compression to optimize API responses.
+- **Filter JSON Paths:** Provides functionality to filter responses based on specific JSON paths for easier analysis.
+- **BigQuery Integration:** Connects to a BigQuery table to retrieve and display proxy data, offering both detailed and aggregated views.
 
 **Prerequisites:**
 
 - **Google Cloud Project:** You need a Google Cloud project to deploy and run the Litmus API.
 - **Firestore Database:** Create a Firestore database in your Google Cloud project.
+- **BigQuery Dataset:** Create a BigQuery dataset for storing proxy logs.
 - **Service Accounts:** Create service accounts for both the API and the worker, and grant the worker permission to invoke the API.
 - **Cloud Run Job:** Deploy a Cloud Run job that handles the execution of test cases.
 - **Docker Image:** Build and push the Docker image for the API to a container registry (e.g., Google Container Registry).
@@ -29,20 +33,24 @@ This repository contains the code for the Litmus API, a service that manages and
 **Getting Started:**
 
 1. **Set Up Your Google Cloud Project:**
-   - Enable the required APIs (Firestore, Cloud Run, etc.).
+
+   - Enable the required APIs (Firestore, Cloud Run, BigQuery, etc.).
    - Create service accounts and grant necessary permissions.
    - Deploy the worker job using a Docker image.
 
 2. **Configure Settings:**
+
    - Create a `util/settings.py` file with the following settings:
      ```python
      project_id = "your-google-cloud-project-id"
      region = "your-gcp-region"
      disable_auth = False # Set to True to disable authentication
+     auth_user = "your-username" # Set this to the username for basic auth
      auth_pass = "your-password" # Set this to a password you want to use for basic auth
      ```
 
 3. **Build and Deploy the API:**
+
    - Build the Docker image for the API:
      ```bash
      docker build -t gcr.io/<your-project-id>/litmus-api:latest .
@@ -64,186 +72,235 @@ This repository contains the code for the Litmus API, a service that manages and
 
 **1. Submit Test Run**
 
-   - **Endpoint:** `/submit_run`
-   - **Method:** POST
-   - **Request Body:**
-     ```json
-     {
-       "run_id": "your-run-id",
-       "template_id": "your-template-id",
-       "pre_request": { ... }, // Optional: Pre-request data
-       "post_request": { ... }, // Optional: Post-request data
-       "test_request": { ... } //  Test request data with placeholders
-     }
-     ```
-   - **Response:**
-     ```json
-     {
-       "message": "Test run 'your-run-id' submitted successfully using template 'your-template-id'"
-     }
-     ```
+- **Endpoint:** `/submit_run`
+- **Method:** POST
+- **Request Body:**
+  ```json
+  {
+    "run_id": "your-run-id",
+    "template_id": "your-template-id",
+    "pre_request": { ... }, // Optional: Pre-request data
+    "post_request": { ... }, // Optional: Post-request data
+    "test_request": { ... } //  Test request data with placeholders
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "message": "Test run 'your-run-id' submitted successfully using template 'your-template-id'"
+  }
+  ```
 
 **2. Manage Test Templates**
 
-   - **Add Template:**
-     - **Endpoint:** `/add_template`
-     - **Method:** POST
-     - **Request Body:**
-       ```json
-       {
-         "template_id": "your-template-id",
-         "template_data": [ ... ], // Array of request/response pairs with placeholders
-         "test_pre_request": { ... }, // Optional: Pre-request for the template
-         "test_post_request": { ... }, // Optional: Post-request for the template
-         "test_request": { ... } // Test request with placeholders
-       }
-       ```
-     - **Response:**
-       ```json
-       {
-         "message": "Template 'your-template-id' added successfully"
-       }
-       ```
+- **Add Template:**
 
-   - **Update Template:**
-     - **Endpoint:** `/update_template`
-     - **Method:** PUT
-     - **Request Body:**
-       ```json
-       {
-         "template_id": "your-template-id",
-         "template_data": [ ... ], // Updated template data (optional)
-         "test_pre_request": { ... }, // Updated pre-request (optional)
-         "test_post_request": { ... }, // Updated post-request (optional)
-         "test_request": { ... } // Updated test request (optional)
-       }
-       ```
-     - **Response:**
-       ```json
-       {
-         "message": "Template 'your-template-id' updated successfully"
-       }
-       ```
+  - **Endpoint:** `/add_template`
+  - **Method:** POST
+  - **Request Body:**
+    ```json
+    {
+      "template_id": "your-template-id",
+      "template_data": [ ... ], // Array of request/response pairs with placeholders
+      "test_pre_request": { ... }, // Optional: Pre-request for the template
+      "test_post_request": { ... }, // Optional: Post-request for the template
+      "test_request": { ... } // Test request with placeholders
+    }
+    ```
+  - **Response:**
+    ```json
+    {
+      "message": "Template 'your-template-id' added successfully"
+    }
+    ```
 
-   - **Delete Template:**
-     - **Endpoint:** `/delete_template/<template_id>`
-     - **Method:** DELETE
-     - **Response:**
-       ```json
-       {
-         "message": "Template 'your-template-id' deleted successfully"
-       }
-       ```
+- **Update Template:**
 
-   - **List Templates:**
-     - **Endpoint:** `/templates`
-     - **Method:** GET
-     - **Response:**
-       ```json
-       {
-         "template_ids": [ "template1", "template2", ... ]
-       }
-       ```
+  - **Endpoint:** `/update_template`
+  - **Method:** PUT
+  - **Request Body:**
+    ```json
+    {
+      "template_id": "your-template-id",
+      "template_data": [ ... ], // Updated template data (optional)
+      "test_pre_request": { ... }, // Updated pre-request (optional)
+      "test_post_request": { ... }, // Updated post-request (optional)
+      "test_request": { ... } // Updated test request (optional)
+    }
+    ```
+  - **Response:**
+    ```json
+    {
+      "message": "Template 'your-template-id' updated successfully"
+    }
+    ```
 
-   - **Get Template:**
-     - **Endpoint:** `/templates/<template_id>`
-     - **Method:** GET
-     - **Response:**
-       ```json
-       {
-         "template_data": [ ... ], // Array of request/response pairs
-         "test_pre_request": { ... }, // Pre-request for the template (optional)
-         "test_post_request": { ... }, // Post-request for the template (optional)
-         "test_request": { ... } // Test request for the template 
-       }
-       ```
+- **Delete Template:**
+
+  - **Endpoint:** `/delete_template/<template_id>`
+  - **Method:** DELETE
+  - **Response:**
+    ```json
+    {
+      "message": "Template 'your-template-id' deleted successfully"
+    }
+    ```
+
+- **List Templates:**
+
+  - **Endpoint:** `/templates`
+  - **Method:** GET
+  - **Response:**
+    ```json
+    {
+      "template_ids": [ "template1", "template2", ... ]
+    }
+    ```
+
+- **Get Template:**
+  - **Endpoint:** `/templates/<template_id>`
+  - **Method:** GET
+  - **Response:**
+    ```json
+    {
+      "template_data": [ ... ], // Array of request/response pairs
+      "test_pre_request": { ... }, // Pre-request for the template (optional)
+      "test_post_request": { ... }, // Post-request for the template (optional)
+      "test_request": { ... } // Test request for the template
+    }
+    ```
 
 **3. Retrieve Test Run Status and Results**
 
-   - **Get Run Status:**
-     - **Endpoint:** `/run_status/<run_id>`
-     - **Method:** GET
-     - **Query Parameters:**
-       - `request_filter`:  Filter the request based on a JSON path (e.g., `body.param1`).
-       - `response_filter`: Filter the response based on a JSON path (e.g., `result.status`).
-       - `golden_response_filter`: Filter the golden response based on a JSON path.
-     - **Response:**
-       ```json
-       {
-         "status": "Completed",
-         "progress": "10/10",
-         "testCases": [
-           {
-             "id": "test_case_1", // ID of the test case
-             "request": { ... }, // Filtered request data
-             "response": { ... }, // Filtered response data
-             "golden_response": { ... } // Filtered golden response data 
-           },
-           ...
-         ]
-       }
-       ```
+- **Get Run Status:**
 
-   - **Get Results for All Runs of a Template:**
-     - **Endpoint:** `/all_run_results/<template_id>`
-     - **Method:** GET
-     - **Query Parameters:**
-       - `request_filter`:  Filter the request based on a JSON path (e.g., `body.param1`).
-       - `response_filter`: Filter the response based on a JSON path (e.g., `result.status`).
-     - **Response:**
-       ```json
-       {
-         "request_key1": [ 
-           {
-             "start_time": "2024-06-05T14:20:39.000Z",
-             "end_time": "2024-06-05T14:20:42.000Z", 
-             "run_id": "run-123",
-             "data": { ... } // Filtered response data
-           },
-           {
-             "start_time": "2024-06-05T14:25:39.000Z",
-             "end_time": "2024-06-05T14:25:42.000Z", 
-             "run_id": "run-456",
-             "data": { ... } // Filtered response data
-           },
-           ...
-         ],
-         "request_key2": [ ... ], 
-         ...
-       }
-       ```
+  - **Endpoint:** `/run_status/<run_id>`
+  - **Method:** GET
+  - **Query Parameters:**
+    - `request_filter`: Filter the request based on a JSON path (e.g., `body.param1`).
+    - `response_filter`: Filter the response based on a JSON path (e.g., `result.status`).
+    - `golden_response_filter`: Filter the golden response based on a JSON path.
+  - **Response:**
+    ```json
+    {
+      "status": "Completed",
+      "progress": "10/10",
+      "testCases": [
+        {
+          "id": "test_case_1", // ID of the test case
+          "request": { ... }, // Filtered request data
+          "response": { ... }, // Filtered response data
+          "golden_response": { ... } // Filtered golden response data
+        },
+        ...
+      ]
+    }
+    ```
+
+- **Get Results for All Runs of a Template:**
+  - **Endpoint:** `/all_run_results/<template_id>`
+  - **Method:** GET
+  - **Query Parameters:**
+    - `request_filter`: Filter the request based on a JSON path (e.g., `body.param1`).
+    - `response_filter`: Filter the response based on a JSON path (e.g., `result.status`).
+  - **Response:**
+    ```json
+    {
+      "request_key1": [
+        {
+          "start_time": "2024-06-05T14:20:39.000Z",
+          "end_time": "2024-06-05T14:20:42.000Z",
+          "run_id": "run-123",
+          "data": { ... } // Filtered response data
+        },
+        {
+          "start_time": "2024-06-05T14:25:39.000Z",
+          "end_time": "2024-06-05T14:25:42.000Z",
+          "run_id": "run-456",
+          "data": { ... } // Filtered response data
+        },
+        ...
+      ],
+      "request_key2": [ ... ],
+      ...
+    }
+    ```
 
 **4. List All Test Runs**
 
-   - **Endpoint:** `/runs`
-   - **Method:** GET
-   - **Response:**
-     ```json
-     {
-       "runs": [
-         {
-           "run_id": "your-run-id",
-           "status": "Completed",
-           "start_time": "2024-06-05T14:20:39.000Z",
-           "end_time": "2024-06-05T14:20:42.000Z",
-           "progress": "10/10",
-           "template_id": "your-template-id"
-         },
-         ...
-       ]
-     }
-     ```
+- **Endpoint:** `/runs`
+- **Method:** GET
+- **Response:**
+  ```json
+  {
+    "runs": [
+      {
+        "run_id": "your-run-id",
+        "status": "Completed",
+        "start_time": "2024-06-05T14:20:39.000Z",
+        "end_time": "2024-06-05T14:20:42.000Z",
+        "progress": "10/10",
+        "template_id": "your-template-id"
+      },
+      ...
+    ]
+  }
+  ```
 
-**5. Version**
+**5. Proxy Data**
 
-   - **Endpoint:** `/version`
-   - **Method:** GET
-   - **Response:**
-     ```json
-     {
-       "version": "0.0.0-alpha"
-     }
-     ```
+- **Endpoint:** `/proxy_data`
+- **Method:** GET
+- **Query Parameters:**
+  - `date`: Date of the log entries (format: YYYY-MM-DD)
+  - `context` (optional): Litmus Context to filter by.
+  - `flatten` (optional): Whether to flatten the returned JSON. Defaults to false.
+- **Response:**
+  - **If `flatten` is False (default):** Returns an array of JSON objects, each representing a log entry.
+  - **If `flatten` is True:** Returns an array of flattened JSON objects.
+
+**6. Aggregated Proxy Data**
+
+- **Endpoint:** `/proxy_agg`
+- **Method:** GET
+- **Query Parameters:**
+  - `date`: Date of the log entries (format: YYYY-MM-DD)
+  - `context` (optional): Litmus Context to filter by.
+- **Response:**
+  - Returns an array of JSON objects, each representing aggregated data for a specific context and request parameters.
+  - Includes fields like `total_token_count`, `average_latency`, etc.
+
+**7. Version**
+
+- **Endpoint:** `/version`
+- **Method:** GET
+- **Response:**
+  ```json
+  {
+    "version": "0.0.0-alpha"
+  }
+  ```
+
+**8. List Proxy Services**
+
+- **Endpoint:** `/list_proxy_services`
+- **Method:** GET
+- **Response:**
+  ```json
+  {
+    "proxy_services": [
+      {
+        "name": "us-central1-aiplatform-litmus-abcd",
+        "project_id": "your-project-id",
+        "region": "us-central1",
+        "uri": "https://us-central1-aiplatform-litmus-abcd-1234567890.a.run.app",
+        "created": "2024-07-25T10:30:00Z",
+        "updated": "2024-07-25T12:00:00Z"
+      },
+      ...
+    ]
+  }
+  ```
 
 **Authentication:**
 
@@ -251,7 +308,7 @@ This repository contains the code for the Litmus API, a service that manages and
 - You can disable authentication by setting `disable_auth` to `True` in `util/settings.py`.
 - If authentication is enabled, you need to send basic authentication credentials (username and password) in the request headers.
 
-**Note:** 
-- This documentation outlines the main API endpoints and their basic functionality. 
-- Refer to the API code for more detailed documentation about each endpoint and its usage.
+**Note:**
 
+- This documentation outlines the main API endpoints and their basic functionality.
+- Refer to the API code for more detailed documentation about each endpoint and its usage.
