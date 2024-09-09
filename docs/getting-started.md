@@ -35,7 +35,7 @@
 
    - This will deploy the Litmus core services to your default GCP project.
    - The deployment script creates required service accounts, grants permissions, and deploys the worker and API services to Cloud Run.
-   - You can customize the project and region using flags (see [CLI Usage](cli/README.md)).
+   - You can customize the project and region using flags (see [CLI Usage](https://github.com/google/litmus/tree/main/cli)).
 
 3. **Access Litmus:**
    - Run `litmus status` to retrieve the Litmus web interface URL and credentials.
@@ -59,8 +59,8 @@
 
 ## Need Help?
 
-- **Litmus CLI Usage:** Refer to the Litmus CLI documentation: [cli/README.md](cli/README.md)
-- **Proxy Service:** Learn about deploying and using the Litmus proxy service: [proxy/README.md](proxy/README.md)
-- **Contribute:** We welcome your contributions! See [CONTRIBUTING.md](CONTRIBUTING.md) for details.
+- **Litmus CLI Usage:** Refer to the Litmus CLI documentation: [cli/README.md](https://github.com/google/litmus/tree/main/cli)
+- **Proxy Service:** Learn about deploying and using the Litmus proxy service: [proxy/README.md](https://github.com/google/litmus/tree/main/proxy)
+- **Contribute:** We welcome your contributions! See [CONTRIBUTING.md](https://github.com/google/litmus/blob/main/CONTRIBUTING.md) for details.
 
 Let's get started with testing and evaluating your LLMs with Litmus!

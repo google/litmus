@@ -133,10 +133,6 @@ gcloud services enable run.googleapis.com firestore.googleapis.com bigquery.goog
 - The UI code is in the `api/ui` directory. You can host it using any web server (e.g., Nginx, Apache).
 - Make sure the UI is configured to connect to the deployed API service URL (from the "litmus-service-url" secret).
 
-## 6. Analytics Setup
-
-- Follow the steps in the [Analytics Documentation](cli/analytics/README.md) to set up Litmus analytics and start capturing valuable logs and insights about your LLM interactions.
-
 ## Using Litmus
 
 1. **Access UI:** If you deployed the UI, navigate to its URL.
@@ -147,7 +143,7 @@ gcloud services enable run.googleapis.com firestore.googleapis.com bigquery.goog
 
 ## Proxy Service Setup
 
-- Refer to the [Proxy Service Documentation](proxy/README.md) for detailed instructions on deploying and utilizing the Litmus proxy to monitor LLM interactions.
+- Refer to the [Proxy Service Documentation](https://github.com/google/litmus/tree/main/proxy) for detailed instructions on deploying and utilizing the Litmus proxy to monitor LLM interactions.
 
 ## Customization
 

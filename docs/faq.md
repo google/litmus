@@ -9,7 +9,7 @@ There are two ways to use Litmus:
 - **Use the provided CLI:** This is the easiest way to set up Litmus.
 - **Manual Setup:** This allows for more customization.
 
-See the [README](README.md) for more details.
+See the [README](https://github.com/google/litmus/) for more details.
 
 **What are the benefits of using Litmus?**
 Litmus offers several benefits for testing and evaluating LLMs:
@@ -26,10 +26,10 @@ Litmus offers several benefits for testing and evaluating LLMs:
 - **Quick Deployment:** Facilitates streamlined setup through a deployment tool, simplifying the process of getting Litmus up and running in your environment.
 
 **What LLMs does Litmus support?**
-Currently, Litmus supports Google's [Gemini](https://ai.google.dev/tutorials/get-started-gemini) family of models. The default model can be configured in [settings.py](api/util/settings.py).
+Currently, Litmus supports Google's [Gemini](https://ai.google.dev/tutorials/get-started-gemini) family of models. The default model can be configured in [settings.py](https://github.com/google/litmus/blob/main/api/util/settings.py).
 
 **How can I get help?**
-Please refer to the [README](README.md) for the different ways to get help.
+Please refer to the [README](https://github.com/google/litmus/) for the different ways to get help.
 
 **How can I contribute?**
-Contributions to Litmus are welcome! Please refer to the [CONTRIBUTING](CONTRIBUTING.md) file for guidelines and instructions on how to contribute.
+Contributions to Litmus are welcome! Please refer to the [CONTRIBUTING](https://github.com/google/litmus/blob/main/CONTRIBUTING.md) file for guidelines and instructions on how to contribute.

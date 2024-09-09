@@ -38,7 +38,7 @@ This document outlines the steps to add a new test template using the Litmus Use
 
 5. **Save the Template:** When finished, click the "Add Template" button. This will save your new template.
 
-6. **Start a Run:** You can now use this template to submit test runs. Refer to the [Submitting Test Runs](link-to-submitting-runs.md) documentation for details.
+6. **Start a Run:** You can now use this template to submit test runs. Refer to the [Submitting Test Runs](/ui-start-test-run) documentation for details.
 
 ## Example JSON Upload
 
