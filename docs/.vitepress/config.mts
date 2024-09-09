@@ -2,7 +2,7 @@ import { defineConfig } from "vitepress";
 
 // https://vitepress.dev/reference/site-config
 export default defineConfig({
-  base: "/",
+  base: "/litmus/",
   outDir: "dist",
   cleanUrls: true,
   title: "google/litmus",
