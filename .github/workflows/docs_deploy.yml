@@ -28,13 +28,15 @@ jobs:
       - name: Setup Pages
         uses: actions/configure-pages@v3
       - name: Install deps
+        working-directory: ./docs
         run: npm ci
       - name: Built docs
+        working-directory: ./docs
         run: npm run docs:build
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v2
         with:
-          path: "docs"
+          path: "docs/dist"
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v2
