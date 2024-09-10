@@ -1,4 +1,4 @@
-## Litmus Proxy: Capture and Analyze Your LLM Interactions
+# Litmus Proxy: Capture and Analyze Your LLM Interactions
 
 The Litmus Proxy provides a powerful and transparent way to log and understand interactions with your Large Language Models (LLMs), including Vertex AI and other providers. By routing your LLM API traffic through the proxy, you gain valuable insights into usage patterns, performance, and potential areas for improvement.
 
@@ -9,16 +9,16 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
 - **Usage Analysis:** Gain insights into how your LLMs are being utilized, enabling you to optimize prompts, identify common queries, and track performance over time.
 - **Customizable Integrations:** Forward logs to various destinations like Cloud Logging or your preferred monitoring tools for further analysis and visualization.
 
-### Getting Started
+## Getting Started
 
-#### Prerequisites
+### Prerequisites
 
 - Google Cloud Project with the following APIs enabled:
   - Cloud Run API
   - Secret Manager API
 - Google Cloud SDK installed and configured
 
-#### Deployment
+### Deployment
 
 1. **Install the Litmus CLI:**
 
@@ -47,7 +47,7 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
 
    - Replace `<your_upstream_url>` with the desired upstream endpoint (e.g., `europe-west1-aiplatform.googleapis.com`).
 
-#### Usage
+### Usage
 
 1. **Retrieve Proxy Endpoint:**
 
@@ -97,7 +97,7 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
    vertexai.init(project=project, location=location, api_endpoint=proxy_endpoint, api_transport="rest")
    ```
 
-#### Additional Commands
+### Additional Commands
 
 - **Remove Proxy Service:**
 
@@ -111,7 +111,7 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
   litmus proxy destroy-all
   ```
 
-### Log Analysis
+## Log Analysis
 
 The Litmus Proxy logs provide a detailed record of each LLM interaction, including:
 
