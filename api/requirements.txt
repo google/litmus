@@ -9,3 +9,4 @@ uuid
 gunicorn
 bigquery
 numpy==1.20.0
+setuptools
