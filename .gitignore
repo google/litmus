@@ -1,2 +1,3 @@
 api/lib64
 *.pyc
+cli/cli

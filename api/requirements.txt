@@ -8,3 +8,4 @@ requests
 uuid
 gunicorn
 bigquery
+numpy==1.26.4

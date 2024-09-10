@@ -89,7 +89,7 @@ limitations under the License.
             <!-- JSON Editor for Request Payload -->
             <json-editor-vue v-model="templateData.test_request" mode="text"></json-editor-vue>
             <!-- Available Tokens Information -->
-            The following tokens are available: {query} , {response} , {filter} , {source} , {block} , {category}
+            The following tokens are available: {query} , {response} , {filter} , {source} , {block} , {category}, {auth_token}
           </n-tab-pane>
 
           <!-- Pre-Request (Optional) Tab -->

@@ -5,6 +5,7 @@ go 1.23
 require (
 	cloud.google.com/go/secretmanager v1.13.6
 	github.com/briandowns/spinner v1.23.1
+	github.com/google/uuid v1.6.0
 )
 
 require (
