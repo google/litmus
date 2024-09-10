@@ -83,8 +83,14 @@ def version():
 
 @app.route("/submit_run", methods=["POST"])
 @auth.login_required
-def submit_run():
+def submit_run(data=None):
     """Submits a new test run.
+
+    Can be called with data from a request or directly with a data dictionary.
+
+    Args:
+        data (dict, optional): A dictionary containing run information.
+                             If None, data is fetched from request.get_json().
 
     Expects a JSON payload with:
         - run_id: Unique identifier for the test run.
@@ -100,7 +106,8 @@ def submit_run():
         JSON response indicating success or failure.
     """
 
-    data = request.get_json()
+    if data is None:
+        data = request.get_json()
     run_id = data.get("run_id")
     template_id = data.get("template_id")
     pre_request = data.get("pre_request")
@@ -109,6 +116,7 @@ def submit_run():
     template_llm_prompt = data.get("template_llm_prompt")
     template_input_field = data.get("template_input_field")
     template_output_field = data.get("template_output_field")
+    auth_token = data.get("auth_token")
 
     # Input validation
     if not run_id or not template_id:
@@ -154,6 +162,10 @@ def submit_run():
             if key == "response":
                 test["golden_response"] = value
 
+                # Replace {auth_token} in the test request
+        if auth_token:
+            json_string = json_string.replace("{auth_token}", auth_token)
+
         test["request"] = json.loads(json_string)
         test["result"] = None
         tests.append(test)
@@ -191,6 +203,55 @@ def submit_run():
             "message": f"Test run '{run_id}' submitted successfully using template '{template_id}'"
         }
     )
+
+
+@app.route("/submit_run_simple", methods=["POST"])
+@auth.login_required
+def submit_run_simple():
+    """Submits a new test run using default values from the template.
+
+    Expects a JSON payload with:
+        - run_id: Unique identifier for the test run.
+        - template_id: Identifier for the test template.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+
+    data = request.get_json()
+    run_id = data.get("run_id")
+    template_id = data.get("template_id")
+    auth_token = data.get("auth_token")
+
+    # Input validation
+    if not run_id or not template_id:
+        return (
+            jsonify({"error": "Missing 'run_id' or 'template_id' in request data"}),
+            400,
+        )
+
+    # Retrieve test template from Firestore
+    template_ref = db.collection("test_templates").document(template_id)
+    template_data = template_ref.get().to_dict()
+
+    if not template_data:
+        return jsonify({"error": f"Test template '{template_id}' not found"}), 404
+
+    # Construct data for submit_run() using template defaults
+    submit_data = {
+        "run_id": run_id,
+        "template_id": template_id,
+        "test_request": template_data.get("test_request"),
+        "template_llm_prompt": template_data.get("template_llm_prompt"),
+        "template_input_field": template_data.get("template_input_field"),
+        "template_output_field": template_data.get("template_output_field"),
+        "pre_request": template_data.get("test_pre_request"),
+        "post_request": template_data.get("test_post_request"),
+        "auth_token": auth_token,
+    }
+
+    # Call submit_run() with constructed data
+    return submit_run(submit_data)
 
 
 # Invoke Run

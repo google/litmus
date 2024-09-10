@@ -22,6 +22,7 @@ import (
 	"github.com/google/litmus/cli/analytics"
 	"github.com/google/litmus/cli/cmd"
 	"github.com/google/litmus/cli/utils"
+	"github.com/google/uuid"
 )
 
 func main() {
@@ -122,6 +123,31 @@ func main() {
 			return
 		}
 		cmd.OpenRun(projectID, runID)
+    case "start":
+        // 1. Handle TEMPLATE_ID
+        if len(os.Args) < 3 {
+            fmt.Println("Error: 'start' command requires a TEMPLATE_ID argument")
+            return
+        }
+        templateID := os.Args[2]
+
+        // 2. Handle RUN_ID (generate if not provided)
+        if runID == "" {
+            runID = uuid.New().String() // Generate a random UUID
+            fmt.Printf("Generated Run ID: %s\n", runID)
+        }
+
+        // 3. Get AUTH_TOKEN (optional)
+        authToken := os.Getenv("AUTH_TOKEN")
+
+        // Example: Assuming cmd.SubmitRun takes templateID, runID, and optionally authToken
+        err := cmd.SubmitRun(templateID, runID, projectID, authToken) 
+        if err != nil {
+            fmt.Printf("Error submitting run: %v\n", err)
+            return
+        }
+
+        fmt.Println("Run submitted successfully.")
 	case "status":
 		cmd.ShowStatus(projectID)
 	case "version":
