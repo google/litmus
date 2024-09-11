@@ -39,9 +39,9 @@ class Settings:
     """AI Model for validation of responses. Defaults to "gemini-1.5-flash"."""
 
     # Application general
-    disable_auth: bool = os.getenv("DISABLE_AUTH", "False") == "False"
+    disable_auth: bool = os.getenv("DISABLE_AUTH", "True") == "True"
     """Flag to enable/disable authentication. 
-    Defaults to False (authentication enabled)
+    Defaults to True (authentication enabled)
     """
     auth_user: str = os.environ.get("USERNAME", "admin")
     """Username for authentication. Defaults to "admin"."""
