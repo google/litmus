@@ -241,7 +241,7 @@ def submit_run_simple():
     submit_data = {
         "run_id": run_id,
         "template_id": template_id,
-        "test_request": template_data.get("test_request"),
+        "test_request": json.loads(template_data.get("test_request")),
         "template_llm_prompt": template_data.get("template_llm_prompt"),
         "template_input_field": template_data.get("template_input_field"),
         "template_output_field": template_data.get("template_output_field"),
