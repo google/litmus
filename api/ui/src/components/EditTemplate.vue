@@ -18,28 +18,68 @@ limitations under the License.
   <div class="add-update-template">
     <!-- Form to manage Litmus test templates -->
     <n-form ref="formRef" :model="templateData" :rules="rules" label-placement="top">
-      <!-- Template ID Input -->
-      <n-form-item label="Template ID" path="template_id">
-        <n-input v-model:value="templateData.template_id" placeholder="Enter Template ID" :disabled="editMode" />
-      </n-form-item>
+      <n-card>
+        <n-space>
+          <!-- Template ID Input -->
+          <n-form-item label="Template ID" path="template_id">
+            <n-input v-model:value="templateData.template_id" placeholder="Enter Template ID" :disabled="editMode" />
+          </n-form-item>
+
+          <!-- Template Type Selection -->
+          <n-form-item label="Type" path="template_type">
+            <n-select
+              v-model:value="templateData.template_type"
+              :options="templateTypeOptions"
+              @update:value="syncTabs"
+              :disabled="editMode"
+            />
+          </n-form-item>
+        </n-space>
+      </n-card>
 
       <!-- Main Content Card: Test Cases, Request Payloads, LLM Prompts -->
       <n-card>
-        <n-tabs type="line" animated>
+        <n-tabs type="line" ref="templateTabs" animated v-model:value="tabvalue">
           <!-- Test Cases Tab -->
-          <n-tab-pane name="Test Cases" tab="Test Cases">
-            <!-- Test Data Items -->
+          <n-tab-pane
+            :name="templateData.template_type === 'Test Run' ? 'Test Cases' : 'Missions'"
+            :tab="templateData.template_type === 'Test Run' ? 'Test Cases' : 'Missions'"
+          >
+            <!-- Mission Duration Input (only for Test Mission type) -->
+            <n-form-item
+              v-if="templateData.template_type === 'Test Mission'"
+              label="Mission Duration (Number of loops)"
+              path="mission_duration"
+            >
+              <n-input-number v-model:value="templateData.mission_duration" placeholder="Enter Mission Duration" />
+            </n-form-item>
+            <!-- Test Data / Mission Items -->
             <n-form-item>
               <n-collapse>
                 <n-collapse-item v-for="(item, index) in templateData.template_data" :key="index" :title="item.query">
                   <div class="data-item">
-                    <!-- Query Input -->
-                    <n-form-item label="Query" :path="`template_data.${index}.query`">
-                      <n-input v-model:value="item.query" placeholder="Enter Query" />
+                    <!-- Dynamic Label and Path for Query/Mission -->
+                    <n-form-item
+                      :label="templateData.template_type === 'Test Run' ? 'Query' : 'Mission'"
+                      :path="`template_data.${index}.query`"
+                    >
+                      <n-input
+                        v-model:value="item.query"
+                        type="textarea"
+                        :placeholder="templateData.template_type === 'Test Run' ? 'Enter Query' : 'Enter Mission'"
+                      />
                     </n-form-item>
-                    <!-- Expected Response Input -->
-                    <n-form-item label="Response" :path="`template_data.${index}.response`">
-                      <n-input v-model:value="item.response" type="textarea" placeholder="Enter Response" />
+
+                    <!-- Dynamic Label and Path for Response/Mission Result -->
+                    <n-form-item
+                      :label="templateData.template_type === 'Test Run' ? 'Response' : 'Mission Result'"
+                      :path="`template_data.${index}.response`"
+                    >
+                      <n-input
+                        v-model:value="item.response"
+                        type="textarea"
+                        :placeholder="templateData.template_type === 'Test Run' ? 'Enter Response' : 'Enter Mission Result'"
+                      />
                     </n-form-item>
                     <!-- Filter Input -->
                     <n-form-item label="Filter" :path="`template_data.${index}.filter`">
@@ -67,7 +107,12 @@ limitations under the License.
             <!-- Add Test Case and Upload JSON Buttons -->
             <n-space>
               <n-form-item>
-                <v-btn variant="flat" color="secondary" class="mt-2" @click="addItem"> Add Test Case </v-btn>
+                <v-btn variant="flat" color="secondary" class="mt-2" @click="addItem" v-if="templateData.template_type === 'Test Run'">
+                  Add Test Case
+                </v-btn>
+                <v-btn variant="flat" color="secondary" class="mt-2" @click="addItem" v-if="templateData.template_type === 'Test Mission'">
+                  Add Mission
+                </v-btn>
               </n-form-item>
               <n-form-item>
                 <n-upload @before-upload="handleFileUpload">
@@ -105,7 +150,7 @@ limitations under the License.
           </n-tab-pane>
 
           <!-- LLM Evaluation Prompt (Optional) Tab -->
-          <n-tab-pane name="LLM Evaluation Prompt (Optional)" tab="LLM Evaluation Prompt (Optional)">
+          <n-tab-pane name="LLM Evaluation Prompt" tab="LLM Evaluation Prompt">
             <!-- Textarea for LLM Evaluation Prompt -->
             <n-input
               v-model:value="templateData.template_llm_prompt"
@@ -170,13 +215,28 @@ import {
   NDrawerContent,
   NSpace,
   NDivider,
-  useMessage
+  useMessage,
+  NSelect,
+  NInputNumber
 } from 'naive-ui';
+import type { TabsInst } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
-import { ref, onMounted, onUnmounted } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick } from 'vue';
 import JsonEditorVue from 'json-editor-vue';
 import { JsonTreeView } from 'json-tree-view-vue3';
 import 'json-tree-view-vue3/dist/style.css';
+
+const templateTabs = ref<TabsInst | null>(null);
+const tabvalue = ref();
+
+const syncTabs = (value: string) => {
+  if (value == 'Test Mission') {
+    tabvalue.value = 'Missions';
+  } else {
+    tabvalue.value = 'Test Cases';
+  }
+  nextTick(() => templateTabs.value?.syncBarPosition());
+};
 
 // Interface for Test Data Items
 interface DataItem {
@@ -208,6 +268,8 @@ interface TemplateData {
   template_input_field: string;
   template_output_field: string;
   template_llm_prompt: string;
+  template_type: string; // Added template type
+  mission_duration?: number; // Added mission duration, optional
 }
 
 // Emits 'close' event to parent component
@@ -225,6 +287,18 @@ const message = useMessage();
 // Test Response Data
 let test_response: string = '';
 
+// Template Type Options for Dropdown
+const templateTypeOptions = [
+  {
+    label: 'Test Run',
+    value: 'Test Run'
+  },
+  {
+    label: 'Test Mission',
+    value: 'Test Mission'
+  }
+];
+
 // Template Data Object with Default Values
 const templateData = ref<TemplateData>({
   template_id: '',
@@ -232,7 +306,9 @@ const templateData = ref<TemplateData>({
   test_request: '',
   template_input_field: '',
   template_output_field: '',
-  template_llm_prompt: ''
+  template_llm_prompt: '',
+  template_type: 'Test Run', // Default template type
+  mission_duration: undefined // Mission duration is optional
 });
 
 // Edit Mode Flag
@@ -243,6 +319,13 @@ const rules = {
   template_id: {
     required: true,
     message: 'Please enter a Template ID',
+    trigger: ['blur', 'input']
+  },
+  mission_duration: {
+    // Validation rule for mission_duration
+    required: true,
+    type: 'number',
+    message: 'Please enter Mission Duration',
     trigger: ['blur', 'input']
   }
   // ... add validation rules for other fields
@@ -365,14 +448,25 @@ const submitForm = async () => {
  * Adds a new empty test case item to the template data.
  */
 const addItem = () => {
-  templateData.value.template_data.push({
-    query: 'Enter your query',
-    response: '',
-    filter: '',
-    source: '',
-    block: false,
-    category: ''
-  });
+  if (templateData.value.template_type == 'Test Run') {
+    templateData.value.template_data.push({
+      query: 'Enter your query',
+      response: '',
+      filter: '',
+      source: '',
+      block: false,
+      category: ''
+    });
+  } else {
+    templateData.value.template_data.push({
+      query: 'Enter your mission',
+      response: '',
+      filter: '',
+      source: '',
+      block: false,
+      category: ''
+    });
+  }
 };
 
 /**
@@ -561,7 +655,9 @@ Comparison result:
     "similarity_explanation": "There is no answer provided"
 }`,
       template_input_field: 'INCOMPLETE',
-      template_output_field: 'INCOMPLETE'
+      template_output_field: 'INCOMPLETE',
+      template_type: 'Test Run', // Default template type
+      mission_duration: undefined // Mission duration is optional
     };
   }
 });

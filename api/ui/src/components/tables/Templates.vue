@@ -23,20 +23,23 @@ limitations under the License.
         <thead>
           <tr>
             <th>Template ID</th>
+            <th>Type</th>
             <th>Actions</th>
           </tr>
         </thead>
         <tbody>
-          <!-- Iterate over templateIds to display each template -->
-          <tr v-for="templateId in templateIds" :key="templateId">
+          <!-- Iterate over templates to display each template -->
+          <tr v-for="template in templates" :key="template.template_id">
             <!-- Display template ID -->
-            <td>{{ templateId }}</td>
+            <td>{{ template.template_id }}</td>
+            <!-- Display template type -->
+            <td>{{ template.template_type || 'N/A' }}</td>
             <td>
               <!-- Edit button to navigate to Edit Template page -->
-              <v-btn variant="flat" color="primary" class="mt-2" @click="navigateToEditPage(templateId)">Edit</v-btn>
+              <v-btn variant="flat" color="primary" class="mt-2" @click="navigateToEditPage(template.template_id)">Edit</v-btn>
                
               <!-- Delete button to delete a template -->
-              <v-btn variant="flat" color="accent" class="mt-2" @click="deleteTemplate(templateId)">Delete</v-btn>
+              <v-btn variant="flat" color="accent" class="mt-2" @click="deleteTemplate(template.template_id)">Delete</v-btn>
             </td>
           </tr>
         </tbody>
@@ -57,8 +60,8 @@ import { NTable, useMessage, NDivider, NSpace, NSpin } from 'naive-ui';
 import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
-// Define a ref to store template IDs, initialized as an empty array
-const templateIds = ref<string[]>([]);
+// Define a ref to store templates, initialized as an empty array
+const templates = ref<{ template_id: string; template_type: string | null }[]>([]);
 // Access the message instance from Naive UI
 const message = useMessage();
 
@@ -128,8 +131,8 @@ const fetchTemplates = () => {
   fetch('/templates')
     .then((response) => response.json())
     .then((data) => {
-      // Update the templateIds ref with the fetched data
-      templateIds.value = data.template_ids;
+      // Update the templates ref with the fetched data
+      templates.value = data.templates;
       // Hide the loading spinner after data is fetched
       show.value = false;
     })

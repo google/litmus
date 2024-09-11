@@ -84,7 +84,7 @@ def version():
 @app.route("/submit_run", methods=["POST"])
 @auth.login_required
 def submit_run(data=None):
-    """Submits a new test run.
+    """Submits a new test run or test mission.
 
     Can be called with data from a request or directly with a data dictionary.
 
@@ -93,7 +93,7 @@ def submit_run(data=None):
                              If None, data is fetched from request.get_json().
 
     Expects a JSON payload with:
-        - run_id: Unique identifier for the test run.
+        - run_id: Unique identifier for the test run/mission.
         - template_id: Identifier for the test template.
         - pre_request (optional): JSON object representing a pre-request to be executed.
         - post_request (optional): JSON object representing a post-request to be executed.
@@ -101,6 +101,10 @@ def submit_run(data=None):
         - template_llm_prompt: The LLM prompt associated with the test template.
         - template_input_field: The input field used in the test template.
         - template_output_field: The output field used in the test template.
+        - template_type (optional): The type of template. Can be "Test Run" or "Test Mission".
+                                     Defaults to "Test Run" if not provided.
+        - mission_duration (optional): Number of interaction loops for a "Test Mission". Required if
+                                        template_type is "Test Mission".
 
     Returns:
         JSON response indicating success or failure.
@@ -116,6 +120,8 @@ def submit_run(data=None):
     template_llm_prompt = data.get("template_llm_prompt")
     template_input_field = data.get("template_input_field")
     template_output_field = data.get("template_output_field")
+    template_type = data.get("template_type", "Test Run")  # Default to "Test Run"
+    mission_duration = data.get("mission_duration")
     auth_token = data.get("auth_token")
 
     # Input validation
@@ -127,6 +133,16 @@ def submit_run(data=None):
 
     if not test_request:
         return jsonify({"error": "Missing 'test_request' in request data"}), 400
+
+    if template_type == "Test Mission" and not isinstance(mission_duration, int):
+        return (
+            jsonify(
+                {
+                    "error": "'mission_duration' is required and must be an integer for 'Test Mission' type"
+                }
+            ),
+            400,
+        )
 
     # Retrieve test template from Firestore
     template_ref = db.collection("test_templates").document(template_id)
@@ -162,7 +178,7 @@ def submit_run(data=None):
             if key == "response":
                 test["golden_response"] = value
 
-                # Replace {auth_token} in the test request
+        # Replace {auth_token} in the test request
         if auth_token:
             json_string = json_string.replace("{auth_token}", auth_token)
 
@@ -173,7 +189,7 @@ def submit_run(data=None):
     # Get current time for start timestamp
     start_time = datetime.utcnow()
 
-    # Create a document for the test run
+    # Create a document for the test run/mission
     run_ref = db.collection("test_runs").document(run_id)
     run_ref.set(
         {
@@ -184,6 +200,8 @@ def submit_run(data=None):
             "template_input_field": template_input_field,
             "template_output_field": template_output_field,
             "template_llm_prompt": template_llm_prompt,
+            "template_type": template_type,  # Store the template type
+            "mission_duration": mission_duration,  # Store mission duration, if applicable
         }
     )
 
@@ -193,14 +211,20 @@ def submit_run(data=None):
         test_case_ref = test_cases_collection.document(f"test_case_{i+1}")
         test_case_ref.set(request_data)
 
-    # Invoke the Cloud Run job to execute the test run
+    # Invoke the Cloud Run job to execute the test run/mission
     invoke_job(
-        settings.project_id, settings.region, "litmus-worker", run_id, template_id
+        settings.project_id,
+        settings.region,
+        "litmus-worker",
+        run_id,
+        template_id,
+        template_type,
+        mission_duration,
     )
 
     return jsonify(
         {
-            "message": f"Test run '{run_id}' submitted successfully using template '{template_id}'"
+            "message": f"{template_type} '{run_id}' submitted successfully using template '{template_id}'"
         }
     )
 
@@ -208,10 +232,10 @@ def submit_run(data=None):
 @app.route("/submit_run_simple", methods=["POST"])
 @auth.login_required
 def submit_run_simple():
-    """Submits a new test run using default values from the template.
+    """Submits a new test run or mission using default values from the template.
 
     Expects a JSON payload with:
-        - run_id: Unique identifier for the test run.
+        - run_id: Unique identifier for the test run/mission.
         - template_id: Identifier for the test template.
 
     Returns:
@@ -247,6 +271,12 @@ def submit_run_simple():
         "template_output_field": template_data.get("template_output_field"),
         "pre_request": template_data.get("test_pre_request"),
         "post_request": template_data.get("test_post_request"),
+        "template_type": template_data.get(
+            "template_type", "Test Run"
+        ),  # Get template type, default to "Test Run"
+        "mission_duration": template_data.get(
+            "mission_duration"
+        ),  # Get mission duration if available
         "auth_token": auth_token,
     }
 
@@ -258,10 +288,10 @@ def submit_run_simple():
 @app.route("/invoke_run", methods=["POST"])
 @auth.login_required
 def invoke_run():
-    """Re-invokes an existing test run.
+    """Re-invokes an existing test run or mission.
 
     Expects a JSON payload with:
-        - run_id: Unique identifier for the test run.
+        - run_id: Unique identifier for the test run/mission.
         - template_id: Identifier for the test template.
 
     Returns:
@@ -279,18 +309,32 @@ def invoke_run():
             400,
         )
 
-    # Update run status to "Not Started"
+    # Retrieve the template type and mission duration from the existing run data
     run_ref = db.collection("test_runs").document(run_id)
+    run_data = run_ref.get().to_dict()
+    if not run_data:
+        return jsonify({"error": f"Run with ID '{run_id}' not found"}), 404
+
+    template_type = run_data.get("template_type", "Test Run")
+    mission_duration = run_data.get("mission_duration")
+
+    # Update run status to "Not Started"
     run_ref.update({"status": "Not Started", "progress": "0/0"})
 
-    # Invoke the Cloud Run job to execute the test run
+    # Invoke the Cloud Run job to execute the test run/mission
     invoke_job(
-        settings.project_id, settings.region, "litmus-worker", run_id, template_id
+        settings.project_id,
+        settings.region,
+        "litmus-worker",
+        run_id,
+        template_id,
+        template_type,
+        mission_duration,
     )
 
     return jsonify(
         {
-            "message": f"Test run '{run_id}' submitted successfully using template '{template_id}'"
+            "message": f"{template_type} '{run_id}' submitted successfully using template '{template_id}'"
         }
     )
 
@@ -299,10 +343,10 @@ def invoke_run():
 @app.route("/delete_run/<run_id>", methods=["DELETE"])
 @auth.login_required
 def delete_run(run_id):
-    """Deletes a test run from Firestore.
+    """Deletes a test run or mission from Firestore.
 
     Args:
-        run_id: Unique identifier for the test run.
+        run_id: Unique identifier for the test run/mission.
 
     Returns:
         JSON response indicating success or failure.
@@ -336,6 +380,9 @@ def add_template():
         - template_llm_prompt: The LLM prompt associated with the test template.
         - template_input_field: The input field used in the test template.
         - template_output_field: The output field used in the test template.
+        - template_type: The type of template. Can be "Test Run" or "Test Mission".
+        - mission_duration (optional): Number of interaction loops for a "Test Mission". Required if
+                                        template_type is "Test Mission".
 
     Returns:
         JSON response indicating success or failure.
@@ -349,12 +396,36 @@ def add_template():
     template_llm_prompt = data.get("template_llm_prompt")
     template_input_field = data.get("template_input_field")
     template_output_field = data.get("template_output_field")
+    template_type = data.get("template_type")  # "Test Run" or "Test Mission"
+    mission_duration = (
+        data.get("mission_duration") if template_type == "Test Mission" else None
+    )
 
     # Input validation
     if not template_id:
         return (
             jsonify(
                 {"error": "Missing 'template_id' or 'template_data' in request data"}
+            ),
+            400,
+        )
+
+    if not template_type or template_type not in ["Test Run", "Test Mission"]:
+        return (
+            jsonify(
+                {
+                    "error": "'template_type' is required and must be either 'Test Run' or 'Test Mission'"
+                }
+            ),
+            400,
+        )
+
+    if template_type == "Test Mission" and not isinstance(mission_duration, int):
+        return (
+            jsonify(
+                {
+                    "error": "'mission_duration' is required and must be an integer for 'Test Mission' type"
+                }
             ),
             400,
         )
@@ -377,6 +448,8 @@ def add_template():
             "test_request": test_request,
             "template_input_field": template_input_field,
             "template_output_field": template_output_field,
+            "template_type": template_type,  # Store the template type
+            "mission_duration": mission_duration,  # Store mission duration, if applicable
         }
     )
     return jsonify({"message": f"Template '{template_id}' added successfully"})
@@ -397,6 +470,9 @@ def update_template():
         - template_llm_prompt (optional): The LLM prompt associated with the test template.
         - template_input_field (optional): The input field used in the test template.
         - template_output_field (optional): The output field used in the test template.
+        - template_type (optional): The type of template. Can be "Test Run" or "Test Mission".
+        - mission_duration (optional): Number of interaction loops for a "Test Mission". Required if
+                                        template_type is updated to "Test Mission" and not previously set.
 
     Returns:
         JSON response indicating success or failure.
@@ -410,6 +486,8 @@ def update_template():
     template_llm_prompt = data.get("template_llm_prompt")
     template_input_field = data.get("template_input_field")
     template_output_field = data.get("template_output_field")
+    template_type = data.get("template_type")
+    mission_duration = data.get("mission_duration")
 
     # Input validation
     if not template_id:
@@ -419,6 +497,21 @@ def update_template():
 
     if not template_ref.get().exists:
         return jsonify({"error": f"Template with ID '{template_id}' not found"}), 404
+
+    # Check if template_type is being updated to "Test Mission" without mission_duration
+    if (
+        template_type == "Test Mission"
+        and not mission_duration
+        and not template_ref.get().to_dict().get("mission_duration")
+    ):
+        return (
+            jsonify(
+                {
+                    "error": "'mission_duration' is required when updating template_type to 'Test Mission'"
+                }
+            ),
+            400,
+        )
 
     # Check if at least one field is being updated
     if not any(
@@ -430,6 +523,8 @@ def update_template():
             test_request,
             template_input_field,
             template_output_field,
+            template_type,
+            mission_duration,
         ]
     ):
         return jsonify({"error": "No fields provided for update"}), 400
@@ -447,8 +542,12 @@ def update_template():
         update_data["test_request"] = test_request
     if template_input_field is not None:
         update_data["template_input_field"] = template_input_field
-    if template_input_field is not None:
+    if template_output_field is not None:
         update_data["template_output_field"] = template_output_field
+    if template_type is not None:
+        update_data["template_type"] = template_type
+    if mission_duration is not None:
+        update_data["mission_duration"] = mission_duration
 
     template_ref.update(update_data)
     return jsonify({"message": f"Template '{template_id}' updated successfully"})
@@ -477,14 +576,33 @@ def delete_template(template_id):
 @app.route("/templates", methods=["GET"])
 @auth.login_required
 def list_templates():
-    """Retrieves a list of all available test template IDs.
+    """Retrieves a list of all available test template IDs, optionally filtered by type.
+
+    Query parameters:
+        - type (optional): The type of templates to retrieve ("Test Run" or "Test Mission").
+                           If not provided, returns all templates.
 
     Returns:
-        JSON response containing an array of template IDs.
+        JSON response containing an array of template IDs and their types.
     """
+    template_type_filter = request.args.get("type")
+
     templates_ref = db.collection("test_templates")
-    template_ids = [doc.id for doc in templates_ref.stream()]
-    return jsonify({"template_ids": template_ids})
+
+    if template_type_filter:
+        # Apply template type filter
+        templates_ref = templates_ref.where("template_type", "==", template_type_filter)
+
+    templates = []
+    for doc in templates_ref.stream():
+        template_data = doc.to_dict()
+        templates.append(
+            {
+                "template_id": doc.id,
+                "template_type": template_data.get("template_type"),
+            }
+        )
+    return jsonify({"templates": templates})
 
 
 # Templates: Get
@@ -509,10 +627,10 @@ def get_template(template_id):
 @app.route("/run_status/<run_id>", methods=["GET"])
 @auth.login_required
 def get_run_status(run_id):
-    """Retrieves the status and detailed results of a test run.
+    """Retrieves the status and detailed results of a test run/mission.
 
     Args:
-        run_id: Unique identifier for the test run.
+        run_id: Unique identifier for the test run/mission.
 
     Returns:
         JSON response containing run status, progress, and test case details.
@@ -555,6 +673,7 @@ def get_run_status(run_id):
             "template_id": run_data.get("template_id"),
             "template_input_field": run_data.get("template_input_field"),
             "template_output_field": run_data.get("template_output_field"),
+            "template_type": run_data.get("template_type"),  # Include template type
             "testCases": test_cases,  # Return the detailed test case data
         }
     )
@@ -563,13 +682,13 @@ def get_run_status(run_id):
 @app.route("/run_status_fields/<run_id>", methods=["GET"])
 @auth.login_required
 def get_run_status_fields(run_id):
-    """Retrieves specific fields from the status of a test run.
+    """Retrieves specific fields from the status of a test run/mission.
 
     Args:
-        run_id: Unique identifier for the test run.
+        run_id: Unique identifier for the test run/mission.
 
     Returns:
-        JSON response containing run date, template ID, input/output fields.
+        JSON response containing run date, template ID, input/output fields, and template type.
     """
     run_ref = db.collection("test_runs").document(run_id)
     run_data = run_ref.get().to_dict()
@@ -582,6 +701,7 @@ def get_run_status_fields(run_id):
             "template_id": run_data.get("template_id"),
             "template_input_field": run_data.get("template_input_field"),
             "template_output_field": run_data.get("template_output_field"),
+            "template_type": run_data.get("template_type"),  # Include template type
         }
     )
 
@@ -589,7 +709,7 @@ def get_run_status_fields(run_id):
 @app.route("/all_run_results/<template_id>", methods=["GET"])
 @auth.login_required
 def all_run_results(template_id):
-    """Retrieves filtered responses for all runs of a specified template.
+    """Retrieves filtered responses for all runs/missions of a specified template.
 
     Args:
         template_id: The ID of the test template.
@@ -599,7 +719,7 @@ def all_run_results(template_id):
         Each value is a list of responses sorted by start time, including run and time information.
     """
 
-    # Get all test runs for the given template
+    # Get all test runs/missions for the given template
     runs_ref = db.collection("test_runs")
     runs = []
     for doc in runs_ref.stream():
@@ -613,6 +733,7 @@ def all_run_results(template_id):
                         "end_time"
                     ),  # Include end_time if available
                     "progress": run_data.get("progress"),
+                    "template_type": run_data.get("template_type"),
                 }
             )
 
@@ -645,6 +766,7 @@ def all_run_results(template_id):
                     "start_time": run["start_time"],
                     "end_time": run["end_time"],
                     "run_id": run_id,
+                    "template_type": run["template_type"],  # Include template type here
                     "data": filtered_response,
                 }
             )
@@ -706,12 +828,22 @@ def filter_json(data, filter_pathx):
 @app.route("/runs", methods=["GET"])
 @auth.login_required
 def list_runs():
-    """Lists all test runs with their details, sorted by start time.
+    """Lists all test runs/missions with their details, sorted by start time.
+
+    Query parameters:
+        - type (optional): The type of runs/missions to retrieve ("Test Run" or "Test Mission").
+                           If not provided, returns all runs/missions.
 
     Returns:
-        JSON response containing an array of run details.
+        JSON response containing an array of run/mission details.
     """
     runs_ref = db.collection("test_runs")
+
+    # Apply filtering if type is provided in query parameters
+    template_type_filter = request.args.get("type")
+    if template_type_filter:
+        runs_ref = runs_ref.where("template_type", "==", template_type_filter)
+
     runs = []
     for doc in runs_ref.stream():
         run_data = doc.to_dict()
@@ -723,6 +855,7 @@ def list_runs():
                 "end_time": run_data.get("end_time"),
                 "progress": run_data.get("progress"),
                 "template_id": run_data.get("template_id"),
+                "template_type": run_data.get("template_type"),  # Include template type
             }
         )
 
@@ -819,7 +952,7 @@ def proxy_agg():
             sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
             sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
             avg(jsonPayload.latency) AS average_latency
-        FROM 
+        FROM
             `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
         GROUP BY 1,2;
     """
@@ -833,7 +966,7 @@ def proxy_agg():
                 sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
                 sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
                 avg(jsonPayload.latency) AS average_latency
-            FROM 
+            FROM
                 `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
             WHERE jsonPayload.litmuscontext = "{context}"
             GROUP BY 1,2;
@@ -934,29 +1067,35 @@ def flatten_json(data, parent_key="", sep="_"):
     return dict(items)
 
 
-def invoke_job(project_id, region, job_id, run_id, template_id):
+def invoke_job(
+    project_id, region, job_id, run_id, template_id, template_type, mission_duration
+):
     """Invokes a Cloud Run job with specified parameters.
 
     Args:
         project_id: Google Cloud project ID.
         region: Google Cloud region.
         job_id: Cloud Run job ID.
-        run_id: Unique identifier for the test run.
+        run_id: Unique identifier for the test run/mission.
         template_id: Identifier for the test template.
+        template_type: The type of template ("Test Run" or "Test Mission").
+        mission_duration: Number of interaction loops for a "Test Mission" (can be None).
     """
     client = run_v2.JobsClient()
     job_name = client.job_path(project_id, region, job_id)
 
-    override_spec = {
-        "container_overrides": [
-            {
-                "env": [
-                    {"name": "RUN_ID", "value": run_id},
-                    {"name": "TEMPLATE_ID", "value": template_id},
-                ]
-            }
-        ]
-    }
+    # Include template_type and mission_duration in environment variables
+    env_vars = [
+        {"name": "RUN_ID", "value": run_id},
+        {"name": "TEMPLATE_ID", "value": template_id},
+        {"name": "TEMPLATE_TYPE", "value": template_type},
+    ]
+    if mission_duration is not None:
+        env_vars.append(
+            {"name": "MISSION_DURATION", "value": str(mission_duration)}
+        )  # Ensure mission_duration is a string
+
+    override_spec = {"container_overrides": [{"env": env_vars}]}
 
     # Initialize the request
     job_name = f"projects/{project_id}/locations/{region}/jobs/{job_id}"
