@@ -389,3 +389,19 @@ func SelectUpstreamURL() (string, error) {
 
 	return upstreamURLs[choice-1], nil
 }
+
+// getAuthCredentials retrieves the basic authentication username and password from Secret Manager.
+func GetAuthCredentials(projectID string) (string, string, error) {
+	//username, err := AccessSecret(projectID, "litmus-username") // Replace with your secret name
+	//if err != nil {
+	//	return "", "", fmt.Errorf("error retrieving username from Secret Manager: %w", err)
+	//}
+	username := "admin"
+
+	password, err := AccessSecret(projectID, "litmus-password") // Replace with your secret name
+	if err != nil {
+		return "", "", fmt.Errorf("error retrieving password from Secret Manager: %w", err)
+	}
+
+	return username, password, nil
+}

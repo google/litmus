@@ -15,23 +15,77 @@
 package cmd
 
 import (
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
-	"os/exec"
+	"net/http"
 
+	"github.com/google/litmus/cli/api"
 	"github.com/google/litmus/cli/utils"
 )
 
 // OpenRun opens the URL associated with a specific Litmus run ID in the browser.
-func OpenRun(projectID, runID string) {
+func OpenRun(projectID, runID string) error {
 	serviceURL, err := utils.AccessSecret(projectID, "litmus-service-url")
 	if err != nil {
 		log.Fatalf("Error retrieving service URL from Secret Manager: %v", err)
 	}
+	serviceURL = utils.RemoveAnsiEscapeSequences(serviceURL)
 
-	runURL := fmt.Sprintf("%s/runs/%s", serviceURL, runID)
-
-	if err := exec.Command("open", runURL).Start(); err != nil {
-		log.Fatalf("Error opening URL: %v", err)
+	username, password, err := utils.GetAuthCredentials(projectID)
+	if err != nil {
+		return fmt.Errorf("error getting authentication credentials: %w", err)
 	}
+
+	runURL := fmt.Sprintf("%s/run_status/%s", serviceURL, runID)
+	fmt.Println(runURL)
+
+	// Create HTTP client
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", runURL, nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Set basic auth header
+	req.SetBasicAuth(username, password)
+
+	resp, err := client.Do(req)
+	if err != nil {
+		return fmt.Errorf("error making request: %w", err)
+	}
+	defer resp.Body.Close() // Close the body AFTER reading
+
+	// Handle the response (check for success/errors)
+	if resp.StatusCode != http.StatusOK {
+		body, _ := io.ReadAll(resp.Body)
+		return fmt.Errorf("unexpected status code: %s, response: %s", resp.Status, string(body))
+	}
+
+	body, err := io.ReadAll(resp.Body) // Read the body here
+	if err != nil {
+		return fmt.Errorf("error reading response body: %w", err)
+	}
+
+	// Unmarshal the JSON response
+	var runDetails api.RunDetails
+	if err := json.Unmarshal(body, &runDetails); err != nil {
+		return fmt.Errorf("error unmarshalling JSON response: %w", err)
+	}
+
+	// Now you can access the data in a structured way:
+	fmt.Println("Progress:", runDetails.Progress)
+	fmt.Println("Status:", runDetails.Status)
+	// ... access other fields ...
+
+	for _, testCase := range runDetails.TestCases {
+		fmt.Println("Test Case ID:", testCase.ID)
+		fmt.Println("Status:", testCase.Response.Status)
+		fmt.Println("Tracing ID:", testCase.TracingID)
+		// ... access other fields within the test case ...
+	}
+
+	return nil
+
 }

@@ -16,6 +16,46 @@ package api
 
 // RunInfo holds information about a Litmus run.
 type RunInfo struct {
-	RunID string `json:"runID"`
-	URL   string `json:"url"`
+	EndTime   string `json:"end_time"`
+	Progress  string `json:"progress"`
+	RunID     string `json:"run_id"`
+	StartTime string `json:"start_time"`
+	Status    string `json:"status"`
+	TemplateID string `json:"template_id"`
+    URL       string `json:"url"` // Add the URL field
+}
+
+// Structs to represent the JSON response
+type RunDetails struct {
+	Progress            string        `json:"progress"`
+	Status              string        `json:"status"`
+	TemplateID         string        `json:"template_id"`
+	TemplateInputField  string        `json:"template_input_field"`
+	TemplateOutputField string        `json:"template_output_field"`
+	TestCases           []TestCase `json:"testCases"`
+}
+
+type TestCase struct {
+	GoldenResponse string   `json:"golden_response"`
+	ID            string   `json:"id"`
+	Request       Request `json:"request"`
+	Response      Response `json:"response"`
+	TracingID     string   `json:"tracing_id"`
+}
+
+type Request struct {
+	Body    interface{} `json:"body"` // Can be more specific if needed
+	Headers interface{} `json:"headers"` // Can be more specific if needed
+	Method  string      `json:"method"`
+	URL     string      `json:"url"`
+}
+
+type Response struct {
+	Note     string     `json:"note"`
+	Response ResponseData `json:"response"`
+	Status   string     `json:"status"`
+}
+type ResponseData struct {
+	Error  string `json:"error"`
+	Status string `json:"status"`
 }

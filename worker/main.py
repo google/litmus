@@ -138,7 +138,7 @@ def execute_tests_and_store_results(run_id, template_id):
             execute_request(test_case["pre_request"])
 
         request_data = test_case.get("request")
-        request_data["tracing_id"] = tracing_id
+
         golden_response = test_case.get("golden_response")
 
         try:

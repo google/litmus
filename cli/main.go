@@ -120,10 +120,11 @@ func main() {
 			cmd.OpenLitmus(projectID) // Open Litmus dashboard
 		}
 	case "run":
-		if runID == "" {
-			fmt.Println("Error: 'run' command requires a runID argument")
-			return
-		}
+		if len(os.Args) < 3 {
+            fmt.Println("Error: 'run' command requires a runID argument")
+            return
+        }
+        runID := os.Args[2]
 		cmd.OpenRun(projectID, runID)
     case "start":
         // 1. Handle TEMPLATE_ID
