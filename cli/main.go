@@ -102,6 +102,8 @@ func main() {
 		cmd.DeployApplication(projectID, region, envVars, quiet)
 	case "destroy":
 		cmd.DestroyResources(projectID, region, quiet)
+	case "update":
+		cmd.UpdateApplication(projectID, region, quiet)
 	case "execute":
 		if len(os.Args) < 4 {
 			fmt.Println("Usage: litmus execute <payload>")
@@ -130,6 +132,7 @@ func main() {
             return
         }
         templateID := os.Args[2]
+		runID := os.Args[3]
 
         // 2. Handle RUN_ID (generate if not provided)
         if runID == "" {
