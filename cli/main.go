@@ -132,13 +132,15 @@ func main() {
             return
         }
         templateID := os.Args[2]
-		runID := os.Args[3]
 
-        // 2. Handle RUN_ID (generate if not provided)
-        if runID == "" {
-            runID = uuid.New().String() // Generate a random UUID
-            fmt.Printf("Generated Run ID: %s\n", runID)
-        }
+		// 2. Handle RUN_ID (generate if not provided)
+		runID := ""
+		if len(os.Args) >= 4 { // Check if runID is provided
+			runID = os.Args[3] 
+		} else {
+			runID = uuid.New().String() // Generate a random UUID
+			fmt.Printf("Generated Run ID: %s\n", runID)
+		}
 
         // 3. Get AUTH_TOKEN (optional)
         authToken := os.Getenv("AUTH_TOKEN")
