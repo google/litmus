@@ -7,6 +7,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"regexp"
 	"time"
 
 	"github.com/google/litmus/cli/utils"
@@ -14,7 +15,14 @@ import (
 
 // SubmitRun submits a Litmus run.
 func SubmitRun(templateID, runID, projectID, authToken string) error {
-    serviceURL, err := utils.AccessSecret(projectID, "litmus-service-url")
+	serviceURL, err := utils.AccessSecret(projectID, "litmus-service-url")
+	if err != nil {
+		log.Fatalf("Error retrieving service URL from Secret Manager: %v", err)
+	}
+	
+	// Remove ANSI escape codes using a regular expression
+	re := regexp.MustCompile(`\x1b\[[0-9;]*[mG]`)
+	serviceURL = re.ReplaceAllString(serviceURL, "") 
     if err != nil {
         log.Fatalf("Error retrieving service URL from Secret Manager: %v", err)
     }
@@ -62,7 +70,7 @@ func SubmitRun(templateID, runID, projectID, authToken string) error {
 	}
 
 	// Handle successful response (You might want to process the response here)
-	fmt.Println("Run submitted successfully.")
+	//fmt.Println("Run submitted successfully.")
 
 	return nil
 }
