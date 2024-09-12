@@ -142,10 +142,7 @@ const formData = ref({
   run_id: '', // User-defined run ID
   test_request: {}, // Test request payload
   pre_request: {}, // Pre-request payload (optional)
-  post_request: {}, // Post-request payload (optional)
-  template_input_field: '', // Template's input field
-  template_output_field: '', // Template's output field
-  template_llm_prompt: '' // Template's LLM prompt
+  post_request: {} // Post-request payload (optional)
 });
 
 // Form validation rules
@@ -211,10 +208,6 @@ const submitForm = async () => {
   form.validate(async (errors: ValidationError[]) => {
     if (!errors) {
       try {
-        // Populate form data with template details
-        //formData.value.template_input_field = templateData.value.template_input_field;
-        //formData.value.template_output_field = templateData.value.template_output_field;
-        //formData.value.template_llm_prompt = templateData.value.template_llm_prompt;
         // Check if test_request exists in templateData, otherwise assign an empty object to avoid errors
         formData.value.test_request = templateData.value.test_request || {};
         if (templateData.value.test_pre_request) {

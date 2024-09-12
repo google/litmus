@@ -163,8 +163,11 @@ def submit_run(data=None):
         json_string = json.dumps(test["request"])
 
         for key, value in request_item.items():
-            # Replace placeholders in test_request with values from request_item
-            json_string = json_string.replace(f"{{{key}}}", str(value))
+            if template_type == "Test Run":
+                # Replace placeholders in test_request with values from request_item
+                json_string = json_string.replace(f"{{{key}}}", str(value))
+            elif template_type == "Test Mission" and key == "query":
+                test["mission"] = value
 
             # Get the corresponding golden response from the template
             if key == "response":
