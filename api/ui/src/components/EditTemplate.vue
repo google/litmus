@@ -540,6 +540,7 @@ const removeItem = (index: number) => {
 onMounted(() => {
   if (props.templateId) {
     getTemplate(props.templateId);
+    syncTabs(templateData.value.template_type);
   } else {
     templateData.value = {
       template_id: '',
