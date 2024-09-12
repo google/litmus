@@ -26,7 +26,7 @@ import (
 )
 
 // UpdateApplication updates the Litmus application to the latest version.
-func UpdateApplication(projectID, region string, quiet bool) {
+func UpdateApplication(projectID, region string, env string, quiet bool) {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 
 	if !quiet {
@@ -43,11 +43,13 @@ func UpdateApplication(projectID, region string, quiet bool) {
 		defer s.Stop()
 	}
 
+	apiImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/api:latest",env)
+
 	updateServiceCmd := exec.Command(
 		"gcloud", "run", "deploy", "litmus-api",
 		"--project", projectID,
 		"--region", region,
-		"--image", "europe-docker.pkg.dev/litmusai-prod/litmus/api:latest", 
+		"--image", apiImage, 
 		"--no-traffic", // Stop traffic during the update
 	)
 	output, err := updateServiceCmd.CombinedOutput()
@@ -86,11 +88,13 @@ func UpdateApplication(projectID, region string, quiet bool) {
 		defer s.Stop()
 	}
 
+	workerImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/worker:latest",env)
+
 	updateJobCmd := exec.Command(
 		"gcloud", "run", "jobs", "update", "litmus-worker", 
 		"--project", projectID,
 		"--region", region,
-		"--image", "europe-docker.pkg.dev/litmusai-prod/litmus/worker:latest", 
+		"--image", workerImage, 
 	)
 	output, err = updateJobCmd.CombinedOutput()
 	if err != nil {

@@ -42,35 +42,39 @@ func main() {
 	command := os.Args[1]
 	region := "us-central1" // Default region
 	var runID string
+	quiet := false           // Check for --quiet flag
 
 	// Parse command-line arguments
-	for i := 2; i < len(os.Args); i++ {
-		switch os.Args[i] {
+	args := os.Args[2:] // Skip program name and command
+	for i := 0; i < len(args); i++ {
+		switch args[i] {
 		case "--project":
-			if i+1 < len(os.Args) {
-				projectID = os.Args[i+1]
-				i++
+			if i+1 < len(args) {
+				projectID = args[i+1]
+				i++ // Skip the next argument (project ID)
 			} else {
 				fmt.Println("Error: --project flag requires an argument")
 				return
 			}
 		case "--region":
-			if i+1 < len(os.Args) {
-				region = os.Args[i+1]
-				i++
+			if i+1 < len(args) {
+				region = args[i+1]
+				i++ // Skip the next argument (region)
 			} else {
 				fmt.Println("Error: --region flag requires an argument")
 				return
 			}
+		case "--quiet":
+			quiet = true
 		case "open": // Assuming "open" might also need a runID
-			if i+1 < len(os.Args) {
-				runID = os.Args[i+1]
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				runID = args[i+1]
 				i++
 			}
 			// No error here, as "open" without runID might be valid
 		case "run":
-			if i+1 < len(os.Args) {
-				runID = os.Args[i+1]
+			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
+				runID = args[i+1]
 				i++
 			} else {
 				fmt.Println("Error: 'run' command requires a runID argument")
@@ -81,35 +85,38 @@ func main() {
 
 	// Extract environment variables from command-line arguments
 	envVars := make(map[string]string)
-	for i := 2; i < len(os.Args); i++ { // Start from index 2 to skip command and runID
-		parts := strings.Split(os.Args[i], "=")
+	for _, arg := range args {
+		// Skip flags and commands
+		if strings.HasPrefix(arg, "-") || arg == command {
+			continue
+		}
+		parts := strings.Split(arg, "=")
 		if len(parts) == 2 {
 			envVars[parts[0]] = parts[1]
 		}
 	}
 
-	// Check for --quiet flag
-	quiet := false
-	for _, arg := range os.Args {
-		if arg == "--quiet" {
-			quiet = true
-			break
-		}
-	}
-
 	switch command {
 	case "deploy":
-		cmd.DeployApplication(projectID, region, envVars, quiet)
+		env := "prod"
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") { // Check if a service name is provided
+			env = args[0]
+		}
+		cmd.DeployApplication(projectID, region, envVars, env, quiet)
 	case "destroy":
 		cmd.DestroyResources(projectID, region, quiet)
 	case "update":
-		cmd.UpdateApplication(projectID, region, quiet)
+		env := "prod"
+		if len(args) > 0 && !strings.HasPrefix(args[0], "-") { // Check if a service name is provided
+			env = args[0]
+		}
+		cmd.UpdateApplication(projectID, region, env, quiet)
 	case "execute":
-		if len(os.Args) < 4 {
+		if len(args) < 1 {
 			fmt.Println("Usage: litmus execute <payload>")
 			return
 		}
-		payload := os.Args[3]
+		payload := args[0]
 		cmd.ExecutePayload(projectID, payload)
 	case "ls":
 		cmd.ListRuns(projectID)
@@ -120,52 +127,51 @@ func main() {
 			cmd.OpenLitmus(projectID) // Open Litmus dashboard
 		}
 	case "run":
-		if len(os.Args) < 3 {
-            fmt.Println("Error: 'run' command requires a runID argument")
-            return
-        }
-        runID := os.Args[2]
+		if runID == "" {
+			fmt.Println("Error: 'run' command requires a runID argument")
+			return
+		}
 		cmd.OpenRun(projectID, runID)
-    case "start":
-        // 1. Handle TEMPLATE_ID
-        if len(os.Args) < 3 {
-            fmt.Println("Error: 'start' command requires a TEMPLATE_ID argument")
-            return
-        }
-        templateID := os.Args[2]
+	case "start":
+		// 1. Handle TEMPLATE_ID
+		if len(args) < 1 {
+			fmt.Println("Error: 'start' command requires a TEMPLATE_ID argument")
+			return
+		}
+		templateID := args[0]
 
 		// 2. Handle RUN_ID (generate if not provided)
 		runID := ""
-		if len(os.Args) >= 4 { // Check if runID is provided
-			runID = os.Args[3] 
+		if len(args) >= 2 { // Check if runID is provided
+			runID = args[1]
 		} else {
 			runID = uuid.New().String() // Generate a random UUID
 			fmt.Printf("Generated Run ID: %s\n", runID)
 		}
 
-        // 3. Get AUTH_TOKEN (optional)
-        authToken := os.Getenv("AUTH_TOKEN")
+		// 3. Get AUTH_TOKEN (optional)
+		authToken := os.Getenv("AUTH_TOKEN")
 
-        // Example: Assuming cmd.SubmitRun takes templateID, runID, and optionally authToken
-        err := cmd.SubmitRun(templateID, runID, projectID, authToken) 
-        if err != nil {
-            fmt.Printf("Error submitting run: %v\n", err)
-            return
-        }
+		// Example: Assuming cmd.SubmitRun takes templateID, runID, and optionally authToken
+		err := cmd.SubmitRun(templateID, runID, projectID, authToken)
+		if err != nil {
+			fmt.Printf("Error submitting run: %v\n", err)
+			return
+		}
 
-        fmt.Println("Run submitted successfully.")
+		fmt.Println("Run submitted successfully.")
 	case "status":
 		cmd.ShowStatus(projectID)
 	case "version":
 		utils.DisplayVersion()
 	case "analytics":
-		if len(os.Args) < 3 {
+		if len(args) < 1 {
 			fmt.Println("Invalid analytics subcommand.")
-			fmt.Println("Usage: litmus analytics [deploy | destroy]") // Corrected typo: "destory" -> "destroy"
+			fmt.Println("Usage: litmus analytics [deploy | destroy]")
 			return
 		}
 
-		subcommand := os.Args[2]
+		subcommand := args[0]
 		switch subcommand {
 		case "deploy":
 			err := analytics.DeployAnalytics(projectID, region, quiet)
@@ -182,18 +188,18 @@ func main() {
 			fmt.Println("Usage: litmus analytics [deploy | destroy]")
 		}
 	case "proxy":
-		if len(os.Args) < 3 {
+		if len(args) < 1 {
 			fmt.Println("Invalid proxy subcommand.")
 			fmt.Println("Usage: litmus proxy [deploy --upstreamURL <upstreamURL> | list | destroy <service_name> | destroy-all]")
 			return
 		}
 
-		subcommand := os.Args[2]
+		subcommand := args[0]
 		switch subcommand {
 		case "deploy":
 			var upstreamURL string
-			if len(os.Args) >= 5 {
-				upstreamURL = os.Args[4]
+			if len(args) >= 3 && args[1] == "--upstreamURL" {
+				upstreamURL = args[2]
 			}
 			err := cmd.DeployProxy(projectID, region, upstreamURL, quiet)
 			if err != nil {
@@ -206,8 +212,8 @@ func main() {
 			}
 		case "destroy":
 			var serviceName string
-			if len(os.Args) >= 4 { // Check if a service name is provided
-				serviceName = os.Args[3]
+			if len(args) >= 2 { // Check if a service name is provided
+				serviceName = args[1]
 			}
 			err := cmd.DestroyProxyService(projectID, serviceName, region, quiet)
 			if err != nil {
