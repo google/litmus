@@ -28,12 +28,14 @@ limitations under the License.
         </thead>
         <tbody>
           <!-- Iterate over the templateIds array to display each template ID -->
-          <tr v-for="templateId in templateIds" :key="templateId">
+          <tr v-for="template in templates" :key="template.template_id">
             <!-- Display the templateId -->
-            <td>{{ templateId }}</td>
+            <td>{{ template.template_id }}</td>
             <td>
               <!-- Button to navigate to the comparison page for the specific templateId -->
-              <v-btn variant="flat" color="secondary" class="mt-2" @click="navigateToComparePage(templateId)">Compare Tests</v-btn>
+              <v-btn variant="flat" color="secondary" class="mt-2" @click="navigateToComparePage(template.template_id)"
+                >Compare Tests</v-btn
+              >
             </td>
           </tr>
         </tbody>
@@ -49,7 +51,7 @@ import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 
 // Define a ref to store an array of template IDs
-const templateIds = ref<string[]>([]);
+const templates = ref<{ template_id: string; template_type: string | null }[]>([]);
 
 // Get the router instance
 const router = useRouter();
@@ -68,19 +70,24 @@ const navigateToComparePage = (templateId: string) => {
 };
 
 /**
- * Fetches the list of templates from the backend API.
+ * Fetches the list of UI Templates from the backend.
  */
 const fetchTemplates = () => {
+  // Show the loading spinner
   show.value = true;
+  // Fetch the templates from the backend API
   fetch('/templates')
     .then((response) => response.json())
     .then((data) => {
-      // Update the templateIds ref with the fetched template IDs
-      templateIds.value = data.template_ids;
+      // Update the templates ref with the fetched data
+      templates.value = data.templates;
+      // Hide the loading spinner after data is fetched
       show.value = false;
     })
     .catch((error) => {
+      // Log any errors encountered while fetching templates
       console.error('Error fetching templates:', error);
+      // Hide the loading spinner in case of an error
       show.value = false;
     });
 };
