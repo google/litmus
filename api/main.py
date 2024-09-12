@@ -117,11 +117,6 @@ def submit_run(data=None):
     pre_request = data.get("pre_request")
     post_request = data.get("post_request")
     test_request = data.get("test_request")
-    template_llm_prompt = data.get("template_llm_prompt")
-    template_input_field = data.get("template_input_field")
-    template_output_field = data.get("template_output_field")
-    template_type = data.get("template_type", "Test Run")  # Default to "Test Run"
-    mission_duration = data.get("mission_duration")
     auth_token = data.get("auth_token")
 
     # Input validation
@@ -134,19 +129,10 @@ def submit_run(data=None):
     if not test_request:
         return jsonify({"error": "Missing 'test_request' in request data"}), 400
 
-    if template_type == "Test Mission" and not isinstance(mission_duration, int):
-        return (
-            jsonify(
-                {
-                    "error": "'mission_duration' is required and must be an integer for 'Test Mission' type"
-                }
-            ),
-            400,
-        )
-
     # Retrieve test template from Firestore
     template_ref = db.collection("test_templates").document(template_id)
     template_data = template_ref.get().to_dict()
+    template_type = template_data.get("template_type")
 
     if not template_data:
         return jsonify({"error": f"Test template '{template_id}' not found"}), 404
@@ -154,7 +140,13 @@ def submit_run(data=None):
     # Generate test requests with payload structure and URL
     tests = []
     for i, request_item in enumerate(template_data.get("template_data", [])):
-        test = {"request": test_request}
+        test = {}
+        if test_request:
+            test["request"] = (
+                json.loads(test_request)
+                if not isinstance(test_request, dict)
+                else test_request
+            )
         if pre_request:
             test["pre_request"] = (
                 json.loads(pre_request)
@@ -171,8 +163,11 @@ def submit_run(data=None):
         json_string = json.dumps(test["request"])
 
         for key, value in request_item.items():
-            # Replace placeholders in test_request with values from request_item
-            json_string = json_string.replace(f"{{{key}}}", str(value))
+            if template_type == "Test Run":
+                # Replace placeholders in test_request with values from request_item
+                json_string = json_string.replace(f"{{{key}}}", str(value))
+            elif template_type == "Test Mission" and key == "query":
+                test["mission"] = value
 
             # Get the corresponding golden response from the template
             if key == "response":
@@ -194,14 +189,14 @@ def submit_run(data=None):
     run_ref.set(
         {
             "status": "Not Started",
-            "progress": "0/0",
+            "progress": "0/{}".format(len(tests)),
             "template_id": template_id,
             "start_time": start_time,
-            "template_input_field": template_input_field,
-            "template_output_field": template_output_field,
-            "template_llm_prompt": template_llm_prompt,
-            "template_type": template_type,  # Store the template type
-            "mission_duration": mission_duration,  # Store mission duration, if applicable
+            "template_input_field": template_data.get("template_input_field"),
+            "template_output_field": template_data.get("template_output_field"),
+            "template_llm_prompt": template_data.get("template_llm_prompt"),
+            "template_type": template_type,
+            "mission_duration": template_data.get("mission_duration"),
         }
     )
 
@@ -219,7 +214,7 @@ def submit_run(data=None):
         run_id,
         template_id,
         template_type,
-        mission_duration,
+        template_data.get("mission_duration"),
     )
 
     return jsonify(
@@ -265,18 +260,9 @@ def submit_run_simple():
     submit_data = {
         "run_id": run_id,
         "template_id": template_id,
-        "test_request": json.loads(template_data.get("test_request")),
-        "template_llm_prompt": template_data.get("template_llm_prompt"),
-        "template_input_field": template_data.get("template_input_field"),
-        "template_output_field": template_data.get("template_output_field"),
+        "test_request": template_data.get("test_request"),
         "pre_request": template_data.get("test_pre_request"),
         "post_request": template_data.get("test_post_request"),
-        "template_type": template_data.get(
-            "template_type", "Test Run"
-        ),  # Get template type, default to "Test Run"
-        "mission_duration": template_data.get(
-            "mission_duration"
-        ),  # Get mission duration if available
         "auth_token": auth_token,
     }
 
