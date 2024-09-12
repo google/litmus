@@ -30,14 +30,19 @@ limitations under the License.
           <n-input v-model:value="formData.run_id" placeholder="Please enter a run ID." />
         </n-form-item>
 
+        <!-- Display template type and duration -->
+        <n-card v-if="templateData.template_id">
+          <div>
+            <strong>Template Type:</strong> {{ templateData.template_type }} | <strong>Duration (loops):</strong>
+            {{ templateData.mission_duration || 'N/A' }}
+          </div>
+        </n-card>
+
         <!-- Template details and test request card -->
-        <n-card>
-          <!-- Display template details if available -->
-          <div v-if="templateData.template_data.length > 0">
-            <strong>Test Cases</strong>: {{ templateData.template_data.length }} |
-            <strong> Input Field:</strong>
-            {{ templateData.template_input_field }} | <strong>Output Field:</strong>
-            {{ templateData.template_output_field }}
+        <n-card v-if="templateData.template_data.length > 0">
+          <div>
+            <strong>Test Cases/Missions:</strong> {{ templateData.template_data.length }} | <strong>Input Field:</strong>
+            {{ templateData.template_input_field }} | <strong>Output Field:</strong> {{ templateData.template_output_field }}
           </div>
 
           <!-- Tabs for Request Payload, Pre-Request, and Post-Request -->
@@ -49,13 +54,11 @@ limitations under the License.
               <!-- Available tokens for the request payload -->
               The following tokens are available: {query} , {response} , {filter} , {source} , {block} , {category}
             </n-tab-pane>
-
             <!-- Pre-Request tab (optional) -->
             <n-tab-pane name="Pre-Request (Optional)" tab="Pre-Request (Optional)">
               <!-- JSON editor for editing the pre-request payload (optional) -->
               <json-editor-vue v-model="templateData.test_pre_request" mode="text"></json-editor-vue>
             </n-tab-pane>
-
             <!-- Post-Request tab (optional) -->
             <n-tab-pane name="Post-Request (Optional)" tab="Post-Request (Optional)">
               <!-- JSON editor for editing the post-request payload (optional) -->
@@ -111,6 +114,8 @@ interface TemplateData {
   template_input_field: string;
   template_output_field: string;
   template_llm_prompt: string;
+  template_type: string; // Template type
+  mission_duration?: number; // Mission duration (optional)
 }
 
 // Reactive variable for storing template data
@@ -119,7 +124,9 @@ const templateData = ref<TemplateData>({
   template_data: [],
   template_input_field: '',
   template_output_field: '',
-  template_llm_prompt: ''
+  template_llm_prompt: '',
+  template_type: '',
+  mission_duration: undefined
 } as TemplateData);
 
 // Reactive variable to control loading spinner visibility

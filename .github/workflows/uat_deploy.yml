@@ -10,184 +10,184 @@ jobs:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      id: 'auth'
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIP }}
-        service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
-        token_format: 'access_token'
-        access_token_lifetime: '300s'
+      - name: Authenticate to Google Cloud
+        id: "auth"
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIP }}
+          service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
+          token_format: "access_token"
+          access_token_lifetime: "300s"
 
-    - name: Set up Cloud SDK
-      uses: google-github-actions/setup-gcloud@v2
-      with:
-        project_id: ${{ secrets.UAT_GCP_PROJECT }}
+      - name: Set up Cloud SDK
+        uses: google-github-actions/setup-gcloud@v2
+        with:
+          project_id: ${{ secrets.UAT_GCP_PROJECT }}
 
-    - name: Build Docker image
-      working-directory: ./worker
-      run: docker build -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:latest -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:${{ github.sha }} .
+      - name: Build Docker image
+        working-directory: ./worker
+        run: docker build -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:latest -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:${{ github.sha }} .
 
-    - name: Configure Docker to use Artifact Registry
-      run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.UAT_GCP_PROJECT }}
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.UAT_GCP_PROJECT }}
 
-    - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:${{ github.sha }}
+      - name: Push Docker SHA tagged image to Artifact Registry
+        run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:${{ github.sha }}
 
-    - name: Push Docker latest tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:latest
+      - name: Push Docker latest tagged image to Artifact Registry
+        run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/worker:latest
 
   api-build-push:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      id: 'auth'
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIP }}
-        service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
-        token_format: 'access_token'
-        access_token_lifetime: '300s'
+      - name: Authenticate to Google Cloud
+        id: "auth"
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIP }}
+          service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
+          token_format: "access_token"
+          access_token_lifetime: "300s"
 
-    # Install UI Dependencies
-    - name: Install UI Dependencies
-      working-directory: ./api/ui
-      run: npm install
+      # Install UI Dependencies
+      - name: Install UI Dependencies
+        working-directory: ./api/ui
+        run: npm install
 
-    # Build Litmus UI
-    - name: Build Litmus UI
-      working-directory: ./api/ui
-      run: npm run build
+      # Build Litmus UI
+      - name: Build Litmus UI
+        working-directory: ./api/ui
+        run: npm run build
 
-    - name: Build Docker image
-      working-directory: ./api
-      run: docker build -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:latest -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:${{ github.sha }} .
+      - name: Build Docker image
+        working-directory: ./api
+        run: docker build -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:latest -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:${{ github.sha }} .
 
-    - name: Configure Docker to use Artifact Registry
-      run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.UAT_GCP_PROJECT }}
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.UAT_GCP_PROJECT }}
 
-    - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:${{ github.sha }}
+      - name: Push Docker SHA tagged image to Artifact Registry
+        run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:${{ github.sha }}
 
-    - name: Push Docker latest tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:latest
+      - name: Push Docker latest tagged image to Artifact Registry
+        run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/api:latest
 
   proxy-build-push:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      id: 'auth'
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIP }}
-        service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
-        token_format: 'access_token'
-        access_token_lifetime: '300s'
+      - name: Authenticate to Google Cloud
+        id: "auth"
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIP }}
+          service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
+          token_format: "access_token"
+          access_token_lifetime: "300s"
 
-    - name: Build Docker image
-      working-directory: ./proxy
-      run: docker build -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:latest -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:${{ github.sha }} .
+      - name: Build Docker image
+        working-directory: ./proxy
+        run: docker build -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:latest -t europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:${{ github.sha }} .
 
-    - name: Configure Docker to use Artifact Registry
-      run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.UAT_GCP_PROJECT }}
+      - name: Configure Docker to use Artifact Registry
+        run: gcloud auth configure-docker europe-docker.pkg.dev --quiet --project ${{ secrets.UAT_GCP_PROJECT }}
 
-    - name: Push Docker SHA tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:${{ github.sha }}
+      - name: Push Docker SHA tagged image to Artifact Registry
+        run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:${{ github.sha }}
 
-    - name: Push Docker latest tagged image to Artifact Registry
-      run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:latest
+      - name: Push Docker latest tagged image to Artifact Registry
+        run: docker push europe-docker.pkg.dev/${{ secrets.UAT_GCP_PROJECT }}/litmus/proxy:latest
 
   cli-build-store:
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      id: 'auth'
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIP }}
-        service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
-        token_format: 'access_token'
-        access_token_lifetime: '300s'
+      - name: Authenticate to Google Cloud
+        id: "auth"
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIP }}
+          service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
+          token_format: "access_token"
+          access_token_lifetime: "300s"
 
-    # Install GO
-    - name: Set up Go
-      uses: actions/setup-go@v3
-      with:
-        go-version: '1.23' 
+      # Install GO
+      - name: Set up Go
+        uses: actions/setup-go@v3
+        with:
+          go-version: "1.23"
 
-    # Build & Deploy
-    - name: Build & Deploy
-      working-directory: ./cli
-      run: |
-        go install
-        go build main.go
-        sha256sum main > litmus.sha256
-        gcloud storage cp main gs://litmus-cloud/uat/linux/litmus
-        gcloud storage cp litmus.sha256 gs://litmus-cloud/uat/linux/litmus.sha256
-        env GOOS=darwin GOARCH=amd64 go build main.go
-        sha256sum main > litmus.sha256
-        gcloud storage cp main gs://litmus-cloud/uat/osx/litmus
-        gcloud storage cp litmus.sha256 gs://litmus-cloud/uat/osx/litmus.sha256
+      # Build & Deploy
+      - name: Build & Deploy
+        working-directory: ./cli
+        run: |
+          go install
+          go build main.go
+          sha256sum main > litmus.sha256
+          gcloud storage cp main gs://litmus-cloud/uat/linux/litmus
+          gcloud storage cp litmus.sha256 gs://litmus-cloud/uat/linux/litmus.sha256
+          env GOOS=darwin GOARCH=amd64 go build main.go
+          sha256sum main > litmus.sha256
+          gcloud storage cp main gs://litmus-cloud/uat/osx/litmus
+          gcloud storage cp litmus.sha256 gs://litmus-cloud/uat/osx/litmus.sha256
 
   deployment:
     needs: [worker-build-push, api-build-push, cli-build-store]
     runs-on: ubuntu-latest
 
     permissions:
-      contents: 'read'
-      id-token: 'write'
+      contents: "read"
+      id-token: "write"
 
     steps:
-    - name: Checkout code
-      uses: actions/checkout@v4
+      - name: Checkout code
+        uses: actions/checkout@v4
 
-    - name: Authenticate to Google Cloud
-      id: 'auth'
-      uses: google-github-actions/auth@v2
-      with:
-        workload_identity_provider: ${{ secrets.WIP }}
-        service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
-        token_format: 'access_token'
-        access_token_lifetime: '300s'
+      - name: Authenticate to Google Cloud
+        id: "auth"
+        uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: ${{ secrets.WIP }}
+          service_account: ${{ secrets.UAT_SERVICE_ACCOUNT }}
+          token_format: "access_token"
+          access_token_lifetime: "300s"
 
-    # Deploy
-    - name: Deployment
-      working-directory: ./
-      run: |
-        wget https://storage.googleapis.com/litmus-cloud/uat/linux/litmus
-        chmod 755 ./litmus
-        ./litmus deploy --project litmusai-uat --quiet
-        ./litmus proxy delete-all --project litmusai-uat --quiet
-        ./litmus proxy deploy --upstreamURL us-central1-aiplatform.googleapis.com --project litmusai-uat --quiet
-        ./litmus analytics deploy --project litmusai-uat --quiet
+      # Deploy
+      - name: Deployment
+        working-directory: ./
+        run: |
+          wget https://storage.googleapis.com/litmus-cloud/uat/linux/litmus
+          chmod 755 ./litmus
+          ./litmus deploy uat --project litmusai-uat --quiet
+          ./litmus proxy delete-all --project litmusai-uat --quiet
+          ./litmus proxy deploy --upstreamURL us-central1-aiplatform.googleapis.com --project litmusai-uat --quiet
+          ./litmus analytics deploy --project litmusai-uat --quiet

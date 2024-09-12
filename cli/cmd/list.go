@@ -25,29 +25,52 @@ import (
 )
 
 // ListRuns retrieves and displays a list of Litmus runs.
-func ListRuns(projectID string) {
+func ListRuns(projectID string) error {
 	serviceURL, err := utils.AccessSecret(projectID, "litmus-service-url")
 	if err != nil {
 		log.Fatalf("Error retrieving service URL from Secret Manager: %v", err)
 	}
 
-	resp, err := http.Get(serviceURL + "/runs")
+	serviceURL = utils.RemoveAnsiEscapeSequences(serviceURL) 
+
+	username, password, err := utils.GetAuthCredentials(projectID)
+	if err != nil {
+		return fmt.Errorf("error getting authentication credentials: %w", err)
+	}
+
+	// Create HTTP client
+	client := &http.Client{}
+	req, err := http.NewRequest("GET", serviceURL+"/runs", nil)
+	if err != nil {
+		return fmt.Errorf("error creating request: %w", err)
+	}
+
+	// Set basic auth header
+	req.SetBasicAuth(username, password)
+
+	resp, err := client.Do(req)
 	if err != nil {
 		log.Fatalf("Error sending request: %v", err)
 	}
 	defer resp.Body.Close()
 
-	var runs []api.RunInfo
-	if err := json.NewDecoder(resp.Body).Decode(&runs); err != nil {
+	// Decode the response into a struct that matches the API response
+	var response struct {
+		Runs []api.RunInfo `json:"runs"`
+	}
+	if err := json.NewDecoder(resp.Body).Decode(&response); err != nil {
 		log.Fatalf("Error decoding response: %v", err)
 	}
+
+	runs := response.Runs // Access the runs slice from the decoded response
 
 	if len(runs) == 0 {
 		fmt.Println("No runs found.")
 	} else {
 		fmt.Println("Runs:")
 		for _, run := range runs {
-			fmt.Printf("Run ID: %s, URL: %s\n", run.RunID, run.URL)
+			fmt.Printf("Run ID: %s, Status: %s, Progress: %s, StartTime: %s, URL: %s/#/runs/%s\n", run.RunID, run.Status, run.Progress, run.StartTime, serviceURL, run.RunID)
 		}
 	}
+	return nil
 }
