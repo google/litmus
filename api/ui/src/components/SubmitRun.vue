@@ -27,22 +27,17 @@ limitations under the License.
 
         <!-- Run ID input -->
         <n-form-item label="Run ID" path="run_Id">
-          <n-input v-model:value="formData.run_id" placeholder="Please enter a run ID." />
+          <n-input v-model:value="formData.run_id" placeholder="Please enter a run ID." :allow-input="noSpace" />
         </n-form-item>
-
-        <!-- Display template type and duration -->
-        <n-card v-if="templateData.template_id">
-          <div>
-            <strong>Template Type:</strong> {{ templateData.template_type }} | <strong>Duration (loops):</strong>
-            {{ templateData.mission_duration || 'N/A' }}
-          </div>
-        </n-card>
 
         <!-- Template details and test request card -->
         <n-card v-if="templateData.template_data.length > 0">
           <div>
-            <strong>Test Cases/Missions:</strong> {{ templateData.template_data.length }} | <strong>Input Field:</strong>
+            <strong>{{ templateData.template_type }}s:</strong> {{ templateData.template_data.length }} | <strong>Input Field:</strong>
             {{ templateData.template_input_field }} | <strong>Output Field:</strong> {{ templateData.template_output_field }}
+            <template v-if="templateData.template_type === 'Test Mission'"
+              >| <strong>Duration (loops):</strong> {{ templateData.mission_duration }}</template
+            >
           </div>
 
           <!-- Tabs for Request Payload, Pre-Request, and Post-Request -->
@@ -182,8 +177,8 @@ const getTemplates = async () => {
     const response = await fetch('/templates');
     const data = await response.json();
     // Extract template IDs from the 'templates' array
-    templateOptions.value = data.templates.map((template: { template_id: string }) => ({
-      label: template.template_id,
+    templateOptions.value = data.templates.map((template: { template_id: string; template_type: string }) => ({
+      label: template.template_type + ' : ' + template.template_id,
       value: template.template_id
     }));
   } catch (error) {
@@ -252,6 +247,8 @@ const submitForm = async () => {
     }
   });
 };
+
+const noSpace = (value: string) => !/ /g.test(value);
 
 // Fetch available templates when the component is mounted
 onMounted(() => {

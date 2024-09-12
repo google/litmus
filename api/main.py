@@ -154,7 +154,13 @@ def submit_run(data=None):
     # Generate test requests with payload structure and URL
     tests = []
     for i, request_item in enumerate(template_data.get("template_data", [])):
-        test = {"request": test_request}
+        test = {}
+        if test_request:
+            test["request"] = (
+                json.loads(test_request)
+                if not isinstance(test_request, dict)
+                else test_request
+            )
         if pre_request:
             test["pre_request"] = (
                 json.loads(pre_request)
@@ -194,7 +200,7 @@ def submit_run(data=None):
     run_ref.set(
         {
             "status": "Not Started",
-            "progress": "0/0",
+            "progress": "0/{}".format(len(tests)),
             "template_id": template_id,
             "start_time": start_time,
             "template_input_field": template_input_field,
@@ -265,7 +271,7 @@ def submit_run_simple():
     submit_data = {
         "run_id": run_id,
         "template_id": template_id,
-        "test_request": json.loads(template_data.get("test_request")),
+        "test_request": template_data.get("test_request"),
         "template_llm_prompt": template_data.get("template_llm_prompt"),
         "template_input_field": template_data.get("template_input_field"),
         "template_output_field": template_data.get("template_output_field"),

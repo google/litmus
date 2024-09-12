@@ -22,7 +22,7 @@ limitations under the License.
         <n-space>
           <!-- Template ID Input -->
           <n-form-item label="Template ID" path="template_id">
-            <n-input v-model:value="templateData.template_id" placeholder="Enter Template ID" :disabled="editMode" />
+            <n-input v-model:value="templateData.template_id" placeholder="Enter Template ID" :disabled="editMode" :allow-input="noSpace" />
           </n-form-item>
 
           <!-- Template Type Selection -->
@@ -229,6 +229,7 @@ import 'json-tree-view-vue3/dist/style.css';
 const templateTabs = ref<TabsInst | null>(null);
 const tabvalue = ref();
 
+// Syncing correct Tabs
 const syncTabs = (value: string) => {
   if (value == 'Test Mission') {
     tabvalue.value = 'Missions';
@@ -404,7 +405,10 @@ const getTemplate = async (templateId: string) => {
       templateData.value.template_data = [];
     }
     editMode.value = true;
-  } catch (error) {}
+    syncTabs(templateData.value.template_type);
+  } catch (error) {
+    throw new Error('Failed to get Templates');
+  }
 };
 
 /**
@@ -540,7 +544,6 @@ const removeItem = (index: number) => {
 onMounted(() => {
   if (props.templateId) {
     getTemplate(props.templateId);
-    syncTabs(templateData.value.template_type);
   } else {
     templateData.value = {
       template_id: '',
@@ -662,6 +665,8 @@ Comparison result:
     };
   }
 });
+
+const noSpace = (value: string) => !/ /g.test(value);
 
 // Lifecycle Hook: onUnmounted
 onUnmounted(() => {
