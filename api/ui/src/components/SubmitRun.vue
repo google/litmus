@@ -27,22 +27,17 @@ limitations under the License.
 
         <!-- Run ID input -->
         <n-form-item label="Run ID" path="run_Id">
-          <n-input v-model:value="formData.run_id" placeholder="Please enter a run ID." />
+          <n-input v-model:value="formData.run_id" placeholder="Please enter a run ID." :allow-input="noSpace" />
         </n-form-item>
-
-        <!-- Display template type and duration -->
-        <n-card v-if="templateData.template_id">
-          <div>
-            <strong>Template Type:</strong> {{ templateData.template_type }} | <strong>Duration (loops):</strong>
-            {{ templateData.mission_duration || 'N/A' }}
-          </div>
-        </n-card>
 
         <!-- Template details and test request card -->
         <n-card v-if="templateData.template_data.length > 0">
           <div>
-            <strong>Test Cases/Missions:</strong> {{ templateData.template_data.length }} | <strong>Input Field:</strong>
+            <strong>{{ templateData.template_type }}s:</strong> {{ templateData.template_data.length }} | <strong>Input Field:</strong>
             {{ templateData.template_input_field }} | <strong>Output Field:</strong> {{ templateData.template_output_field }}
+            <template v-if="templateData.template_type === 'Test Mission'"
+              >| <strong>Duration (loops):</strong> {{ templateData.mission_duration }}</template
+            >
           </div>
 
           <!-- Tabs for Request Payload, Pre-Request, and Post-Request -->
@@ -82,8 +77,8 @@ import JsonEditorVue from 'json-editor-vue';
 
 // Interface for template options in the dropdown
 interface TemplateOption {
-  label: string;
-  value: string;
+  label: string; // Label of the option
+  value: string; // Value of the option
 }
 
 // Interface for data items within the template
@@ -98,24 +93,24 @@ interface DataItem {
 
 // Interface for request/response payload items
 interface PayloadItem {
-  body: string;
-  headers: {};
-  method: string;
-  url: string;
+  body: string; // Body of the request/response
+  headers: {}; // Headers of the request/response
+  method: string; // HTTP method (e.g., GET, POST)
+  url: string; // URL for the request
 }
 
 // Interface for template data
 interface TemplateData {
-  template_id: string;
-  test_pre_request?: [];
-  test_post_request?: [];
-  test_request?: PayloadItem;
-  template_data: DataItem[];
-  template_input_field: string;
-  template_output_field: string;
-  template_llm_prompt: string;
-  template_type: string; // Template type
-  mission_duration?: number; // Mission duration (optional)
+  template_id: string; // ID of the template
+  test_pre_request?: []; // Pre-request data (optional)
+  test_post_request?: []; // Post-request data (optional)
+  test_request?: PayloadItem; // Test request data
+  template_data: DataItem[]; // Array of test data items
+  template_input_field: string; // Input field for the template
+  template_output_field: string; // Output field for the template
+  template_llm_prompt: string; // LLM prompt for the template
+  template_type: string; // Template type (e.g., 'Test Run', 'Test Mission')
+  mission_duration?: number; // Mission duration (optional, for 'Test Mission' type)
 }
 
 // Reactive variable for storing template data
@@ -143,14 +138,11 @@ const formRef = ref();
 
 // Reactive variable for storing form data
 const formData = ref({
-  template_id: '',
-  run_id: '',
-  test_request: {},
-  pre_request: {},
-  post_request: {},
-  template_input_field: '',
-  template_output_field: '',
-  template_llm_prompt: ''
+  template_id: '', // Selected template ID
+  run_id: '', // User-defined run ID
+  test_request: {}, // Test request payload
+  pre_request: {}, // Pre-request payload (optional)
+  post_request: {} // Post-request payload (optional)
 });
 
 // Form validation rules
@@ -169,8 +161,8 @@ const rules = {
 
 // Interface for validation errors
 interface ValidationError {
-  message: string;
-  field?: string; // Optional field for specifying the error field
+  message: string; // Validation error message
+  field?: string; // Optional field name where the error occurred
 }
 
 // Reactive variable for storing template options for the dropdown
@@ -181,9 +173,10 @@ const getTemplates = async () => {
   try {
     const response = await fetch('/templates');
     const data = await response.json();
-    templateOptions.value = data.template_ids.map((id: string) => ({
-      label: id,
-      value: id
+    // Extract template IDs from the 'templates' array
+    templateOptions.value = data.templates.map((template: { template_id: string; template_type: string }) => ({
+      label: template.template_type + ' : ' + template.template_id,
+      value: template.template_id
     }));
   } catch (error) {
     console.error('Error fetching templates:', error);
@@ -215,10 +208,6 @@ const submitForm = async () => {
   form.validate(async (errors: ValidationError[]) => {
     if (!errors) {
       try {
-        // Populate form data with template details
-        formData.value.template_input_field = templateData.value.template_input_field;
-        formData.value.template_output_field = templateData.value.template_output_field;
-        formData.value.template_llm_prompt = templateData.value.template_llm_prompt;
         // Check if test_request exists in templateData, otherwise assign an empty object to avoid errors
         formData.value.test_request = templateData.value.test_request || {};
         if (templateData.value.test_pre_request) {
@@ -251,6 +240,8 @@ const submitForm = async () => {
     }
   });
 };
+
+const noSpace = (value: string) => !/ /g.test(value);
 
 // Fetch available templates when the component is mounted
 onMounted(() => {
