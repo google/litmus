@@ -46,7 +46,7 @@ limitations under the License.
     <n-divider />
     <!-- Link to proxy installation instructions -->
     Proxy installation instructions:
-    <a href="https://github.com/google/litmus/tree/main/proxy" target="_blank">https://github.com/google/litmus/tree/main/proxy</a>
+    <a href="https://google.github.io/litmus/proxy" target="_blank">https://google.github.io/litmus/proxy</a>
 
     <!-- Drawer for displaying setup instructions -->
     <n-drawer v-model:show="showDrawer" :width="980">

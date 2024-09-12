@@ -7,7 +7,6 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"regexp"
 	"time"
 
 	"github.com/google/litmus/cli/utils"
@@ -20,42 +19,40 @@ func SubmitRun(templateID, runID, projectID, authToken string) error {
 		log.Fatalf("Error retrieving service URL from Secret Manager: %v", err)
 	}
 	
-	// Remove ANSI escape codes using a regular expression
-	re := regexp.MustCompile(`\x1b\[[0-9;]*[mG]`)
-	serviceURL = re.ReplaceAllString(serviceURL, "") 
-    if err != nil {
-        log.Fatalf("Error retrieving service URL from Secret Manager: %v", err)
-    }
-    // Construct the URL for your submit_run_simple endpoint.
-    url := fmt.Sprintf("%s/submit_run_simple", serviceURL)
+	serviceURL = utils.RemoveAnsiEscapeSequences(serviceURL) 
 
-    // Create the JSON payload
-    payload := map[string]interface{}{
-        "run_id":      runID,
-        "template_id": templateID,
-    }
-
-    // Add authToken to payload only if it's set
-    if authToken != "" {
-        payload["auth_token"] = authToken 
-    }
-
-    payloadJSON, err := json.Marshal(payload)
-    if err != nil {
-        return fmt.Errorf("error marshaling JSON payload: %w", err)
-    }
-
-	// Create HTTP client with timeout
-	client := &http.Client{
-		Timeout: 10 * time.Second, // Set a timeout for the request
+	username, password, err := utils.GetAuthCredentials(projectID)
+	if err != nil {
+		return fmt.Errorf("error getting authentication credentials: %w", err)
 	}
 
-	// Make the HTTP request
+	url := fmt.Sprintf("%s/submit_run_simple", serviceURL)
+	payload := map[string]interface{}{
+		"run_id":      runID,
+		"template_id": templateID,
+	}
+	// Add authToken to payload only if it's set
+	if authToken != "" {
+		payload["auth_token"] = authToken 
+	}
+	
+	payloadJSON, err := json.Marshal(payload)
+	if err != nil {
+		return fmt.Errorf("error marshaling JSON payload: %w", err)
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
 	req, err := http.NewRequest("POST", url, bytes.NewBuffer(payloadJSON))
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}
 	req.Header.Set("Content-Type", "application/json")
+
+	// Set basic auth header
+	req.SetBasicAuth(username, password)
 
 	resp, err := client.Do(req)
 	if err != nil {

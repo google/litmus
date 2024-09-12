@@ -27,7 +27,7 @@ import (
 )
 
 // DeployApplication deploys the Litmus application to Google Cloud.
-func DeployApplication(projectID, region string, envVars map[string]string, quiet bool) {
+func DeployApplication(projectID, region string, envVars map[string]string, env string, quiet bool) {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
 	if !quiet {
 		// --- Confirm deployment ---
@@ -192,13 +192,15 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 		s.Start()
 		defer s.Stop()
 	}
+
+	apiImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/api:latest",env)
 	// Construct the deploy command with --no-traffic flag for updates
 	deployServiceCmd := exec.Command(
 		"gcloud", "run", "deploy", "litmus-api",
 		"--project", projectID,
 		"--region", region,
 		"--allow-unauthenticated",
-		"--image", "europe-docker.pkg.dev/litmusai-prod/litmus/api:latest",
+		"--image", apiImage,
 		"--service-account", apiServiceAccount,
 		// Add other required/optional flags for your Cloud Run service
 	)
@@ -252,12 +254,13 @@ func DeployApplication(projectID, region string, envVars map[string]string, quie
 		s.Start()
 		defer s.Stop()
 	}
+	workerImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/worker:latest",env)
 	// Construct the deploy command (always create new)
 	deployJobCmd := exec.Command(
 		"gcloud", "run", "jobs", "deploy", "litmus-worker", // Always use "create"
 		"--project", projectID,
 		"--region", region,
-		"--image", "europe-docker.pkg.dev/litmusai-prod/litmus/worker:latest",
+		"--image", workerImage,
 		"--service-account", workerServiceAccount,
 		// Add other required/optional flags for your Cloud Run job
 	)
