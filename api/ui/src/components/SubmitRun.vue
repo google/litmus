@@ -212,9 +212,9 @@ const submitForm = async () => {
     if (!errors) {
       try {
         // Populate form data with template details
-        formData.value.template_input_field = templateData.value.template_input_field;
-        formData.value.template_output_field = templateData.value.template_output_field;
-        formData.value.template_llm_prompt = templateData.value.template_llm_prompt;
+        //formData.value.template_input_field = templateData.value.template_input_field;
+        //formData.value.template_output_field = templateData.value.template_output_field;
+        //formData.value.template_llm_prompt = templateData.value.template_llm_prompt;
         // Check if test_request exists in templateData, otherwise assign an empty object to avoid errors
         formData.value.test_request = templateData.value.test_request || {};
         if (templateData.value.test_pre_request) {
