@@ -23,7 +23,12 @@ import requests
 from google.cloud import firestore
 from google.cloud import logging
 
-from util.assess import ask_llm_against_golden
+from util.assess import (
+    ask_llm_against_golden,
+    ask_llm_for_action,
+    is_mission_done,
+    evaluate_mission,
+)
 
 # Setup logging
 # Instantiates a logging client
@@ -98,6 +103,117 @@ def execute_request(request_data):
         return {"status": "Failed", "error": str(e)}
 
 
+def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
+    """Executes a test mission, interacting with the LLM iteratively.
+
+    Args:
+        run_data (dict): Data for the current test run.
+        test_case (dict): Data for the current test case.
+        test_case_ref (firestore.DocumentReference): Reference to the test case document.
+        tracing_id (str): Unique ID for tracing requests.
+    """
+
+    mission_duration = run_data.get("mission_duration")
+    mission_description = test_case.get("mission")
+    conversation_history = []
+    request_response_history = []
+    test_result = {}
+
+    for turn in range(mission_duration):
+        worker_logger.log_text(f"Mission turn: {turn+1}/{mission_duration}")
+
+        # Ask LLM for the next action based on conversation history
+        llm_action = ask_llm_for_action(mission_description, conversation_history)
+
+        # Handle cases where LLM doesn't provide a valid action
+        if not llm_action or "request" not in llm_action:
+            worker_logger.log_text(
+                f"Error: LLM returned invalid action: {llm_action}",
+                severity="ERROR",
+            )
+            test_result = {
+                "status": "Error",
+                "error": f"Invalid LLM action on turn {turn+1}",
+            }
+            break
+
+        request_data = test_case.get("request")
+        request_data["tracing_id"] = tracing_id
+        json_string = json.dumps(request_data)
+        json_string = json_string.replace(f"{{query}}", str(llm_action["request"]))
+        request_data = json.loads(json_string)
+        conversation_history.append({"role": "user", "content": llm_action["request"]})
+
+        try:
+            # Execute the request suggested by the LLM
+            actual_response = execute_request(request_data)
+            # Store request - response pair
+            request_response_history.append(
+                {"request": request_data, "response": actual_response}
+            )
+            # Add the response to the conversation history
+            actual_filtered_response = filter_json(
+                actual_response, run_data.get("template_output_field")
+            )
+            try:
+                conversation_history.append(
+                    {
+                        "role": "assistant",
+                        "content": actual_filtered_response[
+                            run_data.get("template_output_field")
+                        ],
+                    }
+                )
+            except:
+                conversation_history.append(
+                    {
+                        "role": "assistant",
+                        "content": actual_filtered_response,
+                    }
+                )
+
+            # Check if the mission is done
+            if is_mission_done(mission_description, conversation_history):
+                worker_logger.log_text(
+                    f"Mission completed successfully on turn {turn+1}"
+                )
+                test_result = {
+                    "status": "Passed",
+                    "conversation_history": conversation_history,
+                }
+                break
+
+        except requests.exceptions.RequestException as e:
+            worker_logger.log_text(
+                f"Error in API request on turn {turn+1}: {str(e)}",
+                severity="ERROR",
+            )
+            test_result = {"status": "Failed", "error": str(e)}
+            break
+
+    # Evaluate the entire mission using the LLM after the loop
+    final_assessment = evaluate_mission(
+        mission_description,
+        conversation_history,
+        test_case.get("golden_response"),
+        run_data.get("template_llm_prompt"),
+    )
+
+    result = {}
+
+    result["turns"] = len(conversation_history) / 2
+    result["conversation"] = conversation_history
+    result["assessment"] = final_assessment
+    result["payloads"] = request_response_history
+    result["result"] = test_result
+    try:
+        result["status"] = final_assessment["overall_success"]
+    except:
+        result["status"] = "Failed"
+
+    return result
+
+
 def execute_tests_and_store_results(run_id, template_id):
     """Executes tests from a template and stores results, updating progress.
 
@@ -138,77 +254,87 @@ def execute_tests_and_store_results(run_id, template_id):
             execute_request(test_case["pre_request"])
 
         request_data = test_case.get("request")
-
         golden_response = test_case.get("golden_response")
 
-        try:
-            # Execute the main request
-            actual_response = execute_request(request_data)
-            output_field = run_data.get("template_output_field")
-            template_llm_prompt = run_data.get("template_llm_prompt")
-            actual_filtered_response = filter_json(
-                actual_response, run_data.get("template_output_field")
+        # If "Test Mission" - execute_test_mission
+        if run_data.get("template_type") == "Test Mission":
+            test_result = execute_test_mission(
+                run_data,
+                test_case,
+                test_cases_ref.document(f"test_case_{i+1}"),
+                tracing_id,
             )
 
-            # Compare with golden response if available
-            if golden_response and actual_filtered_response:
-                try:
-                    # Assess the actual response against the golden response using an LLM
-                    llm_assessment = ask_llm_against_golden(
-                        statement=actual_filtered_response.get(output_field),
-                        golden=golden_response,
-                        prompt=template_llm_prompt,
-                    )
+        else:  # "Test Run"
+            try:
+                # Execute the main request
+                actual_response = execute_request(request_data)
+                output_field = run_data.get("template_output_field")
+                template_llm_prompt = run_data.get("template_llm_prompt")
+                actual_filtered_response = filter_json(
+                    actual_response, run_data.get("template_output_field")
+                )
 
-                    # Evaluate LLM assessment results
-                    if llm_assessment and "similarity" in llm_assessment:
-                        if llm_assessment.get("similarity") > 0.5:
-                            test_result = {
-                                "status": "Passed",
-                                "response": actual_response,
-                                "assessment": llm_assessment,
-                            }
+                # Compare with golden response if available
+                if golden_response and actual_filtered_response:
+                    try:
+                        # Assess the actual response against the golden response using an LLM
+                        llm_assessment = ask_llm_against_golden(
+                            statement=actual_filtered_response.get(output_field),
+                            golden=golden_response,
+                            prompt=template_llm_prompt,
+                        )
+
+                        # Evaluate LLM assessment results
+                        if llm_assessment and "similarity" in llm_assessment:
+                            if llm_assessment.get("similarity") > 0.5:
+                                test_result = {
+                                    "status": "Passed",
+                                    "response": actual_response,
+                                    "assessment": llm_assessment,
+                                }
+                            else:
+                                test_result = {
+                                    "status": "Failed",
+                                    "expected": golden_response,
+                                    "response": actual_response,
+                                    "assessment": llm_assessment,
+                                }
                         else:
+                            # Handle invalid LLM assessment
                             test_result = {
-                                "status": "Failed",
-                                "expected": golden_response,
+                                "status": "Error",
                                 "response": actual_response,
-                                "assessment": llm_assessment,
+                                "error": "LLM assessment returned an invalid response",
                             }
-                    else:
-                        # Handle invalid LLM assessment
+
+                    except Exception as e:
+                        # Log errors from the LLM assessment
+                        worker_logger.log_text(
+                            f"Error in ask_llm_against_golden: {str(e)}",
+                            severity="ERROR",
+                        )
                         test_result = {
                             "status": "Error",
                             "response": actual_response,
-                            "error": "LLM assessment returned an invalid response",
+                            "error": f"Error during LLM assessment: {str(e)}",
                         }
-
-                except Exception as e:
-                    # Log errors from the LLM assessment
-                    worker_logger.log_text(
-                        f"Error in ask_llm_against_golden: {str(e)}", severity="ERROR"
-                    )
+                elif actual_filtered_response:
+                    # Handle cases where no golden response is provided
                     test_result = {
-                        "status": "Error",
+                        "status": "Passed",
                         "response": actual_response,
-                        "error": f"Error during LLM assessment: {str(e)}",
+                        "note": "No golden response available",
                     }
-            elif actual_filtered_response:
-                # Handle cases where no golden response is provided
-                test_result = {
-                    "status": "Passed",
-                    "response": actual_response,
-                    "note": "No golden response available",
-                }
-            else:
-                test_result = {
-                    "status": "Failed",
-                    "response": actual_response,
-                    "note": "No response available",
-                }
+                else:
+                    test_result = {
+                        "status": "Failed",
+                        "response": actual_response,
+                        "note": "No response available",
+                    }
 
-        except requests.exceptions.RequestException as e:
-            test_result = {"status": "Failed", "error": str(e)}
+            except requests.exceptions.RequestException as e:
+                test_result = {"status": "Failed", "error": str(e)}
 
         # Execute post-request hook if defined
         if test_case.get("post_request"):
