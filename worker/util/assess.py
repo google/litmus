@@ -247,8 +247,8 @@ def evaluate_mission(
 
     Today is {current_time.strftime('%A, %B %-d %Y')}. The current time is {current_time.strftime('%-H:%M')}.
 
-    Mission description (Statement): {mission_description}
-    Best-known mission response: {strip_references(golden_response)}
+    Statement (Mission description): {mission_description}
+    Best-known response: {strip_references(golden_response)}
 
     Conversation history:
     {conversation_string}

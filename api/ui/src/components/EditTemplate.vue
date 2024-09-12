@@ -582,8 +582,8 @@ This is what the JSON should look like:
 
 
 Here is an example:
-Statement: Der Fussballer B war 2011 und 2012 Fussballer des Jahres.
-Golden response: 2010 und 2012 war B Fussballer des Jahres.
+Statement: The soccer player B was Footballer of the Year in 2011 and 2012.
+Best-known response: B was the Soccer Player of the Year in 2010 and 2012.
 
 Comparison result:
 {
@@ -602,8 +602,8 @@ Comparison result:
 
 
 Here is another example:
-Statement: Die Polizei im Kanton A wurde gestern wegen einer Unruhestörung zu einem Privathaus gerufen.
-Best-known response: Aufgrund einer Unruhestörung rückte die Polizei gestern im Kanton A aus.
+Statement: Police in canton A were called to a private residence yesterday for a disturbance.
+Best-known response: Police in canton A responded to a disturbance yesterday.
 
 Comparison result:
 {
@@ -622,8 +622,8 @@ Comparison result:
 
 
 Here is another example:
-Statement: C ist seit 2010 CEO von D.
-Best-known response: C wurde 2010 zum CEO von D ernannt.
+Statement: C has been CEO of D since 2010.
+Best-known response: C was appointed CEO of D in 2010.
 
 Comparison result:
 {
@@ -641,8 +641,8 @@ Comparison result:
 }
 
 Here is another example:
-Statement: Diese Frage kann ich nicht beantworten.
-Best-known response: Die Stadt X wurde 1833 gegründet.
+Statement: I cannot answer this question.
+Best-known response: The city of X was founded in 1833.
 
 Comparison result:
 {
