@@ -16,8 +16,9 @@ This guide will walk you through starting a new test run using the Litmus UI.
 
 2. **Select a Test Template:**
 
-   - Choose the desired template from the "Template ID" dropdown.
+   - Choose the desired template from the "Template ID" dropdown. This will display available templates of both types: "Test Run" and "Test Mission".
    - The available test cases, input, and output fields for the chosen template will be shown.
+   - When selecting a "Test Mission" template, you'll see the mission duration defined in the template.
 
 3. **Enter a Run ID:**
 
@@ -27,7 +28,7 @@ This guide will walk you through starting a new test run using the Litmus UI.
 4. **(Optional) Modify Request Payload:**
 
    - Review the default request payload displayed in the "Request Payload" tab.
-   - You can modify this payload if needed, using the available tokens: {query}, {response}, {filter}, {source}, {block}, {category}.
+   - You can modify this payload if needed, using the available tokens: {query}, {response}, {filter}, {source}, {block}, {category}. For "Test Missions", the {query} token will be replaced by the LLM's generated requests in each interaction loop.
    - Ensure the payload is valid JSON.
 
 5. **(Optional) Configure Pre-Request and Post-Request:**
@@ -46,17 +47,19 @@ This guide will walk you through starting a new test run using the Litmus UI.
 
    - After reviewing all configurations, click the "Submit Run" button.
    - This initiates the test run using the chosen template and your configurations.
+   - If you chose a "Test Mission" template, the LLM will be invoked to guide the interactions for the specified duration.
 
 8. **Monitor Run Progress:**
 
    - You can track the progress of your run on the "Tests" page, accessible from the sidebar.
-   - The page displays the run ID, start time, status, and progress.
+   - The page displays the run ID, start time, status, and progress. For "Test Missions", the progress shows the current turn in the mission.
    - When the run completes, its status will change from "Running" to "Completed"
 
 9. **View Results:**
 
 - Click on a completed run ID to view its detailed results.
-- This page displays each test case and its outcome: success or failure.
+- For "Test Runs", this page displays each test case and its outcome: success or failure, along with assessment results.
+- For "Test Missions", you'll see the full conversation history, the final assessment, and details about each interaction loop.
 - You can further explore individual requests, responses, and assessment results (if applicable) by clicking the "Explore" button.
 
 **Note:**
