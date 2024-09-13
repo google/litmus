@@ -43,7 +43,26 @@ The primary purpose of a "Test Run" template is to:
 
 ## Starting a Test Run
 
-### API
+### CLI
+
+1. Get your `RUN_ID` and `TEMPLATE_ID`.
+2. Run the following `litmus` CLI command:
+   ```bash
+   litmus start $TEMPLATE_ID $RUN_ID
+   ```
+
+### API (Simple)
+
+1. Construct a JSON payload with the following information:
+   ```json
+   {
+     "run_id": "your-unique-run-id",
+     "template_id": "your-template-id"
+   }
+   ```
+2. Send a POST request to the `/submit_run_simple` endpoint of the Litmus API.
+
+### API (Advanced)
 
 1. Construct a JSON payload with the following information:
    ```json
@@ -57,30 +76,6 @@ The primary purpose of a "Test Run" template is to:
    ```
 2. Send a POST request to the `/submit_run` endpoint of the Litmus API.
 
-### CLI (Advanced)
-
-1. Gather the following information:
-   - `RUN_ID`: A unique identifier for your test run.
-   - `TEMPLATE_ID`: The ID of your "Test Run" template.
-   - `GCP_PROJECT`: Your Google Cloud project ID.
-   - `GCP_REGION`: The region where your Litmus worker is deployed.
-   - Optional: Prepare JSON strings for `PRE_REQUEST` and `POST_REQUEST` if needed.
-2. Use the `gcloud` CLI to invoke the Litmus worker job with the gathered information as environment variables:
-   ```bash
-   gcloud run jobs execute litmus-worker \
-       --project $GCP_PROJECT \
-       --region $GCP_REGION \
-       --set-env-vars RUN_ID=$RUN_ID,TEMPLATE_ID=$TEMPLATE_ID,PRE_REQUEST='$PRE_REQUEST',POST_REQUEST='$POST_REQUEST'
-   ```
-
-### CLI (Simple)
-
-1. Get your `RUN_ID` and `TEMPLATE_ID`.
-2. Run the following `litmus` CLI command:
-   ```bash
-   litmus start $TEMPLATE_ID $RUN_ID
-   ```
-
 ### UI
 
 1. Navigate to the "Start New Run" page.
@@ -93,10 +88,17 @@ The primary purpose of a "Test Run" template is to:
 
 You can configure various aspects of a "Test Run" template in the UI, including:
 
-- Modifying the `Request Payload` to match your API requirements.
-- Defining or updating the `Pre-Request` and `Post-Request`.
-- Crafting the `LLM Evaluation Prompt` to guide the assessment process.
-- Selecting the appropriate `Input Field` and `Output Field`.
+1. **Modifying the Template Data:** In the **Test Cases** tab, define or update test cases by adding or removing data items. Each test case item requires a query and an expected response. You can optionally provide additional data like Filter, Source, Block, and Category for each test case item.
+2. **Modifying the Request Payload:** In the **Request Payload** tab, modify the `Request Payload` to match your API requirements by using the built-in JSON editor. Use placeholders (e.g., `{query}`) for dynamic values from your test cases or missions.
+3. **Defining or updating the Pre-Request and Post-Request:** Navigate to the **Pre-Request** and **Post-Request** tabs and use the built-in JSON editor to define or update the pre-request and post-request payloads.
+4. **Crafting the LLM Evaluation Prompt:** In the **LLM Evaluation Prompt** tab, enter your prompt in the text area.
+5. **Selecting the appropriate Input Field and Output Field:**
+   - Click on the "Input Field" button. A drawer will open displaying the "Request Payload" as a JSON Tree. Click on the node representing the field you want to use as input.
+   - Click on the "Output Field" button. Before selecting an output field, you need to run the request to get an example response. Once you have an example response, a drawer will open displaying the "Response Payload" as a JSON Tree. Click on the node representing the field you want to use as output for the assessment.
+
+## Example
+
+Let's say you're testing a language translation model. A test case might involve a query in English ("Hello, world!") and its expected translation in Spanish ("¡Hola, mundo!"). You'd define the `Request Payload` to include the English query as `{query}`, and the model's response would be compared to the expected Spanish translation.
 
 ## Restarting and Deleting
 

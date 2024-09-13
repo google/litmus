@@ -43,7 +43,26 @@ A "Test Mission" template is structured similarly to a "Test Run" template but w
 
 ## Starting a Test Mission
 
-### API
+### CLI
+
+1. Get your `RUN_ID` and `TEMPLATE_ID`.
+2. Run the following `litmus` CLI command:
+   ```bash
+   litmus start $TEMPLATE_ID $RUN_ID
+   ```
+
+### API (Simple)
+
+1. Construct a JSON payload:
+   ```json
+   {
+     "run_id": "your-unique-run-id",
+     "template_id": "your-template-id"
+   }
+   ```
+2. Send a POST request to the `/submit_run_simple` endpoint.
+
+### API (Advanced)
 
 1. Construct a JSON payload:
    ```json
@@ -59,28 +78,6 @@ A "Test Mission" template is structured similarly to a "Test Run" template but w
    ```
 2. Send a POST request to the `/submit_run` endpoint.
 
-### CLI (Advanced)
-
-1. Gather the following information:
-   - `RUN_ID`, `TEMPLATE_ID`, `GCP_PROJECT`, `GCP_REGION` (as with "Test Runs").
-   - `MISSION_DURATION`: The maximum number of turns for each mission.
-   - Optional: `PRE_REQUEST` and `POST_REQUEST` as JSON strings.
-2. Invoke the Litmus worker using `gcloud`:
-   ```bash
-   gcloud run jobs execute litmus-worker \
-       --project $GCP_PROJECT \
-       --region $GCP_REGION \
-       --set-env-vars RUN_ID=$RUN_ID,TEMPLATE_ID=$TEMPLATE_ID,TEMPLATE_TYPE="Test Mission",MISSION_DURATION=$MISSION_DURATION,PRE_REQUEST='$PRE_REQUEST',POST_REQUEST='$POST_REQUEST'
-   ```
-
-### CLI (Simple)
-
-1. Get your `RUN_ID` and `TEMPLATE_ID`.
-2. Run the following `litmus` CLI command:
-   ```bash
-   litmus start $TEMPLATE_ID $RUN_ID
-   ```
-
 ### UI
 
 1. Navigate to the "Start New Run" page.
@@ -91,10 +88,36 @@ A "Test Mission" template is structured similarly to a "Test Run" template but w
 
 ## Configuration
 
-- Modify the `Request Payload` to match your API.
-- Define `Pre-Request` and `Post-Request` as needed.
-- Craft the `LLM Evaluation Prompt` for assessing mission success.
-- Adjust `Mission Duration` to control interaction length.
+You can configure various aspects of a "Test Mission" template in the UI, including:
+
+1.  **Modifying the Mission Data:** In the **Mission** tab, you can define or update missions by adding or removing mission items. Each mission item requires a mission description and an expected mission result. You can optionally provide additional data like filter, source, block, and category for each mission item.
+2.  **Modifying the Request Payload:** In the **Request Payload** tab, modify the `Request Payload` to match your API requirements by using the built-in JSON editor. Use placeholders (e.g., `{query}`) for dynamic values from your test cases or missions. For "Test Missions", the {query} placeholder will be dynamically replaced with the LLM's generated requests in each turn.
+3.  **Defining or updating the Pre-Request and Post-Request:** Navigate to the **Pre-Request** and **Post-Request** tabs and use the built-in JSON editor to define or update the pre-request and post-request payloads.
+4.  **Crafting the LLM Evaluation Prompt:** In the **LLM Evaluation Prompt** tab, enter your prompt in the text area.
+5.  **Selecting the appropriate Input Field and Output Field:**
+    - Click on the "Input Field" button. A drawer will open displaying the "Request Payload" as a JSON Tree. Click on the node representing the field you want to use as input.
+    - Click on the "Output Field" button. Before selecting an output field, you need to run the request to get an example response. Once you have an example response, a drawer will open displaying the "Response Payload" as a JSON Tree. Click on the node representing the field you want to use as output for the assessment.
+6.  **Adjust Mission Duration:** In the **Missions** tab, change the `Mission Duration` to control the length of the multi-turn interactions.
+
+## Example
+
+For example, if your mission is to book a flight from San Francisco to New York, your mission description could be:
+
+"Your mission is to book a flight for two adults from San Francisco to New York. The departure date should be December 20th, and the return date should be December 25th."
+
+The following could be a possible dialogue:
+
+1.  **User:** Book a flight from San Francisco to New York for two adults on December 20th, returning on December 25th.
+2.  **AI:** Sure, I can help with that. What are your preferred airlines?
+3.  **User:** I don't have a preference. Just find the cheapest option.
+4.  **AI:** Okay, give me a moment to search for the best deals.
+5.  **AI:** I found a flight on United Airlines for \$450 per person. Would you like to proceed with booking?
+6.  **User:** Yes, please.
+7.  **AI:** Great! Can I have the names of the passengers as they appear on their IDs?
+8.  **User:** John Doe and Jane Doe.
+9.  **AI:** Thank you. Your flight is now confirmed. You'll receive a confirmation email shortly.
+
+In this example, the LLM would evaluate whether the conversation led to a successful flight booking, considering the mission description and the conversation flow.
 
 ## Restarting and Deleting
 
