@@ -88,6 +88,8 @@ A "Test Mission" template is structured similarly to a "Test Run" template but w
 
 ## Configuration
 
+![Editing Test Mission](/img/edit-test-mission.png)
+
 You can configure various aspects of a "Test Mission" template in the UI, including:
 
 1.  **Modifying the Mission Data:** In the **Mission** tab, you can define or update missions by adding or removing mission items. Each mission item requires a mission description and an expected mission result. You can optionally provide additional data like filter, source, block, and category for each mission item.
