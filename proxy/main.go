@@ -253,6 +253,11 @@ func extractLitmusContext(path string) (string, string) {
 		context := matches[1]
 		newPath := matches[2]
 
+		// Remove the "litmus-context-" prefix
+		if len(context) > 14 && context[:14] == "litmus-context-" {
+			context = context[14:]
+		}
+
 		return context, newPath
 	}
 	// If there is no context
