@@ -350,6 +350,7 @@ func grantPermissions(serviceAccount, projectID string, quiet bool) error {
 		"roles/logging.logWriter",
 		"roles/run.developer",
 		"roles/bigquery.dataViewer",
+		"roles/bigquery.jobUser",
 	}
 
 	for _, role := range roles {
