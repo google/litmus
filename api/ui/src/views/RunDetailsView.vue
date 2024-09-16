@@ -442,7 +442,7 @@ const openDrawer = (trace_id: string) => {
   };
 
   // Fetch data from the API for the specified trace ID and date
-  fetch(`/proxy_data?flatten=true&date=${selectedDate.value}&context=litmus-context-${trace_id}`, options)
+  fetch(`/proxy_data?flatten=true&date=${selectedDate.value}&context=${trace_id}`, options)
     .then((response) => {
       // Handle BigQuery data errors
       if (!response.ok && Math.floor(response.status / 100) === 5) {
