@@ -105,7 +105,7 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 
 	// If no context is found in the path, use the tracingID as the context
 	if litmusContext == "" {
-		litmusContext = tracingID 
+		litmusContext = tracingID
 	}
 
 	// Ensure Correct Protocol Scheme
@@ -254,8 +254,8 @@ func extractLitmusContext(path string) (string, string) {
 		newPath := matches[2]
 
 		// Remove the "litmus-context-" prefix
-		if len(context) > 14 && context[:14] == "litmus-context-" {
-			context = context[14:]
+		if len(context) > 15 && context[:15] == "litmus-context-" {
+			context = context[15:]
 		}
 
 		return context, newPath
