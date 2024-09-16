@@ -24,7 +24,7 @@ def cleanup_json(x: str):
         x (str): String containing a JSON structure. May contain leading and trailing characters outside of JSON.
 
     Returns:
-        str: Retuns the substring representig the JSON structure. Returns None if JSON could not be found.
+        str: Returns the substring representig the JSON structure. Returns None if JSON could not be found.
     """
     y = x.replace("'", "")
     startBrace = y.find("{")
