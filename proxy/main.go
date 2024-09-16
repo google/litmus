@@ -103,6 +103,11 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 	litmusContext, newPath := extractLitmusContext(r.URL.Path)
 	r.URL.Path = newPath
 
+	// If no context is found in the path, use the tracingID as the context
+	if litmusContext == "" {
+		litmusContext = tracingID 
+	}
+
 	// Ensure Correct Protocol Scheme
 	if r.URL.Scheme == "" {
 		r.URL.Scheme = upstreamURL.Scheme
