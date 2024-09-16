@@ -1,3 +1,4 @@
 api/lib64
 *.pyc
 cli/cli
+proxy/proxy
