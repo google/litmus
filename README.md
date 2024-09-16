@@ -1,4 +1,4 @@
-# Litmus: HTTP Request and Response Testing Tool with User Interface & LLM Evaluation
+# Litmus: A comprehensive LLM testing and evaluation tool designed for GenAI Application Development.
 
 ![DEV](https://github.com/google/litmus/actions/workflows/dev_deploy.yml/badge.svg)
 ![UAT](https://github.com/google/litmus/actions/workflows/uat_deploy.yml/badge.svg)

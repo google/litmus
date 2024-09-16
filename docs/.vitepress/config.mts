@@ -72,6 +72,13 @@ export default defineConfig({
           ],
         },
         {
+          text: "Template Types",
+          items: [
+            { text: "Test Run", link: "/template-test-run" },
+            { text: "Test Mission", link: "/template-test-mission" },
+          ],
+        },
+        {
           text: "Using Litmus",
           items: [
             { text: "Adding Templates", link: "/ui-adding-templates" },
