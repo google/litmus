@@ -7,6 +7,8 @@
 Litmus is a comprehensive tool designed for testing and evaluating HTTP Requests and Responses, especially for Large Language Models (LLMs).
 It combines a powerful API, a robust worker service, a user-friendly web interface, and an optional proxy service to streamline the testing process.
 
+![Litmus LLM Testing](/docs/public/img/litmus.png)
+
 ## Features
 
 - **Automated Test Execution:** Submit test runs using pre-defined templates to evaluate responses against golden answers using AI.
@@ -21,6 +23,8 @@ It combines a powerful API, a robust worker service, a user-friendly web interfa
 - **Quick Deployment:** Use the provided deployment tool for a streamlined setup.
 
 ## Architecture
+
+![Litmus Architecture](/docs/public/img/litmus-architecture.png)
 
 Litmus consists of four core components:
 
