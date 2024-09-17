@@ -86,6 +86,8 @@ The primary purpose of a "Test Run" template is to:
 
 ## Configuration
 
+![Add template via the UI](/img/add-template.png)
+
 You can configure various aspects of a "Test Run" template in the UI, including:
 
 1. **Modifying the Template Data:** In the **Test Cases** tab, define or update test cases by adding or removing data items. Each test case item requires a query and an expected response. You can optionally provide additional data like Filter, Source, Block, and Category for each test case item.

@@ -5,6 +5,8 @@ This document outlines the steps to add a new test template using the Litmus Use
 - **Test Run:** For evaluating individual requests against expected responses, optionally with LLM-based assessment.
 - **Test Mission:** For evaluating multi-turn conversations guided by an LLM, where the LLM generates requests based on a mission description and previous interactions.
 
+![Add template via the UI](/img/add-template.png)
+
 ## Prerequisites
 
 - Litmus deployed to Google Cloud, accessible through the web interface. See the main [Litmus README](https://github.com/google/litmus/blob/main/README.md) for deployment instructions.
@@ -13,7 +15,11 @@ This document outlines the steps to add a new test template using the Litmus Use
 
 1. **Navigate to the Templates Page:** After logging into Litmus, click on "Templates" in the left-hand navigation menu.
 
+![Template Overview](public/img/templates-overview.png)
+
 2. **Open the Add Template Form:** Click the "Add Template" button. This will open a new form for creating a test template.
+
+![Add template via the UI](/img/add-template.png)
 
 3. **Provide Template Details:**
 
@@ -36,6 +42,7 @@ This document outlines the steps to add a new test template using the Litmus Use
          - **Mission Result:** The expected outcome or goal of the mission. This will be used by the LLM for evaluation after the mission is complete.
          - You can still optionally provide Filter, Source, Block, and Category as for Test Runs.
    - **Request Payload:**
+     ![Edit template payload](/img/edit-template-payload.png)
      - Use the JSON editor to define the structure of your test request.
      - Include placeholders (e.g., `{query}`) for dynamic values from your test cases or missions. For "Test Missions", the {query} placeholder will be dynamically replaced with the LLM's generated requests in each turn.
    - **Pre-Request and Post-Request (optional):** Use the JSON editor to define optional requests to be executed before and after the main test request. These apply to both Test Runs and Test Missions.
@@ -43,6 +50,7 @@ This document outlines the steps to add a new test template using the Litmus Use
      - For **Test Runs:** Provide a prompt to guide the LLM in assessing similarity between actual responses and golden responses for individual test cases.
      - For **Test Missions:** Provide a prompt to guide the LLM in evaluating the overall success of the mission based on the mission description, conversation history, and expected outcome.
    - **Input and Output Field Selection:**
+     ![Input Field](/img/select-input-field.png)
      - Click on the "Input Field" button. The left-hand pane will display a JSON representation of your "Request Payload." Click the node corresponding to the field you wish to use as input to your test cases or missions.
      - You can run your "Request Payload" to get an example response by clicking the "Test Request" button.
      - After running your request, click on the "Output Field" button. In the left-hand pane, click the node corresponding to the field you wish to use as the output for assessment.

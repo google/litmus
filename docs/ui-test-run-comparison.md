@@ -2,6 +2,8 @@
 
 The Litmus UI provides a feature to compare the results of multiple test runs using the same template, allowing you to analyze and understand the differences in responses and LLM assessments over time or across different model configurations.
 
+![Compare using the UI](/img/comparison.png)
+
 ## Steps
 
 1. **Access the Compare Tests View:**

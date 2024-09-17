@@ -4,8 +4,12 @@
 ![UAT](https://github.com/google/litmus/actions/workflows/uat_deploy.yml/badge.svg)
 ![PROD](https://github.com/google/litmus/actions/workflows/prod_deploy.yml/badge.svg)
 
+[![Litmus Video](/docs/public/img/litmus-video-piay.png)](https://www.youtube.com/watch?v=U5ZXFd79CYU)
+
 Litmus is a comprehensive tool designed for testing and evaluating HTTP Requests and Responses, especially for Large Language Models (LLMs).
 It combines a powerful API, a robust worker service, a user-friendly web interface, and an optional proxy service to streamline the testing process.
+
+![Litmus LLM Testing](/docs/public/img/litmus.png)
 
 ## Features
 
@@ -21,6 +25,8 @@ It combines a powerful API, a robust worker service, a user-friendly web interfa
 - **Quick Deployment:** Use the provided deployment tool for a streamlined setup.
 
 ## Architecture
+
+![Litmus Architecture](/docs/public/img/litmus-architecture.png)
 
 Litmus consists of four core components:
 
@@ -43,6 +49,8 @@ Litmus consists of four core components:
    - Provides insights into proxy logs and aggregated metrics about LLM usage.
 
 ## Getting Started
+
+[![Getting Started](/docs/public/img/getting-started-play.png)](https://www.youtube.com/watch?v=V76cjWc_dAc)
 
 **1. Quick Deployment with the Litmus CLI:**
 

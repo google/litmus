@@ -1,5 +1,9 @@
 # Getting Started
 
+This guide will walk you through the initial steps of setting up Litmus and running your first tests.
+
+<video controls="controls" src="/video/GettingStarted.mp4" />
+
 ## Prerequisites
 
 **Before you start, ensure you have the following:**
@@ -59,8 +63,8 @@
 
 ## Need Help?
 
-- **Litmus CLI Usage:** Refer to the Litmus CLI documentation: [cli/README.md](https://github.com/google/litmus/tree/main/cli)
-- **Proxy Service:** Learn about deploying and using the Litmus proxy service: [proxy/README.md](https://github.com/google/litmus/tree/main/proxy)
-- **Contribute:** We welcome your contributions! See [CONTRIBUTING.md](https://github.com/google/litmus/blob/main/CONTRIBUTING.md) for details.
+- **Litmus CLI Usage:** Refer to the Litmus CLI documentation: [CLI Usage](/cli)
+- **Proxy Service:** Learn about deploying and using the Litmus proxy service: [Proxy Usage](/proxy)
+- **Contribute:** We welcome your contributions! See [Contribution Guide](/contribution) for details.
 
 Let's get started with testing and evaluating your LLMs with Litmus!
