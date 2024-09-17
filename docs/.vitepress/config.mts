@@ -63,8 +63,9 @@ export default defineConfig({
         {
           text: "Docs",
           items: [
+            { text: "What is Litmus?", link: "/what-is-litmus" },
             { text: "Getting Started", link: "/getting-started" },
-            { text: "Setup", link: "/setup" },
+            { text: "Manual Setup", link: "/setup" },
             { text: "API Reference", link: "/api" },
             { text: "CLI Usage", link: "/cli" },
             { text: "Proxy Usage", link: "/proxy" },
