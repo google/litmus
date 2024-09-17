@@ -11,6 +11,7 @@ This page outlines how to use the Litmus user interface (UI) to analyze test run
 
 1. **Navigate to the 'Tests' Page:**
    From the main Litmus UI dashboard, click on the "Tests" link in the sidebar navigation.
+   ![Tests](/img/test-overview.png)
 
 2. **Locate Your Test Run:**
    The 'Tests' page displays a table listing all submitted test runs. Find the run you want to analyze,

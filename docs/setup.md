@@ -2,6 +2,8 @@
 
 This guide walks you through the detailed steps for setting up your Google Cloud environment and deploying Litmus manually.
 
+![Litmus Architecture](/img/litmus-architecture.png)
+
 ## Prerequisites
 
 - **Google Cloud Project:** An active GCP project with billing enabled.

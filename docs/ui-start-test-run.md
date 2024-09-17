@@ -12,6 +12,8 @@ This guide will walk you through starting a new test run using the Litmus UI.
 
 1. **Navigate to the "Start New Run" page:**
 
+   ![Start new run](/img/start-new-run.png)
+
    - From the Litmus UI, click on the "Start New Run" item in the left sidebar.
 
 2. **Select a Test Template:**

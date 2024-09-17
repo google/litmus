@@ -2,6 +2,8 @@
 
 The Litmus Proxy provides a powerful and transparent way to log and understand interactions with your Large Language Models (LLMs), including Vertex AI and other providers. By routing your LLM API traffic through the proxy, you gain valuable insights into usage patterns, performance, and potential areas for improvement.
 
+![Proxy Overview](/img/proxy-overview.png)
+
 **Benefits:**
 
 - **Centralized Logging:** Capture all LLM API requests and responses in a unified log, simplifying monitoring and analysis.
@@ -95,7 +97,12 @@ The Litmus Proxy provides a powerful and transparent way to log and understand i
    proxy_endpoint = 'YOUR_PROXY_ENDPOINT/litmus-context-{YOUR CONTEXT ID}'
 
    vertexai.init(project=project, location=location, api_endpoint=proxy_endpoint, api_transport="rest")
+
    ```
+
+### Quick Setup in the UI
+
+![Quick Setup via the UI](/img/proxy-setup-instructions.png)
 
 ### Additional Commands
 
