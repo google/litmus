@@ -145,7 +145,7 @@ gcloud services enable run.googleapis.com firestore.googleapis.com bigquery.goog
 
 ## Proxy Service Setup
 
-- Refer to the [Proxy Service Documentation](https://github.com/google/litmus/tree/main/proxy) for detailed instructions on deploying and utilizing the Litmus proxy to monitor LLM interactions.
+- Refer to the [Proxy Service Documentation](/proxy) for detailed instructions on deploying and utilizing the Litmus proxy to monitor LLM interactions.
 
 ## Customization
 
