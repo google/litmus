@@ -39,7 +39,7 @@ This guide will walk you through the initial steps of setting up Litmus and runn
 
    - This will deploy the Litmus core services to your default GCP project.
    - The deployment script creates required service accounts, grants permissions, and deploys the worker and API services to Cloud Run.
-   - You can customize the project and region using flags (see [CLI Usage](https://github.com/google/litmus/tree/main/cli)).
+   - You can customize the project and region using flags (see [CLI Usage](/cli)).
 
 3. **Access Litmus:**
    - Run `litmus status` to retrieve the Litmus web interface URL and credentials.
