@@ -556,7 +556,7 @@ onMounted(() => {
         method: 'POST',
         url: 'https://example.com/request' // Placeholder URL
       }),
-      template_llm_prompt: `You are a thorough quality inspector. Your task is to compare a statement about some topic to a golden response. The statement and the response can have different formats. Both statement and response are in German. You inspect the statement and the response to find out:
+      template_llm_prompt: `You are a thorough quality inspector. Your task is to compare a statement about some topic to a golden response. The statement and the response can have different formats. You should inspect the statement and the response to find out:
 - has the question been answered at all?
 - does the statement contradict the response?
 - is the statement content-wise equivalent to the response, even it might have additional information?

@@ -8,9 +8,8 @@
       "@/*": ["./src/*"]
     },
     "allowJs": true,
-    "types": [
-      "node"
-    ]
+    "types": ["node"],
+    "lib": ["ES2021.String"]
   },
 
   "references": [

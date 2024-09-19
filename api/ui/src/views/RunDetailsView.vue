@@ -163,12 +163,6 @@ limitations under the License.
             -->
             <n-collapse v-model:expanded="collapseExpanded">
               <n-collapse-item title="Select Fields" name="select-fields">
-                <template #header-extra>
-                  <div class="export-buttons">
-                    <!-- Button to export the currently visible table data to CSV -->
-                    <v-btn variant="flat" color="primary" @click="exportCSV"> Export Table to CSV </v-btn>
-                  </div>
-                </template>
                 <div class="checkbox-container">
                   <!-- Dynamic checkboxes to select/deselect fields for display -->
                   <n-checkbox v-for="field in availableFields" :key="field" v-model:checked="selectedFields[field]">
@@ -184,41 +178,47 @@ limitations under the License.
                 </div>
               </n-collapse-item>
             </n-collapse>
+            <div class="export-buttons">
+              <!-- Button to export the currently visible table data to CSV -->
+              <v-btn variant="flat" color="primary" @click="exportCSV"> Export Table to CSV </v-btn>
+            </div>
 
             <!-- 
               Data Table for Selected Fields: Displays the data in a tabular format, 
               showing only the fields selected by the user.
             -->
-            <n-table class="table-min-width" striped>
-              <thead>
-                <tr>
-                  <!-- Table headers, sortable by clicking -->
-                  <th v-for="field in visibleFields" :key="field" @click="sortTable(field)" class="sortable-header">
-                    {{ field }}
-                    <!-- Sort direction indicator -->
-                    <span v-if="sortField === field">
-                      <n-icon :component="sortDirection === 'asc' ? CaretUpOutline : CaretDownOutline" />
-                    </span>
-                  </th>
-                </tr>
-              </thead>
-              <tbody>
-                <!-- Render table rows with sorted and filtered data -->
-                <tr v-for="(record, index) in sortedData" :key="index">
-                  <td v-for="field in visibleFields" :key="field">
-                    <!-- Display object values as JSON -->
-                    <template v-if="typeof record[field] === 'object'">
-                      {{ JSON.stringify(record[field], null, 2) }}
-                    </template>
+            <div class="table-container">
+              <n-table class="table-min-width" striped>
+                <thead>
+                  <tr>
+                    <!-- Table headers, sortable by clicking -->
+                    <th v-for="field in visibleFields" :key="field" @click="sortTable(field)" class="sortable-header">
+                      {{ field }}
+                      <!-- Sort direction indicator -->
+                      <span v-if="sortField === field">
+                        <n-icon :component="sortDirection === 'asc' ? CaretUpOutline : CaretDownOutline" />
+                      </span>
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <!-- Render table rows with sorted and filtered data -->
+                  <tr v-for="(record, index) in sortedData" :key="index">
+                    <td v-for="field in visibleFields" :key="field">
+                      <!-- Display object values as JSON -->
+                      <template v-if="typeof record[field] === 'object'">
+                        {{ JSON.stringify(record[field], null, 2) }}
+                      </template>
 
-                    <!-- Display primitive values directly -->
-                    <template v-else>
-                      {{ record[field] }}
-                    </template>
-                  </td>
-                </tr>
-              </tbody>
-            </n-table>
+                      <!-- Display primitive values directly -->
+                      <template v-else>
+                        {{ record[field] }}
+                      </template>
+                    </td>
+                  </tr>
+                </tbody>
+              </n-table>
+            </div>
           </div>
 
           <!-- Button to export all data in the drawer to a JSON file -->
@@ -697,5 +697,9 @@ td {
   align-items: center;
   gap: 10px;
   color: red;
+}
+
+.table-container {
+  overflow-x: auto; /* Enable horizontal scrolling */
 }
 </style>

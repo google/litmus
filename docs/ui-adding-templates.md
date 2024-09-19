@@ -1,6 +1,10 @@
 # Adding Templates
 
-This document outlines the steps to add a new test template using the Litmus User Interface (UI). Litmus supports two types of templates:
+This document outlines the steps to add a new test template using the Litmus User Interface (UI).
+
+<video controls="controls" src="/video/TemplateCreation.mp4" />
+
+Litmus supports two types of templates:
 
 - **Test Run:** For evaluating individual requests against expected responses, optionally with LLM-based assessment.
 - **Test Mission:** For evaluating multi-turn conversations guided by an LLM, where the LLM generates requests based on a mission description and previous interactions.
