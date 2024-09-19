@@ -52,6 +52,11 @@ const sidebarItem: menu[] = [
     to: '/compare-list'
   },
   {
+    title: 'Data Explorer',
+    icon: DatabaseOutlined,
+    to: '/data-explorer'
+  },
+  {
     title: 'Start New Run',
     icon: PlayCircleOutlined,
     to: '/start'
