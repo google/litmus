@@ -911,6 +911,66 @@ def proxy_data():
         return jsonify({"error": f"Error querying BigQuery: {str(e)}"}), 500
 
 
+@app.route("/litmus_data", methods=["GET"])
+@auth.login_required
+def litmus_data():
+    """Retrieves proxy log data from BigQuery.
+
+    Expects query parameters:
+        - date: Date of the log data (format: YYYY-MM-DD).
+        - context (optional): Litmus context to filter the results.
+        - flatten (optional): Whether to flatten the JSON structure of the results (default: False).
+
+    Returns:
+        JSON response containing the proxy log data.
+    """
+    date = request.args.get("date")
+    context = request.args.get("context")
+
+    # Get the 'flatten' flag from query parameters
+    flatten_results = request.args.get(
+        "flatten", default=False, type=lambda v: v.lower() == "true"
+    )
+
+    # Input validation
+    if not date:
+        return jsonify({"error": 'Missing "date" or "context" parameter'}), 400
+
+    query = f"""
+        SELECT jsonPayload
+        FROM `{settings.project_id}.litmus_analytics.litmus_core_log_{date}`
+        ORDER BY jsonPayload.timestamp ASC
+        LIMIT 1000
+    """
+
+    if context:
+        query = f"""
+            SELECT jsonPayload
+            FROM `{settings.project_id}.litmus_analytics.litmus_core_log_{date}`
+            WHERE jsonPayload.requestheaders.x_litmus_request = "{context}"
+            ORDER BY jsonPayload.timestamp ASC
+            LIMIT 1000
+        """
+
+    try:
+        query_job = bq_client.query(query)
+        results = list(query_job.result())
+
+        # Flatten the results if requested
+        if flatten_results:
+            processed_results = []
+            for row in results:
+                flattened_row = flatten_json(row.jsonPayload)
+                processed_results.append(flattened_row)
+        else:
+            # Return data as is if not flattening
+            processed_results = [row.jsonPayload for row in results]
+
+        return jsonify(processed_results)
+    except Exception as e:
+        return jsonify({"error": f"Error querying BigQuery: {str(e)}"}), 500
+
+
 @app.route("/proxy_agg", methods=["GET"])
 @auth.login_required
 def proxy_agg():
