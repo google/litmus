@@ -71,6 +71,11 @@ const MainRoutes = {
       path: '/runs/:runId', // Dynamic route for run details
       name: 'runDetails',
       component: () => import('../views/RunDetailsView.vue') // Lazy load the component
+    },
+    {
+      path: '/data-explorer', // Dynamic route for run details
+      name: 'dataExplorer',
+      component: () => import('../views/DataExplorerView.vue') // Lazy load the component
     }
   ]
 };

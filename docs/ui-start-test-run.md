@@ -2,6 +2,8 @@
 
 This guide will walk you through starting a new test run using the Litmus UI.
 
+<video controls="controls" src="/video/StartRun.mp4" />
+
 **Prerequisites:**
 
 - You have deployed the Litmus application.

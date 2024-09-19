@@ -23,6 +23,8 @@ This page outlines how to use the Litmus user interface (UI) to analyze test run
 
 4. **Analyze Test Case Results:**
    The detailed results page presents a table with each row representing a test case from your run.
+   ![Test Run](/img/test-run.png)
+
    Each test case row displays:
 
    - **Test Case ID:** A unique identifier for the test case.
