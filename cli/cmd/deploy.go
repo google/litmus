@@ -347,75 +347,75 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 }
 
 // grantPermissions grants Vertex AI, Firestore, and Storage permissions to the given service account.
-func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName string ) error {
+func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName string) error {
 
-    roles := []string{
-        "roles/aiplatform.user",
-        "roles/datastore.user",
-        "roles/logging.logWriter",
-        "roles/run.developer",
-        "roles/bigquery.dataViewer",
-        "roles/bigquery.jobUser",
-    }
+	roles := []string{
+		"roles/aiplatform.user",
+		"roles/datastore.user",
+		"roles/logging.logWriter",
+		"roles/run.developer",
+		"roles/bigquery.dataViewer",
+		"roles/bigquery.jobUser",
+	}
 
-    for _, role := range roles {
-        if !utils.BindingExists(projectID, "", "", serviceAccount, role) {
-            cmd := exec.Command(
-                "gcloud", "projects", "add-iam-policy-binding", projectID,
-                "--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
-                "--role", role,
-            )
-            output, err := cmd.CombinedOutput()
-            if err != nil {
-                return fmt.Errorf("error granting role '%s': %v\nOutput: %s", role, err, output)
-            }
-        } else if !quiet {
-            fmt.Printf("Role '%s' already granted to service account.\n", role)
-        }
-    }
+	for _, role := range roles {
+		if !utils.BindingExists(projectID, "", "", serviceAccount, role) {
+			cmd := exec.Command(
+				"gcloud", "projects", "add-iam-policy-binding", projectID,
+				"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
+				"--role", role,
+			)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("error granting role '%s': %v\nOutput: %s", role, err, output)
+			}
+		} else if !quiet {
+			fmt.Printf("Role '%s' already granted to service account.\n", role)
+		}
+	}
 
-    // Grant Storage Object Admin role on the bucket
-    if !utils.BindingExists(projectID, "", bucketName, serviceAccount, "roles/storage.objectAdmin") { 
-        cmd := exec.Command(
-            "gsutil", "iam", "ch",
-            fmt.Sprintf("serviceAccount:%s:roles/storage.objectAdmin", serviceAccount),
-            fmt.Sprintf("gs://%s", bucketName),
-        )
-        output, err := cmd.CombinedOutput()
-        if err != nil {
-            return fmt.Errorf("error granting Storage Object Admin role: %w\nOutput: %s", err, output)
-        }
-    } else if !quiet {
-        fmt.Printf("Storage Object Admin role already granted to service account on bucket '%s'.\n", bucketName)
-    }
+	// Grant Storage Object Admin role on the bucket
+	if !utils.BindingExists(projectID, "", bucketName, serviceAccount, "roles/storage.objectAdmin") {
+		cmd := exec.Command(
+			"gcloud", "storage", "buckets", "add-iam-policy-binding", bucketName,
+			"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
+			"--role", "roles/storage.objectAdmin",
+		)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("error granting Storage Object Admin role: %w\nOutput: %s", err, output)
+		}
+	} else if !quiet {
+		fmt.Printf("Storage Object Admin role already granted to service account on bucket '%s'.\n", bucketName)
+	}
 
-    return nil
+	return nil
 }
 
 // createFilesBucket creates a Cloud Storage bucket for storing files if it doesn't exist.
 func createFilesBucket(bucketName, region, projectID string, quiet bool) error {
-    // Check if the bucket already exists using gsutil
-    cmd := exec.Command("gsutil", "ls", "-p", projectID, fmt.Sprintf("gs://%s", bucketName))
-    _, err := cmd.CombinedOutput()
+	// Check if the bucket already exists using gcloud
+	cmd := exec.Command("gcloud", "storage", "buckets", "describe", bucketName, "--project", projectID)
+	_, err := cmd.CombinedOutput()
 
-    if err != nil {
-        // Bucket does not exist, create it
-        cmd = exec.Command(
-            "gsutil", "mb",
-            "-l", region,
-            "-p", projectID,
-            fmt.Sprintf("gs://%s", bucketName),
-        )
-        output, err := cmd.CombinedOutput()
-        if err != nil {
-            return fmt.Errorf("error creating files bucket: %w\nOutput: %s", err, output)
-        }
-        if !quiet {
-            fmt.Printf("Created files bucket: gs://%s\n", bucketName)
-        }
-    } else if !quiet {
-        fmt.Printf("Files bucket '%s' already exists, skipping creation.\n", bucketName)
-    }
+	if err != nil {
+		// Bucket does not exist, create it
+		cmd = exec.Command(
+			"gcloud", "storage", "buckets", "create",
+			fmt.Sprintf("gs://%s", bucketName),
+			"--location", region,
+			"--project", projectID,
+		)
+		output, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("error creating files bucket: %w\nOutput: %s", err, output)
+		}
+		if !quiet {
+			fmt.Printf("Created files bucket: gs://%s\n", bucketName)
+		}
+	} else if !quiet {
+		fmt.Printf("Files bucket '%s' already exists, skipping creation.\n", bucketName)
+	}
 
-    return nil
+	return nil
 }
