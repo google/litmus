@@ -377,7 +377,7 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 	// Grant Storage Object Admin role on the bucket
 	if !utils.BindingExists(projectID, "", bucketName, serviceAccount, "roles/storage.objectAdmin") {
 		cmd := exec.Command(
-			"gcloud", "storage", "buckets", "add-iam-policy-binding", bucketName,
+			"gcloud", "storage", "buckets", "add-iam-policy-binding", fmt.Sprintf("gs://%s", bucketName),
 			"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
 			"--role", "roles/storage.objectAdmin",
 		)
