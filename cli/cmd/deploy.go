@@ -392,26 +392,30 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 	return nil
 }
 
-// createFilesBucket creates a Cloud Storage bucket for storing files if it doesn't exist.
 func createFilesBucket(bucketName, region, projectID string, quiet bool) error {
 	// Check if the bucket already exists using gcloud
 	cmd := exec.Command("gcloud", "storage", "buckets", "describe", bucketName, "--project", projectID)
-	_, err := cmd.CombinedOutput()
+	output, err := cmd.CombinedOutput()
 
 	if err != nil {
-		// Bucket does not exist, create it
-		cmd = exec.Command(
-			"gcloud", "storage", "buckets", "create",
-			fmt.Sprintf("gs://%s", bucketName),
-			"--location", region,
-			"--project", projectID,
-		)
-		output, err := cmd.CombinedOutput()
-		if err != nil {
-			return fmt.Errorf("error creating files bucket: %w\nOutput: %s", err, output)
-		}
-		if !quiet {
-			fmt.Printf("Created files bucket: gs://%s\n", bucketName)
+		// Check if the error is specifically because the bucket doesn't exist
+		if strings.Contains(string(output), "not found") {
+			// Bucket does not exist, create it
+			cmd = exec.Command(
+				"gcloud", "storage", "buckets", "create",
+				fmt.Sprintf("gs://%s", bucketName),
+				"--location", region,
+				"--project", projectID,
+			)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				return fmt.Errorf("error creating files bucket: %w\nOutput: %s", err, output)
+			}
+			if !quiet {
+				fmt.Printf("Created files bucket: gs://%s\n", bucketName)
+			}
+		} else {
+			return fmt.Errorf("error describing bucket (it might exist, but there could be other issues): %w\nOutput: %s", err, output) 
 		}
 	} else if !quiet {
 		fmt.Printf("Files bucket '%s' already exists, skipping creation.\n", bucketName)
