@@ -377,7 +377,8 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 	// Grant Storage Object Admin role on the bucket
 	if !utils.BindingExists(projectID, "", bucketName, serviceAccount, "roles/storage.objectAdmin") {
 		cmd := exec.Command(
-			"gcloud", "storage", "buckets", "add-iam-policy-binding", fmt.Sprintf("gs://%s", bucketName),
+			"gcloud", "storage", "buckets", 
+			"add-iam-policy-binding", fmt.Sprintf("gs://%s", bucketName),
 			"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
 			"--role", "roles/storage.objectAdmin",
 		)
@@ -394,7 +395,11 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 
 func createFilesBucket(bucketName, region, projectID string, quiet bool) error {
 	// Check if the bucket already exists using gcloud
-	cmd := exec.Command("gcloud", "storage", "buckets", "describe", fmt.Sprintf("gs://%s", bucketName), "--project", projectID)
+	cmd := exec.Command(
+		"gcloud", "storage", "buckets", "describe", 
+		fmt.Sprintf("gs://%s", bucketName), 
+		"--project", projectID,
+	)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
