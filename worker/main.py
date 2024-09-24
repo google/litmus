@@ -159,15 +159,14 @@ def replace_file_reference_in_string(text):
     matches = re.findall(pattern, text)
 
     for match in matches:
-        file_content = read_file_from_gcs(
-            f"gs://{files_bucket_name}/{files_prefix}{match}"
-        )
+        file_content = read_file_from_gcs({files_prefix}{match})
+
         text = text.replace(f"[FILE: {match}]", file_content)
 
     return text
 
 
-def read_file_from_gcs(gcs_path):
+def read_file_from_gcs(file):
     """Reads the content of a file from Google Cloud Storage.
 
     Args:
@@ -178,13 +177,13 @@ def read_file_from_gcs(gcs_path):
     """
 
     try:
-        blob = files_bucket.blob(gcs_path[5:])  # Remove "gs://" prefix
+        blob = files_bucket.blob(file)  # Remove "gs://" prefix
         return blob.download_as_text()
     except Exception as e:
         worker_logger.log_text(
-            f"Error reading file from GCS: {gcs_path}, {str(e)}", severity="ERROR"
+            f"Error reading file from GCS: {file}, {str(e)}", severity="ERROR"
         )
-        return f"Error reading file: {gcs_path}"
+        return f"Error reading file: {file}"
 
 
 def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
