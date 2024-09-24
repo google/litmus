@@ -16,12 +16,12 @@
 
 import json
 import os
+import re
 from datetime import datetime
 from uuid import uuid4
 
 import requests
-from google.cloud import firestore
-from google.cloud import logging
+from google.cloud import firestore, logging, storage
 
 from util.assess import (
     ask_llm_against_golden,
@@ -44,6 +44,13 @@ worker_logger = logging_client.logger(WORKER_LOG_NAME)
 
 # Writes a log entry indicating the worker is starting
 worker_logger.log_text("### Litmus-worker starting ###")
+
+# Initialize Storage client
+storage_client = storage.Client()
+
+# Get the files bucket name from environment variable
+files_bucket_name = os.environ.get("FILES_BUCKET")
+files_bucket = storage_client.bucket(files_bucket_name)
 
 
 def execute_request(request_data):
@@ -71,6 +78,9 @@ def execute_request(request_data):
     # Add tracing ID to headers for tracking
     if tracing_id:
         headers["X-Litmus-Request"] = tracing_id
+
+    # Process file references in the request body
+    body = process_file_references(body)
 
     start_time = datetime.utcnow()
 
@@ -101,6 +111,68 @@ def execute_request(request_data):
             request_data, None, start_time, end_time, error=str(e)
         )  # Log the error
         return {"status": "Failed", "error": str(e)}
+
+
+def process_file_references(data):
+    """Replaces file references in the data with the content of the referenced files.
+
+    Args:
+        data: The request data (could be a string, dictionary, or list).
+
+    Returns:
+        The processed data with file references replaced.
+    """
+    if isinstance(data, str):
+        return replace_file_reference_in_string(data)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            data[key] = process_file_references(value)
+        return data
+    elif isinstance(data, list):
+        return [process_file_references(item) for item in data]
+    else:
+        return data
+
+
+def replace_file_reference_in_string(text):
+    """
+    Replaces file references in a string with the content of the referenced file.
+
+    Args:
+        text (str): The text that may contain file references.
+
+    Returns:
+        str: The text with file references replaced.
+    """
+
+    pattern = r"\[FILE:\s*(gs://[^\]]+)\]"
+    matches = re.findall(pattern, text)
+
+    for match in matches:
+        file_content = read_file_from_gcs(match)
+        text = text.replace(f"[FILE: {match}]", file_content)
+
+    return text
+
+
+def read_file_from_gcs(gcs_path):
+    """Reads the content of a file from Google Cloud Storage.
+
+    Args:
+        gcs_path: The full GCS path to the file (e.g., "gs://my-bucket/my-file.txt").
+
+    Returns:
+        str: The content of the file.
+    """
+
+    try:
+        blob = files_bucket.blob(gcs_path[5:])  # Remove "gs://" prefix
+        return blob.download_as_text()
+    except Exception as e:
+        worker_logger.log_text(
+            f"Error reading file from GCS: {gcs_path}, {str(e)}", severity="ERROR"
+        )
+        return f"Error reading file: {gcs_path}"
 
 
 def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):

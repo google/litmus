@@ -45,6 +45,7 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		"aiplatform.googleapis.com",
 		"secretmanager.googleapis.com",
 		"cloudresourcemanager.googleapis.com",
+		"storage.googleapis.com", // Add Storage API
 	}
 	for _, api := range apisToEnable {
 		if !utils.IsAPIEnabled(api, projectID) {
@@ -88,6 +89,20 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		}
 	} else if !quiet {
 		fmt.Println("\nFirestore database already exists.")
+	}
+
+	// --- Create Files Bucket ---
+	bucketName := fmt.Sprintf("%s-litmus-files", projectID)
+	if !quiet {
+		s.Suffix = fmt.Sprintf(" Creating files bucket '%s'... ", bucketName)
+		s.Start()
+		defer s.Stop()
+	}
+	if err := createFilesBucket(bucketName, region, projectID, quiet); err != nil {
+		log.Fatalf("Error creating files bucket: %v\n", err)
+	}
+	if !quiet {
+		fmt.Printf("Done! Created files bucket: %s\n", bucketName)
 	}
 
 	// --- Service Account for API ---
@@ -140,42 +155,42 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		fmt.Printf("Service account for Worker already exists: %s (skipping)\n", workerServiceAccount)
 	}
 
-	// --- Grant Vertex AI and Firestore permissions to API service account ---
+	// --- Grant Vertex AI, Firestore, and Storage permissions to API service account ---
 	if !quiet {
 		s.Suffix = " Granting permissions to API service account... "
 		s.Start()
 		defer s.Stop()
 	}
-	if err := grantPermissions(apiServiceAccount, projectID, quiet); err != nil {
+	if err := grantPermissions(apiServiceAccount, projectID, quiet, bucketName); err != nil {
 		log.Fatalf("Error granting permissions to API service account: %v \n", err)
 	}
 	if !quiet {
 		fmt.Printf("Done! Granted permissions to API service account\n")
 	}
-	// --- Grant Vertex AI and Firestore permissions to Worker service account ---
+	// --- Grant Vertex AI, Firestore, and Storage permissions to Worker service account ---
 	if !quiet {
 		s.Suffix = " Granting permissions to Worker service account... "
 		s.Start()
 		defer s.Stop()
 	}
-	if err := grantPermissions(workerServiceAccount, projectID, quiet); err != nil {
+	if err := grantPermissions(workerServiceAccount, projectID, quiet, bucketName); err != nil {
 		log.Fatalf("Error granting permissions to Worker service account: %v\n", err)
 	}
 	if !quiet {
 		fmt.Printf("Done! Granted permissions to Worker service account\n")
 	}
-	// --- Password and URL Management with Secret Manager ---
-	var password string
+
+	// --- Password, URL with Secret Manager ---
+	var password, serviceURL string
 	if !quiet {
 		s.Suffix = " Getting or creating passwords... "
 		s.Start()
 		defer s.Stop()
 	}
-	// Get or create passwords and store them in Secret Manager
+	// Get or create password and store it in Secret Manager
 	password, err := utils.AccessSecret(projectID, "litmus-password")
 	if err != nil {
 		if strings.Contains(err.Error(), "not found") {
-			// Generate and store password if it doesn't exist
 			password = utils.GenerateRandomPassword(16)
 			if err := utils.CreateOrUpdateSecret(projectID, "litmus-password", password, quiet); err != nil {
 				log.Fatalf("Error storing password in Secret Manager: %v", err)
@@ -193,8 +208,7 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		defer s.Stop()
 	}
 
-	apiImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/api:latest",env)
-	// Construct the deploy command with --no-traffic flag for updates
+	apiImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/api:latest", env)
 	deployServiceCmd := exec.Command(
 		"gcloud", "run", "deploy", "litmus-api",
 		"--project", projectID,
@@ -202,33 +216,29 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		"--allow-unauthenticated",
 		"--image", apiImage,
 		"--service-account", apiServiceAccount,
-		// Add other required/optional flags for your Cloud Run service
 	)
 
-	// Add environment variables to the command
 	for name, value := range envVars {
 		deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("%s=%s", name, value))
 	}
 
-	// Add Region
 	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_REGION=%s", region))
-	// Add Project
 	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_PROJECT=%s", projectID))
+	deployServiceCmd.Args = append(deployServiceCmd.Args, "--set-env-vars", fmt.Sprintf("FILES_BUCKET=%s", bucketName))
 
-	// Check if service already exists and add --no-traffic flag
 	if utils.ServiceExists(projectID, region, "litmus-api") {
 		deployServiceCmd.Args = append(deployServiceCmd.Args, "--no-traffic")
 	}
 
-	output2, err := deployServiceCmd.CombinedOutput()
+	output, err := deployServiceCmd.CombinedOutput()
 	if err != nil {
-		log.Fatalf("Error deploying Cloud Run service: %v\nOutput: %s\n", err, output2)
+		log.Fatalf("Error deploying Cloud Run service: %v\nOutput: %s\n", err, output)
 	}
 	if !quiet {
 		fmt.Println("Done! Deployed API.")
 	}
-	// If the service was updated, route traffic back to the latest revision
-	if strings.Contains(string(output2), "Routing traffic...") {
+
+	if strings.Contains(string(output), "Routing traffic...") {
 		if !quiet {
 			s.Suffix = " Routing traffic to the latest revision... "
 			s.Start()
@@ -248,45 +258,52 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		}
 	}
 
+	// --- Extract Service URL and Store in Secret Manager ---
+	serviceURL = utils.ExtractServiceURL(string(output))
+	if !quiet {
+		s.Suffix = " Storing service URL... "
+		s.Start()
+		defer s.Stop()
+	}
+	if err := utils.CreateOrUpdateSecret(projectID, "litmus-service-url", serviceURL, quiet); err != nil {
+		log.Fatalf("Error storing service URL in Secret Manager: %v", err)
+	}
+
 	// --- Deploy Cloud Run job with service account ---
 	if !quiet {
 		s.Suffix = " Deploying Cloud Run job 'litmus-worker'... "
 		s.Start()
 		defer s.Stop()
 	}
-	workerImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/worker:latest",env)
-	// Construct the deploy command (always create new)
+	workerImage := fmt.Sprintf("europe-docker.pkg.dev/litmusai-%s/litmus/worker:latest", env)
 	deployJobCmd := exec.Command(
-		"gcloud", "run", "jobs", "deploy", "litmus-worker", // Always use "create"
+		"gcloud", "run", "jobs", "deploy", "litmus-worker",
 		"--project", projectID,
 		"--region", region,
 		"--image", workerImage,
 		"--service-account", workerServiceAccount,
-		// Add other required/optional flags for your Cloud Run job
 	)
 
-	// Add environment variables to the command
 	for name, value := range envVars {
 		deployJobCmd.Args = append(deployJobCmd.Args, "--set-env-vars", fmt.Sprintf("%s=%s", name, value))
 	}
 
-	// Add Region
 	deployJobCmd.Args = append(deployJobCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_REGION=%s", region))
-	// Add Project
 	deployJobCmd.Args = append(deployJobCmd.Args, "--set-env-vars", fmt.Sprintf("GCP_PROJECT=%s", projectID))
+	deployJobCmd.Args = append(deployJobCmd.Args, "--set-env-vars", fmt.Sprintf("FILES_BUCKET=%s", bucketName)) // Pass bucket name to Worker
 
-	// Check if job already exists and change command to use --update-job flag
 	if utils.JobExists(projectID, region, "litmus-worker") {
 		deployJobCmd.Args[3] = "update"
 	}
 
-	output, err := deployJobCmd.CombinedOutput()
+	output, err = deployJobCmd.CombinedOutput()
 	if err != nil {
 		log.Fatalf("Error deploying Cloud Run job: %v\nOutput: %s", err, output) // Print gcloud output
 	}
 	if !quiet {
 		fmt.Println("Done! Deployed Worker")
 	}
+
 	// --- Grant API permission to invoke Worker ---
 	if !utils.BindingExists(projectID, region, "litmus-worker", apiServiceAccount, "roles/run.invoker") {
 		if !quiet {
@@ -311,19 +328,6 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		fmt.Println("API permission to invoke Worker already exists.\n")
 	}
 
-	// Extract and print the service URL
-	serviceURL := utils.ExtractServiceURL(string(output2))
-
-	// Store the service URL in Secret Manager
-	if !quiet {
-		s.Suffix = " Storing service URL... "
-		s.Start()
-		defer s.Stop()
-	}
-	if err := utils.CreateOrUpdateSecret(projectID, "litmus-service-url", serviceURL, quiet); err != nil {
-		log.Fatalf("Error storing service URL in Secret Manager: %v", err)
-	}
-
 	if !quiet {
 		s.Suffix = " Setting up analytics... "
 		s.Start()
@@ -342,31 +346,76 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 	}
 }
 
-// grantPermissions grants Vertex AI and Firestore permissions to the given service account.
-func grantPermissions(serviceAccount, projectID string, quiet bool) error {
-	roles := []string{
-		"roles/aiplatform.user",
-		"roles/datastore.user",
-		"roles/logging.logWriter",
-		"roles/run.developer",
-		"roles/bigquery.dataViewer",
-		"roles/bigquery.jobUser",
-	}
+// grantPermissions grants Vertex AI, Firestore, and Storage permissions to the given service account.
+func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName string ) error {
 
-	for _, role := range roles {
-		if !utils.BindingExists(projectID, "", "", serviceAccount, role) { // No region needed for project-level bindings
-			cmd := exec.Command(
-				"gcloud", "projects", "add-iam-policy-binding", projectID,
-				"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
-				"--role", role,
-			)
-			output, err := cmd.CombinedOutput() // Capture output here
-			if err != nil {
-				return fmt.Errorf("error granting role '%s': %v\nOutput: %s", role, err, output) // Include output in the error
-			}
-		} else if !quiet {
-			fmt.Printf("Role '%s' already granted to service account.\n", role)
-		}
-	}
-	return nil
+    roles := []string{
+        "roles/aiplatform.user",
+        "roles/datastore.user",
+        "roles/logging.logWriter",
+        "roles/run.developer",
+        "roles/bigquery.dataViewer",
+        "roles/bigquery.jobUser",
+    }
+
+    for _, role := range roles {
+        if !utils.BindingExists(projectID, "", "", serviceAccount, role) {
+            cmd := exec.Command(
+                "gcloud", "projects", "add-iam-policy-binding", projectID,
+                "--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
+                "--role", role,
+            )
+            output, err := cmd.CombinedOutput()
+            if err != nil {
+                return fmt.Errorf("error granting role '%s': %v\nOutput: %s", role, err, output)
+            }
+        } else if !quiet {
+            fmt.Printf("Role '%s' already granted to service account.\n", role)
+        }
+    }
+
+    // Grant Storage Object Admin role on the bucket
+    if !utils.BindingExists(projectID, "", bucketName, serviceAccount, "roles/storage.objectAdmin") { 
+        cmd := exec.Command(
+            "gsutil", "iam", "ch",
+            fmt.Sprintf("serviceAccount:%s:roles/storage.objectAdmin", serviceAccount),
+            fmt.Sprintf("gs://%s", bucketName),
+        )
+        output, err := cmd.CombinedOutput()
+        if err != nil {
+            return fmt.Errorf("error granting Storage Object Admin role: %w\nOutput: %s", err, output)
+        }
+    } else if !quiet {
+        fmt.Printf("Storage Object Admin role already granted to service account on bucket '%s'.\n", bucketName)
+    }
+
+    return nil
+}
+
+// createFilesBucket creates a Cloud Storage bucket for storing files if it doesn't exist.
+func createFilesBucket(bucketName, region, projectID string, quiet bool) error {
+    // Check if the bucket already exists using gsutil
+    cmd := exec.Command("gsutil", "ls", "-p", projectID, fmt.Sprintf("gs://%s", bucketName))
+    _, err := cmd.CombinedOutput()
+
+    if err != nil {
+        // Bucket does not exist, create it
+        cmd = exec.Command(
+            "gsutil", "mb",
+            "-l", region,
+            "-p", projectID,
+            fmt.Sprintf("gs://%s", bucketName),
+        )
+        output, err := cmd.CombinedOutput()
+        if err != nil {
+            return fmt.Errorf("error creating files bucket: %w\nOutput: %s", err, output)
+        }
+        if !quiet {
+            fmt.Printf("Created files bucket: gs://%s\n", bucketName)
+        }
+    } else if !quiet {
+        fmt.Printf("Files bucket '%s' already exists, skipping creation.\n", bucketName)
+    }
+
+    return nil
 }

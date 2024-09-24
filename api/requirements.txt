@@ -1,6 +1,7 @@
 flask
 flask-compress
 flask-httpauth
+google-cloud-storage
 google-cloud-firestore
 google-cloud-run
 google-cloud-logging

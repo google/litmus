@@ -17,10 +17,10 @@ import json
 import os
 from datetime import datetime
 
-from flask import Flask, jsonify, request, make_response
+from flask import Flask, jsonify, request, make_response, send_file
 from flask_compress import Compress
 from flask_httpauth import HTTPBasicAuth
-from google.cloud import firestore, logging, bigquery
+from google.cloud import firestore, logging, bigquery, storage
 from google.cloud import run_v2
 from werkzeug.security import generate_password_hash, check_password_hash
 
@@ -42,9 +42,14 @@ Compress(app)
 if not settings.disable_auth:
     users = {settings.auth_user: generate_password_hash(settings.auth_pass)}
 
-# Initialize Firestore and BigQuery clients
+# Initialize Firestore, BigQuery, and Storage clients
 db = firestore.Client()
 bq_client = bigquery.Client()
+storage_client = storage.Client()
+
+# Get the files bucket name from environment variable
+files_bucket_name = os.environ.get("FILES_BUCKET")
+files_bucket = storage_client.bucket(files_bucket_name)
 
 
 # Authentication verification callback function
@@ -1148,6 +1153,88 @@ def invoke_job(
     request = run_v2.RunJobRequest(name=job_name, overrides=override_spec)
 
     client.run_job(request=request)
+
+
+@app.route("/files", methods=["GET"])
+@auth.login_required
+def list_files():
+    """Lists all files in the files bucket, including their full GCS paths.
+
+    Returns:
+        JSON response containing a list of file details.
+    """
+    blobs = files_bucket.list_blobs()
+    files = []
+    for blob in blobs:
+        files.append(
+            {"name": blob.name, "gcs_path": f"gs://{files_bucket_name}/{blob.name}"}
+        )
+    return jsonify({"files": files}), 200
+
+
+@app.route("/files/<filename>", methods=["GET"])
+@auth.login_required
+def download_file(filename):
+    """Downloads a file from the files bucket.
+
+    Args:
+        filename: The name of the file to download.
+
+    Returns:
+        The file content.
+    """
+    blob = files_bucket.blob(filename)
+    if not blob.exists():
+        return jsonify({"error": f"File '{filename}' not found"}), 404
+
+    # Create a temporary file to store the downloaded content
+    temp_filename = f"/tmp/{filename}"
+    blob.download_to_filename(temp_filename)
+
+    # Send the downloaded file to the client
+    return send_file(temp_filename, as_attachment=True), 200
+
+
+@app.route("/files/<filename>", methods=["POST"])
+@auth.login_required
+def upload_file(filename):
+    """Uploads a file to the files bucket.
+
+    Args:
+        filename: The name to store the uploaded file under.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+    if "file" not in request.files:
+        return jsonify({"error": "No file part"}), 400
+
+    file = request.files["file"]
+    if file.filename == "":
+        return jsonify({"error": "No selected file"}), 400
+
+    blob = files_bucket.blob(filename)
+    blob.upload_from_file(file)
+    return jsonify({"message": f"File '{filename}' uploaded successfully"}), 201
+
+
+@app.route("/files/<filename>", methods=["DELETE"])
+@auth.login_required
+def delete_file(filename):
+    """Deletes a file from the files bucket.
+
+    Args:
+        filename: The name of the file to delete.
+
+    Returns:
+        JSON response indicating success or failure.
+    """
+    blob = files_bucket.blob(filename)
+    if not blob.exists():
+        return jsonify({"error": f"File '{filename}' not found"}), 404
+
+    blob.delete()
+    return jsonify({"message": f"File '{filename}' deleted successfully"}), 200
 
 
 if __name__ == "__main__":
