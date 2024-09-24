@@ -394,7 +394,7 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 
 func createFilesBucket(bucketName, region, projectID string, quiet bool) error {
 	// Check if the bucket already exists using gcloud
-	cmd := exec.Command("gcloud", "storage", "buckets", "describe", bucketName, "--project", projectID)
+	cmd := exec.Command("gcloud", "storage", "buckets", "describe", fmt.Sprintf("gs://%s", bucketName), "--project", projectID)
 	output, err := cmd.CombinedOutput()
 
 	if err != nil {
