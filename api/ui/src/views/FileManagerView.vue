@@ -65,16 +65,11 @@ limitations under the License.
           </n-space>
           <n-list bordered>
             <n-list-item v-for="file in files" :key="file.name">
-              <n-thing :title="file.name">
-                <template #description>
-                  <div>
-                    <n-space>
-                      <n-tag type="info" size="small" @click="copyReference(file.gcs_path)"> [FILE: {{ file.gcs_path }}] </n-tag>
-                      <v-btn size="small" type="error" variant="flat" color="accent" @click="deleteFile(file.name)">Delete</v-btn>
-                    </n-space>
-                  </div>
-                </template>
-              </n-thing>
+              <n-space>
+                <n-tag type="info" size="small" @click="copyReference(file.name)"> [FILE: {{ file.name }}] </n-tag>
+                <v-btn :href="'/files/' + file.name" target="_blank" size="small">Download</v-btn>
+                <v-btn size="small" type="error" variant="flat" color="accent" @click="deleteFile(file.name)">Delete</v-btn>
+              </n-space>
             </n-list-item>
           </n-list>
         </div>
@@ -224,7 +219,7 @@ const fetchFiles = async () => {
  */
 const copyReference = (reference: string) => {
   navigator.clipboard
-    .writeText(reference)
+    .writeText('[FILE: ' + reference + ']')
     .then(() => {
       message.success('Reference copied to clipboard!');
     })

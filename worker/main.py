@@ -48,8 +48,9 @@ worker_logger.log_text("### Litmus-worker starting ###")
 # Initialize Storage client
 storage_client = storage.Client()
 
-# Get the files bucket name from environment variable
+# Get the files bucket name and prefix from environment variable
 files_bucket_name = os.environ.get("FILES_BUCKET")
+files_prefix = os.environ.get("FILES_PREFIX", "")  # Default to no prefix
 files_bucket = storage_client.bucket(files_bucket_name)
 
 
@@ -154,11 +155,13 @@ def replace_file_reference_in_string(text):
         str: The text with file references replaced.
     """
 
-    pattern = r"\[FILE:\s*(gs://[^\]]+)\]"
+    pattern = r"\[FILE:\s*(.+?)\]"
     matches = re.findall(pattern, text)
 
     for match in matches:
-        file_content = read_file_from_gcs(match)
+        file_content = read_file_from_gcs(
+            f"gs://{files_bucket_name}/{files_prefix}{match}"
+        )
         text = text.replace(f"[FILE: {match}]", file_content)
 
     return text
