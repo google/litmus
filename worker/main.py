@@ -159,7 +159,7 @@ def replace_file_reference_in_string(text):
     matches = re.findall(pattern, text)
 
     for match in matches:
-        file_content = read_file_from_gcs({files_prefix}{match})
+        file_content = read_file_from_gcs(f"{files_prefix}{match}")
 
         text = text.replace(f"[FILE: {match}]", file_content)
 
