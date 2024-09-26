@@ -379,7 +379,7 @@ def get_run_status_fields(run_id):
     )
 
 
-@bp.route("/runs/all_results/<template_id>", methods=["GET"])
+@bp.route("/all_results/<template_id>", methods=["GET"])
 @auth.login_required
 def all_results(template_id):
     """Retrieves filtered responses for all runs/missions of a specified template.

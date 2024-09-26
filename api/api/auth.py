@@ -20,22 +20,31 @@ from util.settings import settings
 
 auth = HTTPBasicAuth()
 
+# Authentication setup
+if not settings.disable_auth:
+    users = {settings.auth_user: generate_password_hash(settings.auth_pass)}
+
 
 # Authentication verification callback function
 @auth.verify_password
 def verify_password(username, password):
     """Verifies user password for basic authentication.
+
     Args:
         username: Username provided in the request.
         password: Password provided in the request.
+
     Returns:
         Username if authentication is successful, otherwise None.
     """
     if not settings.disable_auth:
-        users = {settings.auth_user: generate_password_hash(settings.auth_pass)}
         return (
             username
             if username in users and check_password_hash(users.get(username), password)
             else None
         )
     return username  # Disable authentication
+
+
+def login_required(x):
+    return auth.login_required(x)

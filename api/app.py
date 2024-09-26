@@ -19,9 +19,9 @@ import os
 from flask import Flask, jsonify
 from flask_compress import Compress
 from google.cloud import firestore, logging, bigquery, storage
-
-from api import runs, templates, proxy, files, auth
 from util.settings import settings
+from api import runs, templates, proxy, files, auth
+
 
 # Setup logging
 logging_client = logging.Client()
