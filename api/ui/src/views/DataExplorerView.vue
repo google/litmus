@@ -22,7 +22,7 @@ limitations under the License.
         <v-card elevation="0" variant="text">
           <v-row no-gutters class="align-center">
             <v-col sm="12">
-              <h3 class="text-h3 mt-1 mb-0">{{ selectedDataSource === 'proxy_data' ? 'Proxy Data' : 'Litmus Data' }}</h3>
+              <h3 class="text-h3 mt-1 mb-0">{{ selectedDataSource === 'proxy/data' ? 'Proxy Data' : 'Litmus Data' }}</h3>
             </v-col>
           </v-row>
         </v-card>
@@ -37,7 +37,7 @@ limitations under the License.
         v-model:value="selectedDataSource"
         :options="[
           { label: 'Litmus Data', value: 'proxy/litmus_data	' },
-          { label: 'Proxy Data', value: 'proxy_data' }
+          { label: 'Proxy Data', value: 'proxy/data' }
         ]"
       />
       <!-- Date picker for filtering by date (uses Unix timestamp internally) -->

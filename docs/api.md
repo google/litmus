@@ -377,7 +377,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 6.1 Get Proxy Data
 
-**Endpoint:** `/proxy_data`
+**Endpoint:** `/proxy/data`
 
 **Method:** `GET`
 

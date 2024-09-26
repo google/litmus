@@ -249,7 +249,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 **5. Proxy Data**
 
-- **Endpoint:** `/proxy_data`
+- **Endpoint:** `/proxy/data`
 - **Method:** GET
 - **Query Parameters:**
   - `date`: Date of the log entries (format: YYYY-MM-DD)
