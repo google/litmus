@@ -36,7 +36,7 @@ limitations under the License.
         class="litmus-data-selector"
         v-model:value="selectedDataSource"
         :options="[
-          { label: 'Litmus Data', value: 'litmus_data' },
+          { label: 'Litmus Data', value: 'proxy/litmus_data	' },
           { label: 'Proxy Data', value: 'proxy_data' }
         ]"
       />
@@ -165,7 +165,7 @@ const sortDirection = ref<'asc' | 'desc'>('asc'); // Stores the sort direction (
 const collapseExpanded = ref(['select-fields']); // Controls the expansion state of the collapse panel
 
 // Data Source Selection: Stores the currently selected data source (Litmus or Proxy)
-const selectedDataSource = ref('litmus_data'); // Default to litmus_data
+const selectedDataSource = ref('proxy/litmus_data	'); // Default to proxy/litmus_data
 
 // Watch for changes in collapse panel expansion
 watch(collapseExpanded, (value) => {

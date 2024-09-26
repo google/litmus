@@ -144,7 +144,7 @@ const fetchRunsBackground = async () => {
 const triggerRestart = async (templateId: string, runId: string) => {
   show.value = true;
   try {
-    const response = await fetch('/invoke_run', {
+    const response = await fetch('/runs/invoke', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -173,7 +173,7 @@ const triggerRestart = async (templateId: string, runId: string) => {
 const triggerDelete = async (runId: string) => {
   show.value = true;
   try {
-    const response = await fetch('/delete_run/' + runId, {
+    const response = await fetch('/runs/' + runId, {
       method: 'DELETE'
     });
     if (response.ok) {

@@ -72,7 +72,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 **1. Submit Test Run**
 
-- **Endpoint:** `/submit_run`
+- **Endpoint:** `/runs/submit`
 - **Method:** POST
 - **Request Body:**
   ```json
@@ -95,7 +95,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 - **Add Template:**
 
-  - **Endpoint:** `/add_template`
+  - **Endpoint:** `/templates/add`
   - **Method:** POST
   - **Request Body:**
     ```json
@@ -116,7 +116,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 - **Update Template:**
 
-  - **Endpoint:** `/update_template`
+  - **Endpoint:** `/templates/update`
   - **Method:** PUT
   - **Request Body:**
     ```json
@@ -137,7 +137,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 - **Delete Template:**
 
-  - **Endpoint:** `/delete_template/<template_id>`
+  - **Endpoint:** `/templates/<template_id>`
   - **Method:** DELETE
   - **Response:**
     ```json
@@ -174,7 +174,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 - **Get Run Status:**
 
-  - **Endpoint:** `/run_status/<run_id>`
+  - **Endpoint:** `/runs/status/<run_id>`
   - **Method:** GET
   - **Query Parameters:**
     - `request_filter`: Filter the request based on a JSON path (e.g., `body.param1`).
@@ -198,7 +198,7 @@ This repository contains the code for the Litmus API, a service that manages and
     ```
 
 - **Get Results for All Runs of a Template:**
-  - **Endpoint:** `/all_run_results/<template_id>`
+  - **Endpoint:** `/runs/all_results/<template_id>`
   - **Method:** GET
   - **Query Parameters:**
     - `request_filter`: Filter the request based on a JSON path (e.g., `body.param1`).
@@ -261,7 +261,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 **6. Aggregated Proxy Data**
 
-- **Endpoint:** `/proxy_agg`
+- **Endpoint:** `/proxy/agg`
 - **Method:** GET
 - **Query Parameters:**
   - `date`: Date of the log entries (format: YYYY-MM-DD)
@@ -283,7 +283,7 @@ This repository contains the code for the Litmus API, a service that manages and
 
 **8. List Proxy Services**
 
-- **Endpoint:** `/list_proxy_services`
+- **Endpoint:** `/proxy/list_services`
 - **Method:** GET
 - **Response:**
   ```json

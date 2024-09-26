@@ -131,7 +131,7 @@ const show = ref(false); // Control loading spinner visibility
 const fetchData = () => {
   show.value = true; // Show loading spinner
   const filterString = `response_filter=${responseFilter.value}&request_filter=${requestFilter.value}`; // Construct filter query string
-  fetch(`/all_run_results/${templateId}?${filterString}`)
+  fetch(`/runs/all_results/${templateId}?${filterString}`)
     .then((response) => response.json())
     .then((data) => {
       responseData.value = data;

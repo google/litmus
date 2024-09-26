@@ -217,7 +217,7 @@ const submitForm = async () => {
           formData.value.post_request = templateData.value.test_post_request;
         }
         // Send the test run data to the API
-        const response = await fetch('/submit_run', {
+        const response = await fetch('/runs/submit', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

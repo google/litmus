@@ -405,7 +405,7 @@ const fetchRunDetails = () => {
   const filterString = `response_filter=${responseFilter.value}&request_filter=${requestFilter.value}&golden_responses_filter=${goldenResponsesFilter.value}`;
 
   // Fetch run details from the API
-  fetch(`/run_status/${runId}?${filterString}`)
+  fetch(`/runs/status/${runId}?${filterString}`)
     .then((response) => response.json())
     .then((data) => {
       // Update testCases with fetched data
@@ -442,7 +442,7 @@ const openDrawer = (trace_id: string) => {
   };
 
   // Fetch data from the API for the specified trace ID and date
-  fetch(`/proxy_data?flatten=true&date=${selectedDate.value}&context=${trace_id}`, options)
+  fetch(`/proxy/data?flatten=true&date=${selectedDate.value}&context=${trace_id}`, options)
     .then((response) => {
       // Handle BigQuery data errors
       if (!response.ok && Math.floor(response.status / 100) === 5) {
@@ -481,7 +481,7 @@ const openDrawer = (trace_id: string) => {
  */
 const fetchRunFields = () => {
   // Fetch run fields from the API
-  fetch(`/run_status_fields/${runId}`)
+  fetch(`/runs/status_fields/${runId}`)
     .then((response) => response.json())
     .then((data) => {
       // Update relevant data properties based on fetched fields

@@ -60,7 +60,7 @@ The primary purpose of a "Test Run" template is to:
      "template_id": "your-template-id"
    }
    ```
-2. Send a POST request to the `/submit_run_simple` endpoint of the Litmus API.
+2. Send a POST request to the `/runs/submit_simple` endpoint of the Litmus API.
 
 ### API (Advanced)
 
@@ -74,7 +74,7 @@ The primary purpose of a "Test Run" template is to:
      "test_request": { ... }
    }
    ```
-2. Send a POST request to the `/submit_run` endpoint of the Litmus API.
+2. Send a POST request to the `/runs/submit` endpoint of the Litmus API.
 
 ### UI
 
@@ -104,8 +104,8 @@ Let's say you're testing a language translation model. A test case might involve
 
 ## Restarting and Deleting
 
-- **Restart:** You can restart a "Test Run" by sending a POST request to the `/invoke_run` endpoint with the `RUN_ID` and `TEMPLATE_ID` or by using the UI's restart button.
-- **Delete:** Delete a "Test Run" by sending a DELETE request to the `/delete_run/<run_id>` endpoint or by using the UI's delete button.
+- **Restart:** You can restart a "Test Run" by sending a POST request to the `/runs/invoke` endpoint with the `RUN_ID` and `TEMPLATE_ID` or by using the UI's restart button.
+- **Delete:** Delete a "Test Run" by sending a DELETE request to the `/runs/<run_id>` endpoint or by using the UI's delete button.
 
 ## Additional Information
 

@@ -20,7 +20,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 1. Submit Test Run
 
-**Endpoint:** `/submit_run`
+**Endpoint:** `/runs/submit`
 
 **Method:** `POST`
 
@@ -54,7 +54,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 2. Invoke Existing Test Run
 
-**Endpoint:** `/invoke_run`
+**Endpoint:** `/runs/invoke`
 
 **Method:** `POST`
 
@@ -84,7 +84,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 3. Delete Test Run
 
-**Endpoint:** `/delete_run/<run_id>`
+**Endpoint:** `/runs/<run_id>`
 
 **Method:** `DELETE`
 
@@ -111,7 +111,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 4.1 Add Test Template
 
-**Endpoint:** `/add_template`
+**Endpoint:** `/templates/add`
 
 **Method:** `POST`
 
@@ -148,7 +148,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 4.2 Update Test Template
 
-**Endpoint:** `/update_template`
+**Endpoint:** `/templates/update`
 
 **Method:** `PUT`
 
@@ -185,7 +185,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 4.3 Delete Test Template
 
-**Endpoint:** `/delete_template/<template_id>`
+**Endpoint:** `/templates/<template_id>`
 
 **Method:** `DELETE`
 
@@ -263,7 +263,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 5.1 Get Run Status
 
-**Endpoint:** `/run_status/<run_id>`
+**Endpoint:** `/runs/status/<run_id>`
 
 **Method:** `GET`
 
@@ -308,7 +308,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 5.2 Get Run Status Fields
 
-**Endpoint:** `/run_status_fields/<run_id>`
+**Endpoint:** `/runs/status_fields/<run_id>`
 
 **Method:** `GET`
 
@@ -336,7 +336,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 5.3 Get Results for All Runs of a Template
 
-**Endpoint:** `/all_run_results/<template_id>`
+**Endpoint:** `/runs/all_results/<template_id>`
 
 **Method:** `GET`
 
@@ -402,7 +402,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 6.2 Get Aggregated Proxy Data
 
-**Endpoint:** `/proxy_agg`
+**Endpoint:** `/proxy/agg`
 
 **Method:** `GET`
 
@@ -437,7 +437,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 7. List Proxy Services
 
-**Endpoint:** `/list_proxy_services`
+**Endpoint:** `/proxy/list_services`
 
 **Method:** `GET`
 
