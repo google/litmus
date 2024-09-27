@@ -82,7 +82,7 @@ limitations under the License.
               <n-divider></n-divider>
               {{ testCase.tracing_id }}
               <n-divider></n-divider>
-              <n-space justify="center" v-if="testCase.response.status" size="small">
+              <n-space justify="center" size="small">
                 <div class="vote-container">
                   <v-btn icon variant="text" size="small" @click="upvoteTestCase(testCase.id)">
                     <v-icon>mdi-thumb-up</v-icon>
