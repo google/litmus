@@ -119,7 +119,7 @@ const hasNotStartedRuns = computed(() => runs.value.some((run) => run.status ===
 const fetchRuns = async () => {
   show.value = true; // Show the loading spinner.
   try {
-    const response = await fetch('/runs');
+    const response = await fetch('/runs/');
     const data = await response.json();
     runs.value = data.runs as Run[];
     show.value = false; // Hide the spinner after fetching data.
@@ -132,7 +132,7 @@ const fetchRuns = async () => {
 // Function to fetch run data in the background.
 const fetchRunsBackground = async () => {
   try {
-    const response = await fetch('/runs');
+    const response = await fetch('/runs/');
     const data = await response.json();
     runs.value = data.runs as Run[];
   } catch (error) {
