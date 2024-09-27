@@ -300,6 +300,7 @@ def delete_run(run_id):
     return jsonify({"error": f"Run with ID '{run_id}' not found"}), 404
 
 
+# Run Status
 @bp.route("/status/<run_id>", methods=["GET"])
 @auth.login_required
 def get_run_status(run_id):
@@ -332,6 +333,9 @@ def get_run_status(run_id):
             case_data.get("golden_response"), request.args.get("golden_response_filter")
         )
 
+        # Get the comment count
+        comment_count = len(case_data.get("comments", []))
+
         test_cases.append(
             {
                 "id": doc.id,  # Include the test case ID (e.g., "test_case_1")
@@ -343,6 +347,7 @@ def get_run_status(run_id):
                 "upvotes": case_data.get("upvotes"),
                 "downvotes": case_data.get("downvotes"),
                 "comments": case_data.get("comments"),
+                "comment_count": comment_count,  # Add comment count to the response
             }
         )
 
@@ -353,8 +358,8 @@ def get_run_status(run_id):
             "template_id": run_data.get("template_id"),
             "template_input_field": run_data.get("template_input_field"),
             "template_output_field": run_data.get("template_output_field"),
-            "template_type": run_data.get("template_type"),  # Include template type
-            "testCases": test_cases,  # Return the detailed test case data
+            "template_type": run_data.get("template_type"),
+            "testCases": test_cases,
         }
     )
 

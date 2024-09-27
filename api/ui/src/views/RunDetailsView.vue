@@ -63,6 +63,12 @@ limitations under the License.
           </tr>
           <tr v-for="testCase in filteredTestCases" :key="testCase.id">
             <td>
+              <div class="star-container">
+                <v-btn icon variant="text" size="x-small" @click="toggleStarTestCase(testCase.id)">
+                  <v-icon v-if="testCase.starred">mdi-star</v-icon>
+                  <v-icon v-else>mdi-star-outline</v-icon>
+                </v-btn>
+              </div>
               <strong>{{ testCase.id }}</strong>
               <br />
               <span v-if="testCase.response.status === 'Failed'" style="color: red">
@@ -74,7 +80,6 @@ limitations under the License.
               <br />
               {{ testCase.tracing_id }}
               <n-divider></n-divider>
-              <v-btn variant="flat" color="primary" @click="openDrawer(testCase.tracing_id)"> Explore </v-btn>
               <div class="vote-container">
                 <v-btn
                   icon
@@ -97,14 +102,10 @@ limitations under the License.
                 </v-btn>
                 {{ testCase.downvotes }}
               </div>
-              <div class="star-container">
-                <v-btn icon variant="text" size="x-small" @click="toggleStarTestCase(testCase.id)">
-                  <v-icon v-if="testCase.starred">mdi-star</v-icon>
-                  <v-icon v-else>mdi-star-outline</v-icon>
-                </v-btn>
-              </div>
+              <n-divider></n-divider>
+              <v-btn variant="flat" color="primary" @click="openDrawer(testCase.tracing_id)"> Explore </v-btn>
               <!-- Test Info Button & Data (if available) -->
-              <v-btn variant="flat" color="primary" class="mt-2" @click="showTestInfo(testCase.tracing_id)"> Test Info </v-btn>
+              <v-btn variant="flat" color="primary" class="mt-2" @click="showTestInfo(testCase.tracing_id)"> More Info </v-btn>
               <div v-if="testInfo[testCase.tracing_id]">
                 <strong>Total Tokens:</strong> {{ testInfo[testCase.tracing_id].total_token_count }} <br />
                 <strong>Prompt Tokens:</strong> {{ testInfo[testCase.tracing_id].prompt_token_count }} <br />
@@ -112,7 +113,9 @@ limitations under the License.
                 <strong>Latency (ms):</strong> {{ testInfo[testCase.tracing_id].average_latency }}
               </div>
               <!-- Comments Button -->
-              <v-btn variant="flat" color="primary" class="mt-2" @click="openCommentsDrawer(testCase.id)"> Comments </v-btn>
+              <v-btn variant="flat" color="primary" class="mt-2" @click="openCommentsDrawer(testCase.id)">
+                Comments ({{ testCase.comment_count }})
+              </v-btn>
             </td>
             <!-- Input Data -->
             <td>
@@ -288,6 +291,7 @@ interface TestCase {
   comments: string[];
   userUpvoted: boolean;
   userDownvoted: boolean;
+  comment_count: number;
 }
 
 // Interface for Generic Data Records
@@ -858,7 +862,6 @@ const addComment = async (testCaseId: string) => {
       return;
     }
 
-    // Make an API call to add the comment
     const response = await fetch(`/runs/${runId}/${testCaseId}/comment`, {
       method: 'POST',
       headers: {
@@ -868,22 +871,27 @@ const addComment = async (testCaseId: string) => {
     });
 
     if (response.ok) {
-      // Add the new comment to the test case's comments array
+      // Find the test case and add the new comment
       const testCase = testCases.value.find((tc) => tc.id === testCaseId);
       if (testCase) {
+        // Initialize comments array if it's null
+        if (!testCase.comments) {
+          testCase.comments = [];
+        }
+        // Push the new comment
         testCase.comments.push(newComment.value);
+        // Increase comment count
+        testCase.comment_count = testCase.comment_count + 1;
+        newComment.value = ''; // Clear the comment input field
       }
-      // Clear the new comment input field
-      newComment.value = '';
-      // Display a success message
       message.success('Comment added successfully!');
+      // Re-fetch run details to get updated comments
+      fetchRunDetails();
     } else {
-      // If there's an error, parse the JSON response and display the error message
       const errorData = await response.json();
       message.error(`Error adding comment: ${errorData.error}`);
     }
   } catch (error) {
-    // Log the error to the console and display a generic error message
     console.error('Error adding comment:', error);
     message.error('An unexpected error occurred while adding the comment.');
   }
