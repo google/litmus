@@ -15,7 +15,6 @@
 """This module defines the API routes for test templates."""
 
 from flask import Blueprint, jsonify, request
-from flask_httpauth import HTTPBasicAuth
 from google.cloud import firestore
 from api.auth import auth
 from util.settings import settings

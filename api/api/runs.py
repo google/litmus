@@ -16,8 +16,7 @@
 import json
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request, make_response
-from flask_httpauth import HTTPBasicAuth
+from flask import Blueprint, jsonify, request
 from google.cloud import firestore
 from google.cloud import run_v2
 from api.auth import auth

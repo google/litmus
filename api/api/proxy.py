@@ -15,7 +15,6 @@
 """This module defines the API routes for proxy data."""
 
 from flask import Blueprint, jsonify, request
-from flask_httpauth import HTTPBasicAuth
 from google.cloud import bigquery
 from google.cloud import run_v2
 from datetime import datetime

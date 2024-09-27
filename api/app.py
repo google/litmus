@@ -34,15 +34,6 @@ app = Flask(__name__, static_folder="ui/dist/", static_url_path="/")
 # Turn on compression
 Compress(app)
 
-# Initialize Firestore, BigQuery, and Storage clients
-db = firestore.Client()
-bq_client = bigquery.Client()
-storage_client = storage.Client()
-
-# Get the files bucket name from environment variable
-files_bucket_name = os.environ.get("FILES_BUCKET")
-files_bucket = storage_client.bucket(files_bucket_name)
-
 # Register blueprints
 app.register_blueprint(runs.bp, url_prefix="/runs")
 app.register_blueprint(templates.bp, url_prefix="/templates")
@@ -50,6 +41,7 @@ app.register_blueprint(proxy.bp, url_prefix="/proxy")
 app.register_blueprint(files.bp, url_prefix="/files")
 
 
+# Version
 @app.route("/version")
 @auth.login_required
 def version():
@@ -57,6 +49,7 @@ def version():
     return jsonify({"version": os.environ.get("VERSION", "0.0.0-alpha")}), 200
 
 
+# Serving Static Files
 @app.route("/", defaults={"path": ""})
 @app.route("/<path:path>")
 @auth.login_required
