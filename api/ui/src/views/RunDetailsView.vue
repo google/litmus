@@ -40,7 +40,7 @@ limitations under the License.
       />
       <!-- Show Only Starred Toggle -->
       <n-switch v-model:value="showOnlyStarred" @update:value="fetchRunDetails" />
-      <span>Show Only Starred</span>
+      <span><v-icon>mdi-star</v-icon></span>
       <!-- Clear Filters Button -->
       <v-btn variant="flat" color="primary" @click="clearFilter"> Clear Filters </v-btn>
       <!-- Export Test Cases Button -->
@@ -52,7 +52,7 @@ limitations under the License.
       <n-table :data="testCases" class="table-min-width" striped>
         <thead>
           <tr>
-            <th>Test Case ID</th>
+            <th>Test Case</th>
             <th>Input</th>
             <th>Output</th>
           </tr>
@@ -64,48 +64,43 @@ limitations under the License.
           <tr v-for="testCase in filteredTestCases" :key="testCase.id">
             <td>
               <div class="star-container">
-                <v-btn icon variant="text" size="x-small" @click="toggleStarTestCase(testCase.id)">
+                <v-btn icon variant="text" size="small" @click="toggleStarTestCase(testCase.id)">
                   <v-icon v-if="testCase.starred">mdi-star</v-icon>
                   <v-icon v-else>mdi-star-outline</v-icon>
                 </v-btn>
+                <strong>{{ testCase.id }}</strong>
               </div>
-              <strong>{{ testCase.id }}</strong>
-              <br />
-              <span v-if="testCase.response.status === 'Failed'" style="color: red">
-                <Icon :name="FailedIcon" :size="30" />
-              </span>
-              <span v-else style="color: green">
-                <Icon :name="SuccessIcon" :size="30" />
-              </span>
-              <br />
+              <n-divider v-if="testCase.response.status"></n-divider>
+              <n-space justify="center" v-if="testCase.response.status" size="small">
+                <span v-if="testCase.response.status === 'Failed'" style="color: red">
+                  <Icon :name="FailedIcon" :size="30" />
+                </span>
+                <span v-if="testCase.response.status === 'Passed'" style="color: green">
+                  <Icon :name="SuccessIcon" :size="30" />
+                </span>
+              </n-space>
+              <n-divider></n-divider>
               {{ testCase.tracing_id }}
               <n-divider></n-divider>
-              <div class="vote-container">
-                <v-btn
-                  icon
-                  variant="text"
-                  size="x-small"
-                  @click="upvoteTestCase(testCase.id)"
-                  :color="testCase.userUpvoted ? 'green' : 'default'"
-                >
-                  <v-icon>mdi-thumb-up</v-icon>
-                </v-btn>
-                {{ testCase.upvotes }}
-                <v-btn
-                  icon
-                  variant="text"
-                  size="x-small"
-                  @click="downvoteTestCase(testCase.id)"
-                  :color="testCase.userDownvoted ? 'red' : 'default'"
-                >
-                  <v-icon>mdi-thumb-down</v-icon>
-                </v-btn>
-                {{ testCase.downvotes }}
-              </div>
+              <n-space justify="center" v-if="testCase.response.status" size="small">
+                <div class="vote-container">
+                  <v-btn icon variant="text" size="small" @click="upvoteTestCase(testCase.id)">
+                    <v-icon>mdi-thumb-up</v-icon>
+                  </v-btn>
+                  {{ testCase.upvotes }}
+                  <v-btn icon variant="text" size="small" @click="downvoteTestCase(testCase.id)">
+                    <v-icon>mdi-thumb-down</v-icon>
+                  </v-btn>
+                  {{ testCase.downvotes }}
+                </div>
+              </n-space>
               <n-divider></n-divider>
-              <v-btn variant="flat" color="primary" @click="openDrawer(testCase.tracing_id)"> Explore </v-btn>
-              <!-- Test Info Button & Data (if available) -->
-              <v-btn variant="flat" color="primary" class="mt-2" @click="showTestInfo(testCase.tracing_id)"> More Info </v-btn>
+              <v-btn size="small" variant="outlined" color="primary" @click="openDrawer(testCase.tracing_id)">
+                <v-icon>mdi-magnify-expand</v-icon>
+              </v-btn>
+              <v-btn size="small" variant="outlined" color="primary" @click="showTestInfo(testCase.tracing_id)">
+                <v-icon>mdi-information-box-outline</v-icon>
+              </v-btn>
               <div v-if="testInfo[testCase.tracing_id]">
                 <strong>Total Tokens:</strong> {{ testInfo[testCase.tracing_id].total_token_count }} <br />
                 <strong>Prompt Tokens:</strong> {{ testInfo[testCase.tracing_id].prompt_token_count }} <br />
@@ -113,8 +108,15 @@ limitations under the License.
                 <strong>Latency (ms):</strong> {{ testInfo[testCase.tracing_id].average_latency }}
               </div>
               <!-- Comments Button -->
-              <v-btn variant="flat" color="primary" class="mt-2" @click="openCommentsDrawer(testCase.id)">
-                Comments ({{ testCase.comment_count }})
+              <v-btn
+                prepend-icon="mdi-comment-plus"
+                variant="outlined"
+                color="primary"
+                class="mt-2"
+                @click="openCommentsDrawer(testCase.id)"
+                size="small"
+              >
+                {{ testCase.comment_count }}
               </v-btn>
             </td>
             <!-- Input Data -->
@@ -269,7 +271,6 @@ import { CaretUpOutline, CaretDownOutline } from '@vicons/ionicons5';
 import { AlertCircle } from '@vicons/ionicons5';
 // Import custom Icon component
 import Icon from '@/components/common/Icon.vue';
-import { VueSpinner } from 'vue3-spinners';
 
 // Define names for success and failure icons
 const SuccessIcon = 'carbon:checkmark-outline';
@@ -289,8 +290,6 @@ interface TestCase {
   downvotes: number;
   starred: boolean;
   comments: string[];
-  userUpvoted: boolean;
-  userDownvoted: boolean;
   comment_count: number;
 }
 
@@ -479,9 +478,7 @@ const fetchRunDetails = () => {
     .then((data) => {
       // Update testCases with fetched data, adding user interaction details
       testCases.value = (data.testCases as TestCase[]).map((testCase) => ({
-        ...testCase,
-        userUpvoted: false, // Initialize userUpvoted to false
-        userDownvoted: false // Initialize userDownvoted to false
+        ...testCase
       }));
       show.value = false; // Hide loading spinner after data is fetched
     })
