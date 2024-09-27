@@ -18,8 +18,7 @@ import os
 
 from flask import Flask, jsonify
 from flask_compress import Compress
-from google.cloud import firestore, logging, bigquery, storage
-from util.settings import settings
+from google.cloud import logging
 from api import runs, templates, proxy, files, auth
 
 
@@ -31,6 +30,7 @@ logger.log_text("### Litmus starting ###")
 
 # Flask app initialization
 app = Flask(__name__, static_folder="ui/dist/", static_url_path="/")
+app.url_map.strict_slashes = False
 # Turn on compression
 Compress(app)
 
