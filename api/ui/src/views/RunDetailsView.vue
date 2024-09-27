@@ -16,9 +16,7 @@ limitations under the License.
 
 <template>
   <div>
-    <!-- 
-      Page Title and Breadcrumb: Displays the run ID and template ID. 
-    -->
+    <!-- Page Title and Breadcrumb -->
     <v-row class="page-breadcrumb mb-0 mt-n2">
       <v-col cols="12" md="12">
         <v-card elevation="0" variant="text">
@@ -31,31 +29,25 @@ limitations under the License.
       </v-col>
     </v-row>
 
-    <!-- 
-      Filter and Action Buttons Container: Provides inputs for filtering 
-      test cases and buttons for actions like clearing filters and exporting data.
-    -->
+    <!-- Filter and Action Buttons -->
     <div class="filter-container">
-      <!-- Input field for filtering test cases by request data -->
       <n-input v-model:value="requestFilter" placeholder="Request Filter (e.g., body.query)" clearable @change="fetchRunDetails" />
-      <!-- Input field for filtering test cases by response data -->
       <n-input
         v-model:value="responseFilter"
         placeholder="Response Filter (e.g., response.output.text,assessment,status)"
         clearable
         @change="fetchRunDetails"
       />
-      <!-- Button to clear all applied filters -->
+      <!-- Show Only Starred Toggle -->
+      <n-switch v-model:value="showOnlyStarred" @update:value="fetchRunDetails" />
+      <span>Show Only Starred</span>
+      <!-- Clear Filters Button -->
       <v-btn variant="flat" color="primary" @click="clearFilter"> Clear Filters </v-btn>
-      <!-- Button to export test cases data to a CSV file -->
+      <!-- Export Test Cases Button -->
       <v-btn variant="flat" color="primary" @click="exportTestCasesCSV"> Export Test Cases to CSV </v-btn>
     </div>
 
-    <!-- 
-      Test Cases Table: Displays the list of test cases with details like ID, 
-      input, output, and status. It also includes a loading spinner 
-      while fetching data.
-    -->
+    <!-- Test Cases Table -->
     <n-spin :show="show">
       <n-table :data="testCases" class="table-min-width" striped>
         <thead>
@@ -66,18 +58,10 @@ limitations under the License.
           </tr>
         </thead>
         <tbody>
-          <!-- Placeholder row when no test cases are found -->
-          <tr v-if="testCases.length == 0">
-            <td>No Results</td>
+          <tr v-if="filteredTestCases.length === 0">
+            <td colspan="3">No Results</td>
           </tr>
-
-          <!-- Iterate over each test case and display its details -->
-          <tr v-for="testCase in testCases" :key="testCase.id">
-            <!-- 
-              Test Case ID, Status, Tracing ID, and Explore Button: Displays the 
-              test case ID, its status (success/failed), tracing ID, and 
-              a button to explore further details.
-            -->
+          <tr v-for="testCase in filteredTestCases" :key="testCase.id">
             <td>
               <strong>{{ testCase.id }}</strong>
               <br />
@@ -91,11 +75,46 @@ limitations under the License.
               {{ testCase.tracing_id }}
               <n-divider></n-divider>
               <v-btn variant="flat" color="primary" @click="openDrawer(testCase.tracing_id)"> Explore </v-btn>
+              <div class="vote-container">
+                <v-btn
+                  icon
+                  variant="text"
+                  size="x-small"
+                  @click="upvoteTestCase(testCase.id)"
+                  :color="testCase.userUpvoted ? 'green' : 'default'"
+                >
+                  <v-icon>mdi-thumb-up</v-icon>
+                </v-btn>
+                {{ testCase.upvotes }}
+                <v-btn
+                  icon
+                  variant="text"
+                  size="x-small"
+                  @click="downvoteTestCase(testCase.id)"
+                  :color="testCase.userDownvoted ? 'red' : 'default'"
+                >
+                  <v-icon>mdi-thumb-down</v-icon>
+                </v-btn>
+                {{ testCase.downvotes }}
+              </div>
+              <div class="star-container">
+                <v-btn icon variant="text" size="x-small" @click="toggleStarTestCase(testCase.id)">
+                  <v-icon v-if="testCase.starred">mdi-star</v-icon>
+                  <v-icon v-else>mdi-star-outline</v-icon>
+                </v-btn>
+              </div>
+              <!-- Test Info Button & Data (if available) -->
+              <v-btn variant="flat" color="primary" class="mt-2" @click="showTestInfo(testCase.tracing_id)"> Test Info </v-btn>
+              <div v-if="testInfo[testCase.tracing_id]">
+                <strong>Total Tokens:</strong> {{ testInfo[testCase.tracing_id].total_token_count }} <br />
+                <strong>Prompt Tokens:</strong> {{ testInfo[testCase.tracing_id].prompt_token_count }} <br />
+                <strong>Candidate Tokens:</strong> {{ testInfo[testCase.tracing_id].candidates_token_count }} <br />
+                <strong>Latency (ms):</strong> {{ testInfo[testCase.tracing_id].average_latency }}
+              </div>
+              <!-- Comments Button -->
+              <v-btn variant="flat" color="primary" class="mt-2" @click="openCommentsDrawer(testCase.id)"> Comments </v-btn>
             </td>
-
-            <!-- 
-              Input Data: Displays the request and golden answer for the test case. 
-            -->
+            <!-- Input Data -->
             <td>
               <strong>Request:</strong>
               <pre class="wrap-text">
@@ -107,11 +126,7 @@ limitations under the License.
                 {{ JSON.stringify(testCase.golden_response, null, 2) }}
               </pre>
             </td>
-
-            <!-- 
-              Output Data: Displays the response received for the test case or 
-              an error message if the request failed. 
-            -->
+            <!-- Output Data -->
             <td>
               <pre class="wrap-text" v-if="testCase.response.error">
                 {{ testCase.response.error }}
@@ -125,22 +140,10 @@ limitations under the License.
       </n-table>
     </n-spin>
 
-    <!-- 
-      Data Drawer: A side drawer that opens upon clicking the "Explore" button 
-      for a test case. It displays detailed data related to the selected 
-      tracing ID.
-    -->
+    <!-- Data Drawer (same as before) -->
     <n-drawer v-model:show="showDrawer" :width="980">
       <n-drawer-content :title="drawerTitle" :native-scrollbar="false" :width="996" closable>
-        <!-- 
-          Spinner While Loading Drawer Content: Displays a loading spinner 
-          while the drawer content is being fetched.
-        -->
         <n-spin :show="showDrawerSpinner">
-          <!-- 
-            Error Message Section: Displays an error message if there's an 
-            issue fetching data for the selected tracing ID.
-          -->
           <div v-if="drawerError" class="error-message">
             <n-icon size="30" color="red">
               <AlertCircle />
@@ -150,23 +153,12 @@ limitations under the License.
               {{ drawerTitle }} on {{ selectedDate }}. This might be due to a temporary issue or the data might not be available.
             </p>
           </div>
-
-          <!-- 
-            Data Display and Export Section: This section is responsible for 
-            displaying the data fetched for the selected tracing ID and 
-            provides options to export this data.
-          -->
           <div v-else>
-            <!-- 
-              Field Selection Collapse Panel: A collapsible panel that allows users 
-              to select specific fields they want to view in the data table. 
-            -->
+            <!-- Field Selection Collapse Panel -->
             <n-collapse v-model:expanded="collapseExpanded">
               <n-collapse-item title="Select Fields" name="select-fields">
                 <div class="checkbox-container">
-                  <!-- Dynamic checkboxes to select/deselect fields for display -->
                   <n-checkbox v-for="field in availableFields" :key="field" v-model:checked="selectedFields[field]">
-                    <!-- Highlight important fields with bold font weight -->
                     <span
                       :style="{
                         fontWeight: isImportantField(field) ? 'bold' : 'normal'
@@ -178,23 +170,19 @@ limitations under the License.
                 </div>
               </n-collapse-item>
             </n-collapse>
+
+            <!-- Export Buttons -->
             <div class="export-buttons">
-              <!-- Button to export the currently visible table data to CSV -->
               <v-btn variant="flat" color="primary" @click="exportCSV"> Export Table to CSV </v-btn>
             </div>
 
-            <!-- 
-              Data Table for Selected Fields: Displays the data in a tabular format, 
-              showing only the fields selected by the user.
-            -->
+            <!-- Data Table -->
             <div class="table-container">
               <n-table class="table-min-width" striped>
                 <thead>
                   <tr>
-                    <!-- Table headers, sortable by clicking -->
                     <th v-for="field in visibleFields" :key="field" @click="sortTable(field)" class="sortable-header">
                       {{ field }}
-                      <!-- Sort direction indicator -->
                       <span v-if="sortField === field">
                         <n-icon :component="sortDirection === 'asc' ? CaretUpOutline : CaretDownOutline" />
                       </span>
@@ -202,15 +190,11 @@ limitations under the License.
                   </tr>
                 </thead>
                 <tbody>
-                  <!-- Render table rows with sorted and filtered data -->
                   <tr v-for="(record, index) in sortedData" :key="index">
                     <td v-for="field in visibleFields" :key="field">
-                      <!-- Display object values as JSON -->
                       <template v-if="typeof record[field] === 'object'">
                         {{ JSON.stringify(record[field], null, 2) }}
                       </template>
-
-                      <!-- Display primitive values directly -->
                       <template v-else>
                         {{ record[field] }}
                       </template>
@@ -220,12 +204,35 @@ limitations under the License.
               </n-table>
             </div>
           </div>
-
-          <!-- Button to export all data in the drawer to a JSON file -->
           <n-space v-if="!drawerError">
             <v-btn variant="flat" color="primary" @click="exportJSON"> Export all Data to JSON File </v-btn>
           </n-space>
         </n-spin>
+      </n-drawer-content>
+    </n-drawer>
+
+    <!-- Comments Drawer -->
+    <n-drawer v-model:show="showCommentsDrawer" placement="left" :width="500">
+      <n-drawer-content :title="'Comments for ' + currentTestCaseId" closable>
+        <!-- Comment List -->
+        <n-list bordered>
+          <n-list-item v-for="(comment, index) in currentTestCaseComments" :key="index">
+            {{ comment }}
+          </n-list-item>
+        </n-list>
+        <!-- Comment Input -->
+        <n-input
+          v-model:value="newComment"
+          type="textarea"
+          placeholder="Add a comment"
+          :autosize="{
+            minRows: 2
+          }"
+        />
+        <n-space>
+          <!-- Save Comment Button -->
+          <v-btn variant="flat" color="primary" class="mt-2" @click="addComment(currentTestCaseId)">Add Comment</v-btn>
+        </n-space>
       </n-drawer-content>
     </n-drawer>
   </div>
@@ -233,7 +240,23 @@ limitations under the License.
 
 <script lang="ts" setup>
 // Import necessary components from UI libraries
-import { NTable, NInput, NSpin, NDivider, NDrawer, NDrawerContent, NCheckbox, NIcon, NCollapse, NCollapseItem, NSpace } from 'naive-ui';
+import {
+  NTable,
+  NInput,
+  NSpin,
+  NDivider,
+  NDrawer,
+  NDrawerContent,
+  NCheckbox,
+  NIcon,
+  NCollapse,
+  NCollapseItem,
+  NSpace,
+  useMessage,
+  NSwitch,
+  NList,
+  NListItem
+} from 'naive-ui';
 // Import routing functionality from Vue Router
 import { useRoute } from 'vue-router';
 // Import reactivity functions from Vue
@@ -243,6 +266,7 @@ import { CaretUpOutline, CaretDownOutline } from '@vicons/ionicons5';
 import { AlertCircle } from '@vicons/ionicons5';
 // Import custom Icon component
 import Icon from '@/components/common/Icon.vue';
+import { VueSpinner } from 'vue3-spinners';
 
 // Define names for success and failure icons
 const SuccessIcon = 'carbon:checkmark-outline';
@@ -258,6 +282,12 @@ interface TestCase {
   request: any;
   golden_response: any;
   tracing_id: string;
+  upvotes: number;
+  downvotes: number;
+  starred: boolean;
+  comments: string[];
+  userUpvoted: boolean;
+  userDownvoted: boolean;
 }
 
 // Interface for Generic Data Records
@@ -287,6 +317,10 @@ const drawerError = ref(false);
 const show = ref(false);
 // Flag to control the loading spinner for the data drawer
 const showDrawerSpinner = ref(false);
+// Flag to control the visibility of the comments drawer
+const showCommentsDrawer = ref(false);
+// Current test case ID for the comments drawer
+const currentTestCaseId = ref('');
 
 // Get Current Date for Default Selection
 const today = new Date();
@@ -298,13 +332,15 @@ const selectedDate = ref(`${year}${month}${day}`);
 
 // Filters for Request, Response, and Golden Responses
 // Filter for response data
-const responseFilter = ref('response.output.text,response.output.intent,assessment,status');
+const responseFilter = ref('assessment,response.output.text,response.output.intent,status');
 // Filter for request data
 const requestFilter = ref('body.query');
 // ID of the template used for the test run
 const templateId = ref('');
 // Filter for golden response data
 const goldenResponsesFilter = ref('');
+// Filter to show only starred runs
+const showOnlyStarred = ref(false);
 
 // Data Table Field Management
 // List of available fields in the drawer data
@@ -317,6 +353,15 @@ const sortField = ref<string | null>(null);
 const sortDirection = ref<'asc' | 'desc'>('asc');
 // Controls the expansion state of collapse panels in the drawer
 const collapseExpanded = ref(['select-fields']);
+
+// New comment for a test case
+const newComment = ref('');
+
+// Reactive object to store test info from the API
+const testInfo = ref<Record<string, any>>({}); // Correct type for testInfo
+
+// Get the message instance from Naive UI
+const message = useMessage(); // Import useMessage
 
 // Watch for Changes in Collapse Panel Expansion
 watch(collapseExpanded, (value) => {
@@ -381,6 +426,21 @@ const sortedData = computed(() => {
   return data;
 });
 
+// Computed property for filtering test cases by starred status
+const filteredTestCases = computed(() => {
+  if (showOnlyStarred.value) {
+    return testCases.value.filter((testCase) => testCase.starred);
+  } else {
+    return testCases.value;
+  }
+});
+
+// Computed property to retrieve comments for the current test case
+const currentTestCaseComments = computed(() => {
+  const testCase = testCases.value.find((tc) => tc.id === currentTestCaseId.value);
+  return testCase ? testCase.comments : [];
+});
+
 // --- Data Fetching and Manipulation Functions ---
 
 /**
@@ -402,14 +462,23 @@ function convertDate(dateString: string): string {
 const fetchRunDetails = () => {
   show.value = true; // Show loading spinner
   // Construct the filter string for the API request
-  const filterString = `response_filter=${responseFilter.value}&request_filter=${requestFilter.value}&golden_responses_filter=${goldenResponsesFilter.value}`;
+  let filterString = `response_filter=${responseFilter.value}&request_filter=${requestFilter.value}&golden_responses_filter=${goldenResponsesFilter.value}`;
+
+  // Add starred filter if enabled
+  if (showOnlyStarred.value) {
+    filterString += '&starred=true';
+  }
 
   // Fetch run details from the API
   fetch(`/runs/status/${runId}?${filterString}`)
     .then((response) => response.json())
     .then((data) => {
-      // Update testCases with fetched data
-      testCases.value = data.testCases as TestCase[];
+      // Update testCases with fetched data, adding user interaction details
+      testCases.value = (data.testCases as TestCase[]).map((testCase) => ({
+        ...testCase,
+        userUpvoted: false, // Initialize userUpvoted to false
+        userDownvoted: false // Initialize userDownvoted to false
+      }));
       show.value = false; // Hide loading spinner after data is fetched
     })
     .catch((error) => {
@@ -423,6 +492,9 @@ const fetchRunDetails = () => {
  */
 const clearFilter = () => {
   responseFilter.value = 'response'; // Reset response filter
+  requestFilter.value = ''; // Reset request filter
+  goldenResponsesFilter.value = ''; // Reset golden response filter
+  showOnlyStarred.value = false; // Reset starred filter
   fetchRunDetails(); // Refetch data with cleared filters
 };
 
@@ -494,6 +566,30 @@ const fetchRunFields = () => {
     .catch((error) => {
       console.error('Error fetching run details:', error);
     });
+};
+
+/**
+ * Fetches test information from the proxy/agg endpoint.
+ * @param traceId The tracing ID of the test case.
+ */
+const showTestInfo = async (traceId: string) => {
+  try {
+    const date = convertDate(selectedDate.value);
+    const response = await fetch(`/proxy/agg?date=${date}&context=${traceId}`);
+    if (!response.ok) {
+      throw new Error('Failed to fetch test info');
+    }
+    const data = await response.json();
+
+    // Update the testInfo reactive object with the fetched data, keyed by traceId
+    testInfo.value = {
+      ...testInfo.value,
+      [traceId]: data.length > 0 ? data[0] : null
+    };
+  } catch (error) {
+    console.error('Error fetching test info:', error);
+    message.error('Failed to fetch test info');
+  }
 };
 
 // --- Data Table Sorting Function ---
@@ -624,7 +720,11 @@ const prepareTestCasesForCSV = (data: TestCase[]): any[] => {
       Status: 'response.status',
       Request: 'request',
       'Golden Response': 'golden_response',
-      Response: 'response'
+      Response: 'response',
+      Upvotes: 'upvotes',
+      Downvotes: 'downvotes',
+      Starred: 'starred',
+      Comments: 'comments'
     };
 
     // Extract data for each header
@@ -649,6 +749,146 @@ const exportTestCasesCSV = () => {
   downloadFile(csvContent, 'test_cases.csv', 'text/csv');
 };
 
+/**
+ * Upvotes a test case and refreshes the vote count from the API.
+ * @param testCaseId The ID of the test case to upvote.
+ */
+const upvoteTestCase = async (testCaseId: string) => {
+  try {
+    const response = await fetch(`/runs/${runId}/${testCaseId}/upvote`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      message.success('Test case upvoted!');
+      // After a successful upvote, re-fetch the run details to update the vote counts
+      fetchRunDetails();
+    } else {
+      const errorData = await response.json();
+      message.error(`Error upvoting test case: ${errorData.error}`);
+    }
+  } catch (error) {
+    console.error('Error upvoting test case:', error);
+    message.error('An unexpected error occurred while upvoting the test case.');
+  }
+};
+
+/**
+ * Downvotes a test case and refreshes the vote count from the API.
+ * @param testCaseId The ID of the test case to downvote.
+ */
+const downvoteTestCase = async (testCaseId: string) => {
+  try {
+    const response = await fetch(`/runs/${runId}/${testCaseId}/downvote`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      message.success('Test case downvoted!');
+      // After a successful downvote, re-fetch the run details to update the vote counts
+      fetchRunDetails();
+    } else {
+      const errorData = await response.json();
+      message.error(`Error downvoting test case: ${errorData.error}`);
+    }
+  } catch (error) {
+    console.error('Error downvoting test case:', error);
+    message.error('An unexpected error occurred while downvoting the test case.');
+  }
+};
+
+/**
+ * Toggles the starred status of a test case.
+ * @param testCaseId The ID of the test case to toggle.
+ */
+const toggleStarTestCase = async (testCaseId: string) => {
+  try {
+    const response = await fetch(`/runs/${runId}/${testCaseId}/star`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json'
+      }
+    });
+
+    if (response.ok) {
+      // Find the test case and update its starred status
+      const testCase = testCases.value.find((tc) => tc.id === testCaseId);
+      if (testCase) {
+        testCase.starred = !testCase.starred;
+      }
+      message.success('Test case starred status updated!');
+    } else {
+      const errorData = await response.json();
+      message.error(`Error updating starred status: ${errorData.error}`);
+    }
+  } catch (error) {
+    console.error('Error updating starred status:', error);
+    message.error('An unexpected error occurred while updating the starred status.');
+  }
+};
+
+/**
+ * Opens the comments drawer for a specific test case.
+ * @param testCaseId The ID of the test case.
+ */
+const openCommentsDrawer = (testCaseId: string) => {
+  // Set the current test case ID
+  currentTestCaseId.value = testCaseId;
+  // Open the drawer
+  showCommentsDrawer.value = true;
+  // Clear the new comment input field
+  newComment.value = '';
+};
+
+/**
+ * Adds a new comment to the specified test case.
+ * @param testCaseId The ID of the test case to add the comment to.
+ */
+const addComment = async (testCaseId: string) => {
+  try {
+    // Check if the new comment is empty
+    if (newComment.value.trim() === '') {
+      message.warning('Please enter a comment.');
+      return;
+    }
+
+    // Make an API call to add the comment
+    const response = await fetch(`/runs/${runId}/${testCaseId}/comment`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      body: JSON.stringify({ comment: newComment.value })
+    });
+
+    if (response.ok) {
+      // Add the new comment to the test case's comments array
+      const testCase = testCases.value.find((tc) => tc.id === testCaseId);
+      if (testCase) {
+        testCase.comments.push(newComment.value);
+      }
+      // Clear the new comment input field
+      newComment.value = '';
+      // Display a success message
+      message.success('Comment added successfully!');
+    } else {
+      // If there's an error, parse the JSON response and display the error message
+      const errorData = await response.json();
+      message.error(`Error adding comment: ${errorData.error}`);
+    }
+  } catch (error) {
+    // Log the error to the console and display a generic error message
+    console.error('Error adding comment:', error);
+    message.error('An unexpected error occurred while adding the comment.');
+  }
+};
+
 // --- Lifecycle Hook ---
 
 // Fetch Run Fields and Initial Run Details When Component is Mounted
@@ -669,6 +909,7 @@ onMounted(() => {
   display: flex;
   gap: 10px;
   margin-bottom: 10px;
+  align-items: center;
 }
 
 td {
@@ -701,5 +942,25 @@ td {
 
 .table-container {
   overflow-x: auto; /* Enable horizontal scrolling */
+}
+
+/* Styles for vote and star containers */
+.vote-container,
+.star-container {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  margin-top: 5px;
+}
+
+.comments-section {
+  margin-top: 10px;
+}
+
+.comment {
+  border: 1px solid #ccc;
+  padding: 10px;
+  margin-bottom: 5px;
+  border-radius: 4px;
 }
 </style>

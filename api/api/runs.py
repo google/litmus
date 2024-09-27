@@ -124,6 +124,10 @@ def submit_run(data=None):
 
         test["request"] = json.loads(json_string)
         test["result"] = None
+        test["starred"] = False  # Initialize starred to False
+        test["upvotes"] = 0  # Initialize upvotes to 0
+        test["downvotes"] = 0  # Initialize downvotes to 0
+        test["comments"] = []  # Initialize comments to empty array
         tests.append(test)
 
     # Get current time for start timestamp
@@ -335,6 +339,10 @@ def get_run_status(run_id):
                 "response": filtered_response,
                 "golden_response": filtered_golden_response,
                 "tracing_id": case_data.get("tracing_id"),
+                "starred": case_data.get("starred"),
+                "upvotes": case_data.get("upvotes"),
+                "downvotes": case_data.get("downvotes"),
+                "comments": case_data.get("comments"),
             }
         )
 
@@ -572,3 +580,132 @@ def invoke_job(
     request = run_v2.RunJobRequest(name=job_name, overrides=override_spec)
 
     client.run_job(request=request)
+
+
+# Star a test case
+@bp.route("/<run_id>/<case_id>/star", methods=["PUT"])
+@auth.login_required
+def star_test_case(run_id, case_id):
+    """Toggles the starred status of a test case.
+
+    Args:
+        run_id (str): The ID of the run containing the test case.
+        case_id (str): The ID of the test case.
+
+    Returns:
+        A JSON response indicating success or failure.
+    """
+    case_ref = db.collection(f"test_cases_{run_id}").document(case_id)
+    case_data = case_ref.get().to_dict()
+
+    if not case_data:
+        return (
+            jsonify({"error": f"Test case '{case_id}' not found in run '{run_id}'"}),
+            404,
+        )
+
+    current_starred_status = case_data.get("starred", False)
+    case_ref.update({"starred": not current_starred_status})
+
+    return (
+        jsonify(
+            {"message": f"Test case '{case_id}' starred status updated successfully"}
+        ),
+        200,
+    )
+
+
+# Upvote a test case
+@bp.route("/<run_id>/<case_id>/upvote", methods=["PUT"])
+@auth.login_required
+def upvote_test_case(run_id, case_id):
+    """Upvotes a test case.
+
+    Args:
+        run_id (str): The ID of the run containing the test case.
+        case_id (str): The ID of the test case.
+
+    Returns:
+        A JSON response indicating success or failure.
+    """
+    case_ref = db.collection(f"test_cases_{run_id}").document(case_id)
+    case_data = case_ref.get().to_dict()
+
+    if not case_data:
+        return (
+            jsonify({"error": f"Test case '{case_id}' not found in run '{run_id}'"}),
+            404,
+        )
+
+    current_upvotes = case_data.get("upvotes", 0)
+    case_ref.update({"upvotes": current_upvotes + 1})
+
+    return jsonify({"message": f"Test case '{case_id}' upvoted successfully"}), 200
+
+
+# Downvote a test case
+@bp.route("/<run_id>/<case_id>/downvote", methods=["PUT"])
+@auth.login_required
+def downvote_test_case(run_id, case_id):
+    """Downvotes a test case.
+
+    Args:
+        run_id (str): The ID of the run containing the test case.
+        case_id (str): The ID of the test case.
+
+    Returns:
+        A JSON response indicating success or failure.
+    """
+    case_ref = db.collection(f"test_cases_{run_id}").document(case_id)
+    case_data = case_ref.get().to_dict()
+
+    if not case_data:
+        return (
+            jsonify({"error": f"Test case '{case_id}' not found in run '{run_id}'"}),
+            404,
+        )
+
+    current_downvotes = case_data.get("downvotes", 0)
+    case_ref.update({"downvotes": current_downvotes + 1})
+
+    return jsonify({"message": f"Test case '{case_id}' downvoted successfully"}), 200
+
+
+# Add or update a comment on a test case
+@bp.route("/<run_id>/<case_id>/comment", methods=["POST"])
+@auth.login_required
+def comment_on_test_case(run_id, case_id):
+    """Adds or updates a comment on a test case.
+
+    Args:
+        run_id (str): The ID of the run containing the test case.
+        case_id (str): The ID of the test case.
+
+    Returns:
+        A JSON response indicating success or failure.
+    """
+
+    data = request.get_json()
+    comment = data.get("comment")
+
+    # Input validation
+    if not comment:
+        return jsonify({"error": "Missing 'comment' in request data"}), 400
+
+    case_ref = db.collection(f"test_cases_{run_id}").document(case_id)
+    case_data = case_ref.get().to_dict()
+
+    if not case_data:
+        return (
+            jsonify({"error": f"Test case '{case_id}' not found in run '{run_id}'"}),
+            404,
+        )
+
+    current_comments = case_data.get("comments", [])
+    current_comments.append(comment)
+    case_ref.update({"comments": current_comments})
+
+    return (
+        jsonify({"message": f"Comment added to test case '{case_id}' successfully"}),
+        201,
+    )
