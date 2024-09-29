@@ -173,7 +173,7 @@ def proxy_agg():
             avg(jsonPayload.latency) AS average_latency
         FROM
             `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
-        GROUP BY 1,2;
+        GROUP BY 1;
     """
 
     if context:
@@ -187,7 +187,7 @@ def proxy_agg():
             FROM
                 `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
             WHERE jsonPayload.litmuscontext = "{context}"
-            GROUP BY 1,2;
+            GROUP BY 1;
         """
 
     try:
