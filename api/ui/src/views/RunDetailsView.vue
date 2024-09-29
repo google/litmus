@@ -38,9 +38,9 @@ limitations under the License.
         clearable
         @change="fetchRunDetails"
       />
-      <!-- Show Only Starred Toggle -->
-      <n-switch v-model:value="showOnlyStarred" @update:value="fetchRunDetails" />
-      <span><v-icon>mdi-star</v-icon></span>
+      <!-- Show Only Flagged Toggle -->
+      <n-switch v-model:value="showOnlyFlagged" @update:value="fetchRunDetails" />
+      <span><v-icon>mdi-flag</v-icon></span>
       <!-- Clear Filters Button -->
       <v-btn variant="flat" color="primary" @click="clearFilter"> Clear Filters </v-btn>
       <!-- Export Test Cases Button -->
@@ -63,10 +63,10 @@ limitations under the License.
           </tr>
           <tr v-for="testCase in filteredTestCases" :key="testCase.id">
             <td>
-              <div class="star-container">
-                <v-btn icon variant="text" size="small" @click="toggleStarTestCase(testCase.id)">
-                  <v-icon v-if="testCase.starred">mdi-star</v-icon>
-                  <v-icon v-else>mdi-star-outline</v-icon>
+              <div class="flag-container">
+                <v-btn icon variant="text" size="small" @click="toggleFlagTestCase(testCase.id)">
+                  <v-icon v-if="testCase.flagged">mdi-flag</v-icon>
+                  <v-icon v-else>mdi-flag-outline</v-icon>
                 </v-btn>
                 <strong>{{ testCase.id }}</strong>
               </div>
@@ -83,41 +83,33 @@ limitations under the License.
               {{ testCase.tracing_id }}
               <n-divider></n-divider>
               <n-space justify="center" size="small">
-                <div class="vote-container">
-                  <v-btn icon variant="text" size="small" @click="upvoteTestCase(testCase.id)">
-                    <v-icon>mdi-thumb-up</v-icon>
-                  </v-btn>
-                  {{ testCase.upvotes }}
-                  <v-btn icon variant="text" size="small" @click="downvoteTestCase(testCase.id)">
-                    <v-icon>mdi-thumb-down</v-icon>
-                  </v-btn>
-                  {{ testCase.downvotes }}
+                <div class="rating-container">
+                  <n-rate v-model:value="testCase.rating" @update:value="rateTestCase(testCase.id)" />
                 </div>
               </n-space>
               <n-divider></n-divider>
-              <v-btn size="small" variant="outlined" color="primary" @click="openDrawer(testCase.tracing_id)">
-                <v-icon>mdi-magnify-expand</v-icon>
-              </v-btn>
-              <v-btn size="small" variant="outlined" color="primary" @click="showTestInfo(testCase.tracing_id)">
-                <v-icon>mdi-information-box-outline</v-icon>
-              </v-btn>
-              <div v-if="testInfo[testCase.tracing_id]">
-                <strong>Total Tokens:</strong> {{ testInfo[testCase.tracing_id].total_token_count }} <br />
-                <strong>Prompt Tokens:</strong> {{ testInfo[testCase.tracing_id].prompt_token_count }} <br />
-                <strong>Candidate Tokens:</strong> {{ testInfo[testCase.tracing_id].candidates_token_count }} <br />
-                <strong>Latency (ms):</strong> {{ testInfo[testCase.tracing_id].average_latency }}
-              </div>
-              <!-- Comments Button -->
-              <v-btn
-                prepend-icon="mdi-comment-plus"
-                variant="outlined"
-                color="primary"
-                class="mt-2"
-                @click="openCommentsDrawer(testCase.id)"
-                size="small"
-              >
-                {{ testCase.comment_count }}
-              </v-btn>
+              <n-flex vertical>
+                <v-btn
+                  size="small"
+                  prepend-icon="mdi-magnify-expand"
+                  variant="outlined"
+                  color="primary"
+                  @click="openDrawer(testCase.tracing_id)"
+                >
+                  Explore
+                </v-btn>
+                <!-- Comments Button -->
+                <v-btn
+                  prepend-icon="mdi-comment-plus"
+                  variant="outlined"
+                  color="primary"
+                  class="mt-2"
+                  @click="openCommentsDrawer(testCase.id)"
+                  size="small"
+                >
+                  Comment ({{ testCase.comment_count }})
+                </v-btn>
+              </n-flex>
             </td>
             <!-- Input Data -->
             <td>
@@ -145,7 +137,7 @@ limitations under the License.
       </n-table>
     </n-spin>
 
-    <!-- Data Drawer (same as before) -->
+    <!-- Data Drawer -->
     <n-drawer v-model:show="showDrawer" :width="980">
       <n-drawer-content :title="drawerTitle" :native-scrollbar="false" :width="996" closable>
         <n-spin :show="showDrawerSpinner">
@@ -159,6 +151,14 @@ limitations under the License.
             </p>
           </div>
           <div v-else>
+            <!-- Test Info Section: Displays proxy/agg data when drawerContent is available -->
+            <div v-if="drawerContent.length > 0" class="test-info">
+              <strong>Total Tokens:</strong> {{ testInfo.total_token_count }} <br />
+              <strong>Prompt Tokens:</strong> {{ testInfo.prompt_token_count }} <br />
+              <strong>Candidate Tokens:</strong> {{ testInfo.candidates_token_count }} <br />
+              <strong>Latency (ms):</strong> {{ testInfo.average_latency }}
+            </div>
+
             <!-- Field Selection Collapse Panel -->
             <n-collapse v-model:expanded="collapseExpanded">
               <n-collapse-item title="Select Fields" name="select-fields">
@@ -259,8 +259,10 @@ import {
   NSpace,
   useMessage,
   NSwitch,
+  NRate,
   NList,
-  NListItem
+  NListItem,
+  NFlex
 } from 'naive-ui';
 // Import routing functionality from Vue Router
 import { useRoute } from 'vue-router';
@@ -286,9 +288,8 @@ interface TestCase {
   request: any;
   golden_response: any;
   tracing_id: string;
-  upvotes: number;
-  downvotes: number;
-  starred: boolean;
+  rating: number;
+  flagged: boolean;
   comments: string[];
   comment_count: number;
 }
@@ -342,8 +343,8 @@ const requestFilter = ref('body.query');
 const templateId = ref('');
 // Filter for golden response data
 const goldenResponsesFilter = ref('');
-// Filter to show only starred runs
-const showOnlyStarred = ref(false);
+// Filter to show only flagged runs
+const showOnlyFlagged = ref(false);
 
 // Data Table Field Management
 // List of available fields in the drawer data
@@ -361,7 +362,7 @@ const collapseExpanded = ref(['select-fields']);
 const newComment = ref('');
 
 // Reactive object to store test info from the API
-const testInfo = ref<Record<string, any>>({}); // Correct type for testInfo
+const testInfo = ref<Record<string, any>>({});
 
 // Get the message instance from Naive UI
 const message = useMessage(); // Import useMessage
@@ -375,6 +376,20 @@ watch(collapseExpanded, (value) => {
     collapseExpanded.value = [];
   }
 });
+
+// Watch for changes in drawerContent
+watch(
+  drawerContent,
+  (newDrawerContent) => {
+    if (newDrawerContent.length > 0) {
+      showTestInfo(drawerTitle.value);
+    } else {
+      // Reset test info when drawerContent is empty
+      testInfo.value = {};
+    }
+  },
+  { deep: true }
+);
 
 // --- Computed Properties for Data Transformations ---
 
@@ -429,10 +444,10 @@ const sortedData = computed(() => {
   return data;
 });
 
-// Computed property for filtering test cases by starred status
+// Computed property for filtering test cases by flagged status
 const filteredTestCases = computed(() => {
-  if (showOnlyStarred.value) {
-    return testCases.value.filter((testCase) => testCase.starred);
+  if (showOnlyFlagged.value) {
+    return testCases.value.filter((testCase) => testCase.flagged);
   } else {
     return testCases.value;
   }
@@ -467,9 +482,9 @@ const fetchRunDetails = () => {
   // Construct the filter string for the API request
   let filterString = `response_filter=${responseFilter.value}&request_filter=${requestFilter.value}&golden_responses_filter=${goldenResponsesFilter.value}`;
 
-  // Add starred filter if enabled
-  if (showOnlyStarred.value) {
-    filterString += '&starred=true';
+  // Add flagged filter if enabled
+  if (showOnlyFlagged.value) {
+    filterString += '&flagged=true';
   }
 
   // Fetch run details from the API
@@ -495,7 +510,7 @@ const clearFilter = () => {
   responseFilter.value = 'response'; // Reset response filter
   requestFilter.value = ''; // Reset request filter
   goldenResponsesFilter.value = ''; // Reset golden response filter
-  showOnlyStarred.value = false; // Reset starred filter
+  showOnlyFlagged.value = false; // Reset flagged filter
   fetchRunDetails(); // Refetch data with cleared filters
 };
 
@@ -539,6 +554,11 @@ const openDrawer = (trace_id: string) => {
       // Update drawer content and hide loading spinner
       drawerContent.value = data;
       showDrawerSpinner.value = false;
+
+      // Fetch test info after the table data is loaded
+      if (drawerContent.value.length > 0) {
+        showTestInfo(drawerTitle.value);
+      }
     })
     .catch((err) => {
       console.error(err);
@@ -582,11 +602,12 @@ const showTestInfo = async (traceId: string) => {
     }
     const data = await response.json();
 
-    // Update the testInfo reactive object with the fetched data, keyed by traceId
-    testInfo.value = {
-      ...testInfo.value,
-      [traceId]: data.length > 0 ? data[0] : null
-    };
+    // Update testInfo with the fetched data
+    if (data.length > 0) {
+      testInfo.value = data[0];
+    } else {
+      testInfo.value = {};
+    }
   } catch (error) {
     console.error('Error fetching test info:', error);
     message.error('Failed to fetch test info');
@@ -722,9 +743,8 @@ const prepareTestCasesForCSV = (data: TestCase[]): any[] => {
       Request: 'request',
       'Golden Response': 'golden_response',
       Response: 'response',
-      Upvotes: 'upvotes',
-      Downvotes: 'downvotes',
-      Starred: 'starred',
+      Rating: 'rating',
+      Flagged: 'flagged',
       Comments: 'comments'
     };
 
@@ -751,66 +771,44 @@ const exportTestCasesCSV = () => {
 };
 
 /**
- * Upvotes a test case and refreshes the vote count from the API.
- * @param testCaseId The ID of the test case to upvote.
+ * Rates a test case and refreshes the rating from the API.
+ * @param testCaseId The ID of the test case to rate.
  */
-const upvoteTestCase = async (testCaseId: string) => {
+const rateTestCase = async (testCaseId: string) => {
   try {
-    const response = await fetch(`/runs/${runId}/${testCaseId}/upvote`, {
+    // Get the new rating value from the corresponding test case
+    const testCase = testCases.value.find((tc) => tc.id === testCaseId);
+    const newRating = testCase ? testCase.rating : 0; // Default to 0 if test case not found
+
+    const response = await fetch(`/runs/${runId}/${testCaseId}/rate`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      body: JSON.stringify({ rating: newRating })
     });
 
     if (response.ok) {
-      message.success('Test case upvoted!');
-      // After a successful upvote, re-fetch the run details to update the vote counts
+      message.success('Test case rated successfully!');
+      // After a successful rating update, re-fetch the run details
       fetchRunDetails();
     } else {
       const errorData = await response.json();
-      message.error(`Error upvoting test case: ${errorData.error}`);
+      message.error(`Error rating test case: ${errorData.error}`);
     }
   } catch (error) {
-    console.error('Error upvoting test case:', error);
-    message.error('An unexpected error occurred while upvoting the test case.');
+    console.error('Error rating test case:', error);
+    message.error('An unexpected error occurred while rating the test case.');
   }
 };
 
 /**
- * Downvotes a test case and refreshes the vote count from the API.
- * @param testCaseId The ID of the test case to downvote.
- */
-const downvoteTestCase = async (testCaseId: string) => {
-  try {
-    const response = await fetch(`/runs/${runId}/${testCaseId}/downvote`, {
-      method: 'PUT',
-      headers: {
-        'Content-Type': 'application/json'
-      }
-    });
-
-    if (response.ok) {
-      message.success('Test case downvoted!');
-      // After a successful downvote, re-fetch the run details to update the vote counts
-      fetchRunDetails();
-    } else {
-      const errorData = await response.json();
-      message.error(`Error downvoting test case: ${errorData.error}`);
-    }
-  } catch (error) {
-    console.error('Error downvoting test case:', error);
-    message.error('An unexpected error occurred while downvoting the test case.');
-  }
-};
-
-/**
- * Toggles the starred status of a test case.
+ * Toggles the flagged status of a test case.
  * @param testCaseId The ID of the test case to toggle.
  */
-const toggleStarTestCase = async (testCaseId: string) => {
+const toggleFlagTestCase = async (testCaseId: string) => {
   try {
-    const response = await fetch(`/runs/${runId}/${testCaseId}/star`, {
+    const response = await fetch(`/runs/${runId}/${testCaseId}/flag`, {
       method: 'PUT',
       headers: {
         'Content-Type': 'application/json'
@@ -818,19 +816,19 @@ const toggleStarTestCase = async (testCaseId: string) => {
     });
 
     if (response.ok) {
-      // Find the test case and update its starred status
+      // Find the test case and update its flagged status
       const testCase = testCases.value.find((tc) => tc.id === testCaseId);
       if (testCase) {
-        testCase.starred = !testCase.starred;
+        testCase.flagged = !testCase.flagged;
       }
-      message.success('Test case starred status updated!');
+      message.success('Test case flagged status updated!');
     } else {
       const errorData = await response.json();
-      message.error(`Error updating starred status: ${errorData.error}`);
+      message.error(`Error updating flagged status: ${errorData.error}`);
     }
   } catch (error) {
-    console.error('Error updating starred status:', error);
-    message.error('An unexpected error occurred while updating the starred status.');
+    console.error('Error updating flagged status:', error);
+    message.error('An unexpected error occurred while updating the flagged status.');
   }
 };
 
@@ -949,9 +947,9 @@ td {
   overflow-x: auto; /* Enable horizontal scrolling */
 }
 
-/* Styles for vote and star containers */
-.vote-container,
-.star-container {
+/* Styles for rating and flag containers */
+.rating-container,
+.flag-container {
   display: flex;
   align-items: center;
   gap: 5px;
@@ -967,5 +965,9 @@ td {
   padding: 10px;
   margin-bottom: 5px;
   border-radius: 4px;
+}
+
+.test-info {
+  margin-bottom: 15px; /* Add margin between test info and table */
 }
 </style>

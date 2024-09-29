@@ -124,9 +124,8 @@ def submit_run(data=None):
 
         test["request"] = json.loads(json_string)
         test["result"] = None
-        test["starred"] = False  # Initialize starred to False
-        test["upvotes"] = 0  # Initialize upvotes to 0
-        test["downvotes"] = 0  # Initialize downvotes to 0
+        test["flagged"] = False  # Initialize flagged to False
+        test["rating"] = 0  # Initialize rating to 0
         test["comments"] = []  # Initialize comments to empty array
         tests.append(test)
 
@@ -343,9 +342,8 @@ def get_run_status(run_id):
                 "response": filtered_response,
                 "golden_response": filtered_golden_response,
                 "tracing_id": case_data.get("tracing_id"),
-                "starred": case_data.get("starred"),
-                "upvotes": case_data.get("upvotes"),
-                "downvotes": case_data.get("downvotes"),
+                "flagged": case_data.get("flagged"),
+                "rating": case_data.get("rating"),
                 "comments": case_data.get("comments"),
                 "comment_count": comment_count,  # Add comment count to the response
             }
@@ -587,11 +585,11 @@ def invoke_job(
     client.run_job(request=request)
 
 
-# Star a test case
-@bp.route("/<run_id>/<case_id>/star", methods=["PUT"])
+# Flag a test case
+@bp.route("/<run_id>/<case_id>/flag", methods=["PUT"])
 @auth.login_required
-def star_test_case(run_id, case_id):
-    """Toggles the starred status of a test case.
+def flag_test_case(run_id, case_id):
+    """Toggles the flagged status of a test case.
 
     Args:
         run_id (str): The ID of the run containing the test case.
@@ -609,22 +607,22 @@ def star_test_case(run_id, case_id):
             404,
         )
 
-    current_starred_status = case_data.get("starred", False)
-    case_ref.update({"starred": not current_starred_status})
+    current_flagged_status = case_data.get("flagged", False)
+    case_ref.update({"flagged": not current_flagged_status})
 
     return (
         jsonify(
-            {"message": f"Test case '{case_id}' starred status updated successfully"}
+            {"message": f"Test case '{case_id}' flagged status updated successfully"}
         ),
         200,
     )
 
 
-# Upvote a test case
-@bp.route("/<run_id>/<case_id>/upvote", methods=["PUT"])
+# Rate a test case
+@bp.route("/<run_id>/<case_id>/rate", methods=["PUT"])
 @auth.login_required
-def upvote_test_case(run_id, case_id):
-    """Upvotes a test case.
+def rate_test_case(run_id, case_id):
+    """Rates a test case.
 
     Args:
         run_id (str): The ID of the run containing the test case.
@@ -633,6 +631,16 @@ def upvote_test_case(run_id, case_id):
     Returns:
         A JSON response indicating success or failure.
     """
+
+    data = request.get_json()
+    rating = data.get("rating")
+
+    if not rating:
+        return jsonify({"error": "Missing 'rating' in request data"}), 400
+
+    if rating not in range(1, 6):  # Rating should be between 1 and 5
+        return jsonify({"error": "'rating' must be between 1 and 5"}), 400
+
     case_ref = db.collection(f"test_cases_{run_id}").document(case_id)
     case_data = case_ref.get().to_dict()
 
@@ -642,38 +650,9 @@ def upvote_test_case(run_id, case_id):
             404,
         )
 
-    current_upvotes = case_data.get("upvotes", 0)
-    case_ref.update({"upvotes": current_upvotes + 1})
+    case_ref.update({"rating": rating})
 
-    return jsonify({"message": f"Test case '{case_id}' upvoted successfully"}), 200
-
-
-# Downvote a test case
-@bp.route("/<run_id>/<case_id>/downvote", methods=["PUT"])
-@auth.login_required
-def downvote_test_case(run_id, case_id):
-    """Downvotes a test case.
-
-    Args:
-        run_id (str): The ID of the run containing the test case.
-        case_id (str): The ID of the test case.
-
-    Returns:
-        A JSON response indicating success or failure.
-    """
-    case_ref = db.collection(f"test_cases_{run_id}").document(case_id)
-    case_data = case_ref.get().to_dict()
-
-    if not case_data:
-        return (
-            jsonify({"error": f"Test case '{case_id}' not found in run '{run_id}'"}),
-            404,
-        )
-
-    current_downvotes = case_data.get("downvotes", 0)
-    case_ref.update({"downvotes": current_downvotes + 1})
-
-    return jsonify({"message": f"Test case '{case_id}' downvoted successfully"}), 200
+    return jsonify({"message": f"Test case '{case_id}' rated successfully"}), 200
 
 
 # Add or update a comment on a test case
