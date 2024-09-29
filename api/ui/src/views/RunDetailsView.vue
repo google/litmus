@@ -153,9 +153,8 @@ limitations under the License.
           <div v-else>
             <!-- Test Info Section: Displays proxy/agg data when drawerContent is available -->
             <div v-if="drawerContent.length > 0" class="test-info">
-              <strong>Total Tokens:</strong> {{ testInfo.total_token_count }} <br />
-              <strong>Prompt Tokens:</strong> {{ testInfo.prompt_token_count }} <br />
-              <strong>Candidate Tokens:</strong> {{ testInfo.candidates_token_count }} <br />
+              <strong>Total Tokens:</strong> {{ testInfo.total_token_count }} | <strong>Prompt Tokens:</strong>
+              {{ testInfo.prompt_token_count }} | <strong>Candidate Tokens:</strong> {{ testInfo.candidates_token_count }} |
               <strong>Latency (ms):</strong> {{ testInfo.average_latency }}
             </div>
 

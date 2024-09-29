@@ -167,7 +167,6 @@ def proxy_agg():
     query = f"""
         SELECT
             jsonPayload.litmuscontext,
-            jsonPayload.requestheaders.x_goog_request_params,
             sum(jsonPayload.responsebody.usagemetadata.totaltokencount) AS total_token_count,
             sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
             sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
@@ -181,7 +180,6 @@ def proxy_agg():
         query = f"""
             SELECT
                 jsonPayload.litmuscontext,
-                jsonPayload.requestheaders.x_goog_request_params,
                 sum(jsonPayload.responsebody.usagemetadata.totaltokencount) AS total_token_count,
                 sum(jsonPayload.responsebody.usagemetadata.prompttokencount) AS prompt_token_count,
                 sum(jsonPayload.responsebody.usagemetadata.candidatestokencount) AS candidates_token_count,
