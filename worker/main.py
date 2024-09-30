@@ -22,12 +22,48 @@ from uuid import uuid4
 
 import requests
 from google.cloud import firestore, logging, storage
+from datasets import Dataset
+from ragas.llms.base import LangchainLLMWrapper
+from ragas import evaluate
+from ragas.metrics import (
+    answer_relevancy,
+    answer_similarity,
+    context_precision,
+    context_recall,
+)
+from ragas.metrics.critique import harmfulness
+from deepeval import evaluate as deepeval
+from deepeval.metrics import AnswerRelevancyMetric
+from deepeval.models.base_model import DeepEvalBaseLLM
+from deepeval.test_case import LLMTestCase
+from langchain_google_vertexai import VertexAI, VertexAIEmbeddings
+import vertexai
+from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 from util.assess import (
     ask_llm_against_golden,
     ask_llm_for_action,
     is_mission_done,
     evaluate_mission,
+)
+from util.docsnsnips import cleanup_json, strip_references
+from util.settings import settings
+
+print("Initializing assessment module...")
+
+# Initialize Vertex AI with project and location settings
+vertexai.init(project=settings.project_id, location=settings.location)
+
+# Load the specified LLM
+model = GenerativeModel(settings.ai_default_model)
+
+# Configure generation parameters for the LLM
+config = GenerationConfig(
+    temperature=0.0,  # Control the randomness of the generated text (0.0 = deterministic)
+    top_p=0.8,  # Control the diversity of the generated text
+    top_k=38,  # Limit the vocabulary size for generation
+    candidate_count=1,  # Generate only one candidate response
+    max_output_tokens=1000,  # Set the maximum number of tokens for the generated response
 )
 
 # Setup logging
@@ -52,6 +88,71 @@ storage_client = storage.Client()
 files_bucket_name = os.environ.get("FILES_BUCKET")
 files_prefix = os.environ.get("FILES_PREFIX", "")  # Default to no prefix
 files_bucket = storage_client.bucket(files_bucket_name)
+
+# Load Gemini Pro model and embeddings for RAGAS
+gemini_pro = VertexAI(model_name="gemini-1.5-pro")
+embeddings = VertexAIEmbeddings(model_name="textembedding-gecko@003")
+
+# Compile list of RAGAS Metrics
+ragas_metrics = [
+    answer_relevancy,
+    context_recall,
+    context_precision,
+    harmfulness,
+    answer_similarity,
+]
+
+
+# IMPORTANT: Gemini with RAGAS
+# RAGAS is designed to work with OpenAl Models by default. We must set a few attributes to make it work with Gemini
+class RAGASVertexAIEmbeddings(VertexAIEmbeddings):
+    """Wrapper for RAGAS"""
+
+    async def embed_text(self, text: str) -> list[float]:
+        """Embeds a text for semantics similarity"""
+        return self.embed([text], 1, "SEMANTIC_SIMILARITY")[0]
+
+
+# Wrapper to make RAGAS work with Gemini and Vertex AI Embeddings Models
+ragas_embeddings = RAGASVertexAIEmbeddings(model_name="textembedding-gecko@003")
+ragas_llm = LangchainLLMWrapper(gemini_pro)
+for m in ragas_metrics:
+    # change LLM for metric
+    m.__setattr__("llm", ragas_llm)  # Corrected line
+    # check if this metric needs embeddings
+    if hasattr(m, "embeddings"):
+        # if so change with Vertex AI Embeddings
+        m.__setattr__("embeddings", ragas_embeddings)  # Corrected line
+
+
+# --- DeepEval Setup ---
+class GoogleVertexAIDeepEval(DeepEvalBaseLLM):
+    """Class to implement Vertex AI for DeepEval"""
+
+    def __init__(self, model):  # pylint: disable=W0231
+        self.model = model
+
+    def load_model(self):  # pylint: disable=W0221
+        return self.model
+
+    def generate(self, prompt: str) -> str:  # pylint: disable=W0221
+        chat_model = self.load_model()
+        return chat_model.invoke(prompt).content
+
+    async def a_generate(self, prompt: str) -> str:  # pylint: disable=W0221
+        chat_model = self.load_model()
+        res = await chat_model.ainvoke(prompt)
+        return res.content
+
+    def get_model_name(self):  # pylint: disable=W0236 W0221
+        return "Vertex AI Model"
+
+
+# Initialize the DeepEval wrapper class with Gemini Pro
+deepeval_llm = GoogleVertexAIDeepEval(model=gemini_pro)
+deepeval_metric = AnswerRelevancyMetric(
+    threshold=0.5, model=deepeval_llm, async_mode=False
+)
 
 
 def execute_request(request_data):
@@ -335,6 +436,7 @@ def execute_test_run(run_data, test_case, tracing_id):
     request_data = test_case.get("request")
     request_data["tracing_id"] = tracing_id
     golden_response = test_case.get("golden_response")
+    test_result = {}  # Initialize an empty dictionary to store the test result
 
     try:
         # Execute the main request
@@ -354,70 +456,115 @@ def execute_test_run(run_data, test_case, tracing_id):
             actual_response, run_data.get("template_output_field")
         )
 
-        # Compare with golden response if available
-        if golden_response and actual_filtered_response:
+        # --- Evaluate with RAGAS ---
+        if "ragas" in run_data.get("evaluation_types", []):
+            contexts = [
+                actual_filtered_response.get(output_field)
+            ]  # Assuming contexts are provided
+            answers = [golden_response]
+
+            # Convert to a dataset
+            ragas_dataset = Dataset.from_dict(
+                {"contexts": contexts, "answers": answers, "ground_truth": answers}
+            )
             try:
-                # Assess the actual response against the golden response using an LLM
-                llm_assessment = ask_llm_against_golden(
-                    statement=actual_filtered_response.get(output_field),
-                    golden=golden_response,
-                    prompt=template_llm_prompt,
+                # Evaluate with RAGAS and store results
+                ragas_result = evaluate(
+                    ragas_dataset,
+                    metrics=ragas_metrics,
+                    raise_exceptions=False,
                 )
 
-                # Evaluate LLM assessment results
-                if llm_assessment and "similarity" in llm_assessment:
-                    if llm_assessment.get("similarity") > 0.5:
-                        test_result = {
-                            "status": "Passed",
-                            "response": actual_response,
-                            "assessment": llm_assessment,
-                            "status_code": status_code,
-                        }
+                test_result["ragas_evaluation"] = ragas_result.to_pandas().to_dict()
+
+            except Exception as e:
+                worker_logger.log_text(
+                    f"Error in RAGAS evaluation: {str(e)}", severity="ERROR"
+                )
+                test_result["ragas_evaluation"] = (
+                    f"Error during RAGAS evaluation: {str(e)}"
+                )
+
+        # --- Evaluate with DeepEval ---
+        if "deepeval" in run_data.get("evaluation_types", []):
+            try:
+                # Create a test case
+                deepeval_test_case = LLMTestCase(
+                    input=actual_filtered_response.get(output_field),
+                    actual_output=golden_response,
+                    retrieval_context=None,  # You might need to provide context here based on your setup
+                )
+
+                # Evaluate with DeepEval and store results
+                deepeval_result = deepeval_metric.measure(deepeval_test_case)
+                test_result["deepeval_evaluation"] = deepeval_result.to_dict()
+            except Exception as e:
+                worker_logger.log_text(
+                    f"Error in DeepEval evaluation: {str(e)}", severity="ERROR"
+                )
+                test_result["deepeval_evaluation"] = (
+                    f"Error during DeepEval evaluation: {str(e)}"
+                )
+
+        # --- Evaluate with Custom Method (llm_assessment) ---
+        if "llm_assessment" in run_data.get("evaluation_types", []):
+            if golden_response and actual_filtered_response:
+                try:
+                    # Assess the actual response against the golden response using an LLM
+                    llm_assessment = ask_llm_against_golden(
+                        statement=actual_filtered_response.get(output_field),
+                        golden=golden_response,
+                        prompt=template_llm_prompt,
+                    )
+
+                    # Evaluate LLM assessment results
+                    if llm_assessment and "similarity" in llm_assessment:
+                        if llm_assessment.get("similarity") > 0.5:
+                            test_result["status"] = "Passed"
+                        else:
+                            test_result["status"] = "Failed"
+
+                        # Include other assessment details regardless of status
+                        test_result["response"] = actual_response
+                        test_result["assessment"] = llm_assessment
+                        test_result["status_code"] = status_code
+
                     else:
+                        # Handle invalid LLM assessment
                         test_result = {
-                            "status": "Failed",
-                            "expected": golden_response,
+                            "status": "Error",
                             "response": actual_response,
-                            "assessment": llm_assessment,
+                            "error": "LLM assessment returned an invalid response",
                             "status_code": status_code,
                         }
-                else:
-                    # Handle invalid LLM assessment
+
+                except Exception as e:
+                    # Log errors from the LLM assessment
+                    worker_logger.log_text(
+                        f"Error in ask_llm_against_golden: {str(e)}",
+                        severity="ERROR",
+                    )
                     test_result = {
                         "status": "Error",
                         "response": actual_response,
-                        "error": "LLM assessment returned an invalid response",
+                        "error": f"Error during LLM assessment: {str(e)}",
                         "status_code": status_code,
                     }
-
-            except Exception as e:
-                # Log errors from the LLM assessment
-                worker_logger.log_text(
-                    f"Error in ask_llm_against_golden: {str(e)}",
-                    severity="ERROR",
-                )
+            elif actual_filtered_response:
+                # Handle cases where no golden response is provided
                 test_result = {
-                    "status": "Error",
+                    "status": "Passed",
                     "response": actual_response,
-                    "error": f"Error during LLM assessment: {str(e)}",
+                    "note": "No golden response available",
                     "status_code": status_code,
                 }
-        elif actual_filtered_response:
-            # Handle cases where no golden response is provided
-            test_result = {
-                "status": "Passed",
-                "response": actual_response,
-                "note": "No golden response available",
-                "status_code": status_code,
-            }
-        else:
-            test_result = {
-                "status": "Failed",
-                "response": actual_response,
-                "note": "No response available",
-                "status_code": status_code,
-            }
-
+            else:
+                test_result = {
+                    "status": "Failed",
+                    "response": actual_response,
+                    "note": "No response available",
+                    "status_code": status_code,
+                }
     except Exception as e:
         test_result = {"status": "Failed", "error": str(e), "status_code": status_code}
 

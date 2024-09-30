@@ -4,3 +4,8 @@ google-cloud-firestore
 google-cloud-aiplatform
 google-cloud-logging
 vertexai
+datasets==2.18.0
+langchain
+ragas==0.1.6
+deepeval==0.21.51
+langchain-google-vertexai==1.0.5
