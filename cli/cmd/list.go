@@ -40,7 +40,7 @@ func ListRuns(projectID string) error {
 
 	// Create HTTP client
 	client := &http.Client{}
-	req, err := http.NewRequest("GET", serviceURL+"/runs", nil)
+	req, err := http.NewRequest("GET", serviceURL+"/runs/", nil)
 	if err != nil {
 		return fmt.Errorf("error creating request: %w", err)
 	}

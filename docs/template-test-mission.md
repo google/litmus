@@ -60,7 +60,7 @@ A "Test Mission" template is structured similarly to a "Test Run" template but w
      "template_id": "your-template-id"
    }
    ```
-2. Send a POST request to the `/submit_run_simple` endpoint.
+2. Send a POST request to the `/runs/submit_simple` endpoint.
 
 ### API (Advanced)
 
@@ -76,7 +76,7 @@ A "Test Mission" template is structured similarly to a "Test Run" template but w
      "mission_duration": <number_of_turns> // Required for Test Missions
    }
    ```
-2. Send a POST request to the `/submit_run` endpoint.
+2. Send a POST request to the `/runs/submit` endpoint.
 
 ### UI
 
@@ -123,7 +123,7 @@ In this example, the LLM would evaluate whether the conversation led to a succes
 
 ## Restarting and Deleting
 
-Similar to "Test Runs," you can restart a "Test Mission" using the `/invoke_run` API endpoint or the UI's restart button. Deletion is done through the `/delete_run/<run_id>` endpoint or the UI's delete button.
+Similar to "Test Runs," you can restart a "Test Mission" using the `/runs/invoke` API endpoint or the UI's restart button. Deletion is done through the `/runs/<run_id>` endpoint or the UI's delete button.
 
 ## Additional Information
 

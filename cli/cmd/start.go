@@ -26,7 +26,7 @@ func SubmitRun(templateID, runID, projectID, authToken string) error {
 		return fmt.Errorf("error getting authentication credentials: %w", err)
 	}
 
-	url := fmt.Sprintf("%s/submit_run_simple", serviceURL)
+	url := fmt.Sprintf("%s/runs/submit_simple", serviceURL)
 	payload := map[string]interface{}{
 		"run_id":      runID,
 		"template_id": templateID,

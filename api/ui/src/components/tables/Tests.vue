@@ -119,7 +119,7 @@ const hasNotStartedRuns = computed(() => runs.value.some((run) => run.status ===
 const fetchRuns = async () => {
   show.value = true; // Show the loading spinner.
   try {
-    const response = await fetch('/runs');
+    const response = await fetch('/runs/');
     const data = await response.json();
     runs.value = data.runs as Run[];
     show.value = false; // Hide the spinner after fetching data.
@@ -132,7 +132,7 @@ const fetchRuns = async () => {
 // Function to fetch run data in the background.
 const fetchRunsBackground = async () => {
   try {
-    const response = await fetch('/runs');
+    const response = await fetch('/runs/');
     const data = await response.json();
     runs.value = data.runs as Run[];
   } catch (error) {
@@ -144,7 +144,7 @@ const fetchRunsBackground = async () => {
 const triggerRestart = async (templateId: string, runId: string) => {
   show.value = true;
   try {
-    const response = await fetch('/invoke_run', {
+    const response = await fetch('/runs/invoke', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json'
@@ -173,7 +173,7 @@ const triggerRestart = async (templateId: string, runId: string) => {
 const triggerDelete = async (runId: string) => {
   show.value = true;
   try {
-    const response = await fetch('/delete_run/' + runId, {
+    const response = await fetch('/runs/' + runId, {
       method: 'DELETE'
     });
     if (response.ok) {

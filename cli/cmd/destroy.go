@@ -59,6 +59,8 @@ func DestroyResources(projectID, region string, quiet bool) {
 				"--project", projectID,
 				"--quiet",
 			)
+		} else if resourceType == "bucket" { // Add bucket deletion
+			cmd = exec.Command("gcloud", "storage", "rm", "-r", fmt.Sprintf("gs://%s", resourceName))
 		} else {
 			log.Fatalf("Invalid resource type: %s", resourceType)
 		}
@@ -85,7 +87,7 @@ func DestroyResources(projectID, region string, quiet bool) {
 	deleteResource("job", "litmus-worker")
 
 	// --- Delete Secrets from Secret Manager ---
-	secretsToDelete := []string{"litmus-password", "litmus-service-url"}
+	secretsToDelete := []string{"litmus-password", "litmus-service-url", "litmus-files-bucket"} // Add files bucket secret
 	for _, secretID := range secretsToDelete {
 		deleteResource("secret", secretID)
 	}
@@ -98,6 +100,11 @@ func DestroyResources(projectID, region string, quiet bool) {
 	for _, sa := range serviceAccountsToDelete {
 		deleteResource("serviceAccount", sa)
 	}
+
+	// --- Delete Files Bucket ---
+	bucketName := fmt.Sprintf("%s-litmus-files", projectID)
+	deleteResource("bucket", bucketName)
+
 	if !quiet {
 		s.Suffix = " Removing analytics... "
 		s.Start()

@@ -86,6 +86,8 @@ export default defineConfig({
             { text: "Starting a Test Run", link: "/ui-start-test-run" },
             { text: "Test Run Analysis", link: "/ui-test-run-analysis" },
             { text: "Test Run Comparison", link: "/ui-test-run-comparison" },
+            { text: "Data Explorer", link: "/ui-data-explorer" },
+            { text: "File Manager", link: "/ui-file-manager" },
           ],
         },
         {

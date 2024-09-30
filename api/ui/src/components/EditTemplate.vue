@@ -426,7 +426,7 @@ const submitForm = async () => {
       }))
     };
 
-    const response = await fetch(editMode.value ? '/update_template' : '/add_template', {
+    const response = await fetch(editMode.value ? '/templates/update' : '/templates/add', {
       method: editMode.value ? 'PUT' : 'POST',
       headers: {
         'Content-Type': 'application/json'
