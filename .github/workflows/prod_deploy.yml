@@ -191,3 +191,5 @@ jobs:
           ./litmus proxy destroy-all --project litmusai-prod --quiet
           ./litmus proxy deploy --upstreamURL us-central1-aiplatform.googleapis.com --project litmusai-prod --quiet
           ./litmus analytics deploy --project litmusai-prod --quiet
+          ./litmus status
+          ./litmus ls
