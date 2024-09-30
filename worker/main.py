@@ -22,23 +22,6 @@ from uuid import uuid4
 
 import requests
 from google.cloud import firestore, logging, storage
-from datasets import Dataset
-from ragas.llms.base import LangchainLLMWrapper
-from ragas import evaluate
-from ragas.metrics import (
-    answer_relevancy,
-    answer_similarity,
-    context_precision,
-    context_recall,
-)
-from ragas.metrics.critique import harmfulness
-from deepeval import evaluate as deepeval
-from deepeval.metrics import AnswerRelevancyMetric
-from deepeval.models.base_model import DeepEvalBaseLLM
-from deepeval.test_case import LLMTestCase
-from langchain_google_vertexai import VertexAI, VertexAIEmbeddings
-import vertexai
-from vertexai.generative_models import GenerativeModel, GenerationConfig
 
 from util.assess import (
     ask_llm_against_golden,
@@ -46,25 +29,9 @@ from util.assess import (
     is_mission_done,
     evaluate_mission,
 )
-from util.docsnsnips import cleanup_json, strip_references
-from util.settings import settings
+from util.ragas_eval import evaluate_ragas
+from util.deepeval_eval import evaluate_deepeval
 
-print("Initializing assessment module...")
-
-# Initialize Vertex AI with project and location settings
-vertexai.init(project=settings.project_id, location=settings.location)
-
-# Load the specified LLM
-model = GenerativeModel(settings.ai_default_model)
-
-# Configure generation parameters for the LLM
-config = GenerationConfig(
-    temperature=0.0,  # Control the randomness of the generated text (0.0 = deterministic)
-    top_p=0.8,  # Control the diversity of the generated text
-    top_k=38,  # Limit the vocabulary size for generation
-    candidate_count=1,  # Generate only one candidate response
-    max_output_tokens=1000,  # Set the maximum number of tokens for the generated response
-)
 
 # Setup logging
 # Instantiates a logging client
@@ -88,71 +55,6 @@ storage_client = storage.Client()
 files_bucket_name = os.environ.get("FILES_BUCKET")
 files_prefix = os.environ.get("FILES_PREFIX", "")  # Default to no prefix
 files_bucket = storage_client.bucket(files_bucket_name)
-
-# Load Gemini Pro model and embeddings for RAGAS
-gemini_pro = VertexAI(model_name="gemini-1.5-pro")
-embeddings = VertexAIEmbeddings(model_name="textembedding-gecko@003")
-
-# Compile list of RAGAS Metrics
-ragas_metrics = [
-    answer_relevancy,
-    context_recall,
-    context_precision,
-    harmfulness,
-    answer_similarity,
-]
-
-
-# IMPORTANT: Gemini with RAGAS
-# RAGAS is designed to work with OpenAl Models by default. We must set a few attributes to make it work with Gemini
-class RAGASVertexAIEmbeddings(VertexAIEmbeddings):
-    """Wrapper for RAGAS"""
-
-    async def embed_text(self, text: str) -> list[float]:
-        """Embeds a text for semantics similarity"""
-        return self.embed([text], 1, "SEMANTIC_SIMILARITY")[0]
-
-
-# Wrapper to make RAGAS work with Gemini and Vertex AI Embeddings Models
-ragas_embeddings = RAGASVertexAIEmbeddings(model_name="textembedding-gecko@003")
-ragas_llm = LangchainLLMWrapper(gemini_pro)
-for m in ragas_metrics:
-    # change LLM for metric
-    m.__setattr__("llm", ragas_llm)  # Corrected line
-    # check if this metric needs embeddings
-    if hasattr(m, "embeddings"):
-        # if so change with Vertex AI Embeddings
-        m.__setattr__("embeddings", ragas_embeddings)  # Corrected line
-
-
-# --- DeepEval Setup ---
-class GoogleVertexAIDeepEval(DeepEvalBaseLLM):
-    """Class to implement Vertex AI for DeepEval"""
-
-    def __init__(self, model):  # pylint: disable=W0231
-        self.model = model
-
-    def load_model(self):  # pylint: disable=W0221
-        return self.model
-
-    def generate(self, prompt: str) -> str:  # pylint: disable=W0221
-        chat_model = self.load_model()
-        return chat_model.invoke(prompt).content
-
-    async def a_generate(self, prompt: str) -> str:  # pylint: disable=W0221
-        chat_model = self.load_model()
-        res = await chat_model.ainvoke(prompt)
-        return res.content
-
-    def get_model_name(self):  # pylint: disable=W0236 W0221
-        return "Vertex AI Model"
-
-
-# Initialize the DeepEval wrapper class with Gemini Pro
-deepeval_llm = GoogleVertexAIDeepEval(model=gemini_pro)
-deepeval_metric = AnswerRelevancyMetric(
-    threshold=0.5, model=deepeval_llm, async_mode=False
-)
 
 
 def execute_request(request_data):
@@ -186,7 +88,6 @@ def execute_request(request_data):
     body = process_file_references(body)
 
     start_time = datetime.utcnow()
-    status_code = 0  # Default status code in case of exceptions
 
     try:
         # Send the HTTP request based on the specified method
@@ -224,69 +125,6 @@ def execute_request(request_data):
         return {"status": "Failed", "error": str(e)}, status_code
 
 
-def process_file_references(data):
-    """Replaces file references in the data with the content of the referenced files.
-
-    Args:
-        data: The request data (could be a string, dictionary, or list).
-
-    Returns:
-        The processed data with file references replaced.
-    """
-    if isinstance(data, str):
-        return replace_file_reference_in_string(data)
-    elif isinstance(data, dict):
-        for key, value in data.items():
-            data[key] = process_file_references(value)
-        return data
-    elif isinstance(data, list):
-        return [process_file_references(item) for item in data]
-    else:
-        return data
-
-
-def replace_file_reference_in_string(text):
-    """
-    Replaces file references in a string with the content of the referenced file.
-
-    Args:
-        text (str): The text that may contain file references.
-
-    Returns:
-        str: The text with file references replaced.
-    """
-
-    pattern = r"\[FILE:\s*(.+?)\]"
-    matches = re.findall(pattern, text)
-
-    for match in matches:
-        file_content = read_file_from_gcs(f"{files_prefix}{match}")
-
-        text = text.replace(f"[FILE: {match}]", file_content)
-
-    return text
-
-
-def read_file_from_gcs(file):
-    """Reads the content of a file from Google Cloud Storage.
-
-    Args:
-        gcs_path: The full GCS path to the file (e.g., "gs://my-bucket/my-file.txt").
-
-    Returns:
-        str: The content of the file, or an error message if reading fails.
-    """
-
-    try:
-        blob = files_bucket.blob(file)  # Remove "gs://" prefix
-        return blob.download_as_text()
-    except Exception as e:
-        worker_logger.log_text(
-            f"Error reading file from GCS: {file}, {str(e)}", severity="ERROR"
-        )
-        return f"Error reading file: {file}"
-
-
 def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
     """Executes a test mission, interacting with the LLM iteratively.
 
@@ -305,6 +143,7 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
     conversation_history = []
     request_response_history = []
     test_result = {}
+    status_code = 0  # Initialize status_code here
 
     for turn in range(mission_duration):
         worker_logger.log_text(f"Mission turn: {turn+1}/{mission_duration}")
@@ -322,6 +161,7 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
                 test_result = {
                     "status": "Error",
                     "error": f"Invalid LLM action on turn {turn+1}",
+                    "status_code": status_code,  # Add status_code here
                 }
                 break
 
@@ -437,8 +277,16 @@ def execute_test_run(run_data, test_case, tracing_id):
     request_data["tracing_id"] = tracing_id
     golden_response = test_case.get("golden_response")
     test_result = {}  # Initialize an empty dictionary to store the test result
+    status_code = 0  # Initialize status_code here
 
     try:
+        print(
+            evaluate_deepeval(
+                "whats 2+2?",
+                "22",
+                "math",
+            )
+        )
         # Execute the main request
         actual_response, status_code = execute_request(request_data)
 
@@ -451,68 +299,40 @@ def execute_test_run(run_data, test_case, tracing_id):
             }
 
         output_field = run_data.get("template_output_field")
+        input_field = run_data.get("template_input_field")
         template_llm_prompt = run_data.get("template_llm_prompt")
-        actual_filtered_response = filter_json(
-            actual_response, run_data.get("template_output_field")
-        )
+        question = filter_json(request_data, input_field)
+        answer = filter_json(actual_response, output_field)
+        context = ""
 
-        # --- Evaluate with RAGAS ---
-        if "ragas" in run_data.get("evaluation_types", []):
-            contexts = [
-                actual_filtered_response.get(output_field)
-            ]  # Assuming contexts are provided
-            answers = [golden_response]
+        # --- Evaluation Logic ---
+        evaluation_types = run_data.get("evaluation_types", [])
 
-            # Convert to a dataset
-            ragas_dataset = Dataset.from_dict(
-                {"contexts": contexts, "answers": answers, "ground_truth": answers}
+        # Evaluate with RAGAS
+        if "ragas" in evaluation_types:
+            test_result["ragas_evaluation"] = evaluate_ragas(
+                question.get(input_field),
+                answer.get(output_field),
+                golden_response,
+                context,
             )
-            try:
-                # Evaluate with RAGAS and store results
-                ragas_result = evaluate(
-                    ragas_dataset,
-                    metrics=ragas_metrics,
-                    raise_exceptions=False,
-                )
 
-                test_result["ragas_evaluation"] = ragas_result.to_pandas().to_dict()
+        # Evaluate with DeepEval
+        if "deepeval" in evaluation_types:
+            test_result["deepeval_evaluation"] = evaluate_deepeval(
+                question.get(input_field),
+                answer.get(output_field),
+                golden_response,
+                context,
+            )
 
-            except Exception as e:
-                worker_logger.log_text(
-                    f"Error in RAGAS evaluation: {str(e)}", severity="ERROR"
-                )
-                test_result["ragas_evaluation"] = (
-                    f"Error during RAGAS evaluation: {str(e)}"
-                )
-
-        # --- Evaluate with DeepEval ---
-        if "deepeval" in run_data.get("evaluation_types", []):
-            try:
-                # Create a test case
-                deepeval_test_case = LLMTestCase(
-                    input=actual_filtered_response.get(output_field),
-                    actual_output=golden_response,
-                    retrieval_context=None,  # You might need to provide context here based on your setup
-                )
-
-                # Evaluate with DeepEval and store results
-                deepeval_result = deepeval_metric.measure(deepeval_test_case)
-                test_result["deepeval_evaluation"] = deepeval_result.to_dict()
-            except Exception as e:
-                worker_logger.log_text(
-                    f"Error in DeepEval evaluation: {str(e)}", severity="ERROR"
-                )
-                test_result["deepeval_evaluation"] = (
-                    f"Error during DeepEval evaluation: {str(e)}"
-                )
-
-        # --- Evaluate with Custom Method (llm_assessment) ---
-        if "llm_assessment" in run_data.get("evaluation_types", []):
-            if golden_response and actual_filtered_response:
+        # Evaluate with Custom Method (llm_assessment)
+        if "llm_assessment" in evaluation_types:
+            if golden_response and answer:
                 try:
                     # Assess the actual response against the golden response using an LLM
                     llm_assessment = ask_llm_against_golden(
-                        statement=actual_filtered_response.get(output_field),
+                        statement=answer.get(output_field),
                         golden=golden_response,
                         prompt=template_llm_prompt,
                     )
@@ -550,7 +370,7 @@ def execute_test_run(run_data, test_case, tracing_id):
                         "error": f"Error during LLM assessment: {str(e)}",
                         "status_code": status_code,
                     }
-            elif actual_filtered_response:
+            elif answer:
                 # Handle cases where no golden response is provided
                 test_result = {
                     "status": "Passed",
@@ -565,6 +385,15 @@ def execute_test_run(run_data, test_case, tracing_id):
                     "note": "No response available",
                     "status_code": status_code,
                 }
+
+        # If no assessment is done, just return the response
+        if not evaluation_types:
+            test_result = {
+                "status": "Completed",
+                "response": actual_response,
+                "status_code": status_code,
+            }
+
     except Exception as e:
         test_result = {"status": "Failed", "error": str(e), "status_code": status_code}
 
@@ -736,6 +565,68 @@ def log_request_and_response(request_data, response, start_time, end_time, error
         request_log["error"] = error
 
     core_logger.log_struct(request_log)
+
+
+def process_file_references(data):
+    """Replaces file references in the data with the content of the referenced files.
+
+    Args:
+        data: The request data (could be a string, dictionary, or list).
+
+    Returns:
+        The processed data with file references replaced.
+    """
+    if isinstance(data, str):
+        return replace_file_reference_in_string(data)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            data[key] = process_file_references(value)
+        return data
+    elif isinstance(data, list):
+        return [process_file_references(item) for item in data]
+    else:
+        return data
+
+
+def replace_file_reference_in_string(text):
+    """
+    Replaces file references in a string with the content of the referenced file.
+
+    Args:
+        text (str): The text that may contain file references.
+
+    Returns:
+        str: The text with file references replaced.
+    """
+
+    pattern = r"\[FILE:\s*(.+?)\]"
+    matches = re.findall(pattern, text)
+
+    for match in matches:
+        file_content = read_file_from_gcs(f"{files_prefix}{match}")
+
+        text = text.replace(f"[FILE: {match}]", file_content)
+
+    return text
+
+
+def read_file_from_gcs(file):
+    """Reads the content of a file from Google Cloud Storage.
+
+    Args:
+        gcs_path: The full GCS path to the file (e.g., "gs://my-bucket/my-file.txt").
+
+    Returns:
+        str: The content of the file, or an error message if reading fails.
+    """
+    try:
+        blob = files_bucket.blob(file)  # Remove "gs://" prefix
+        return blob.download_as_text()
+    except Exception as e:
+        worker_logger.log_text(
+            f"Error reading file from GCS: {file}, {str(e)}", severity="ERROR"
+        )
+        return f"Error reading file: {file}"
 
 
 if __name__ == "__main__":
