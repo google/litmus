@@ -20,7 +20,8 @@ import {
   LineChartOutlined,
   DeploymentUnitOutlined,
   QuestionOutlined,
-  DatabaseOutlined
+  DatabaseOutlined,
+  CloudUploadOutlined
 } from '@ant-design/icons-vue';
 
 export interface menu {
@@ -71,6 +72,11 @@ const sidebarItem: menu[] = [
     title: 'Proxies',
     icon: DeploymentUnitOutlined,
     to: '/proxies'
+  },
+  {
+    title: 'File Manager',
+    icon: CloudUploadOutlined,
+    to: '/files'
   },
   {
     title: 'Help & FAQ',

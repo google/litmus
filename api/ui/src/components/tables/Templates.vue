@@ -94,7 +94,7 @@ const deleteTemplate = async (templateId: string) => {
   show.value = true;
   try {
     // Send a DELETE request to the backend to delete the template
-    const response = await fetch(`/delete_template/${templateId}`, {
+    const response = await fetch(`/templates/${templateId}`, {
       method: 'DELETE'
     });
 
@@ -128,7 +128,7 @@ const fetchTemplates = () => {
   // Show the loading spinner
   show.value = true;
   // Fetch the templates from the backend API
-  fetch('/templates')
+  fetch('/templates/')
     .then((response) => response.json())
     .then((data) => {
       // Update the templates ref with the fetched data

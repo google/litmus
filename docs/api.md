@@ -20,7 +20,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 1. Submit Test Run
 
-**Endpoint:** `/submit_run`
+**Endpoint:** `/runs/submit`
 
 **Method:** `POST`
 
@@ -54,7 +54,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 2. Invoke Existing Test Run
 
-**Endpoint:** `/invoke_run`
+**Endpoint:** `/runs/invoke`
 
 **Method:** `POST`
 
@@ -84,7 +84,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 3. Delete Test Run
 
-**Endpoint:** `/delete_run/<run_id>`
+**Endpoint:** `/runs/<run_id>`
 
 **Method:** `DELETE`
 
@@ -111,7 +111,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 4.1 Add Test Template
 
-**Endpoint:** `/add_template`
+**Endpoint:** `/templates/add`
 
 **Method:** `POST`
 
@@ -148,7 +148,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 4.2 Update Test Template
 
-**Endpoint:** `/update_template`
+**Endpoint:** `/templates/update`
 
 **Method:** `PUT`
 
@@ -185,7 +185,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 4.3 Delete Test Template
 
-**Endpoint:** `/delete_template/<template_id>`
+**Endpoint:** `/templates/<template_id>`
 
 **Method:** `DELETE`
 
@@ -263,7 +263,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 5.1 Get Run Status
 
-**Endpoint:** `/run_status/<run_id>`
+**Endpoint:** `/runs/status/<run_id>`
 
 **Method:** `GET`
 
@@ -294,7 +294,11 @@ Authorization: Basic YWRtaW46YWRtaW4=
       "request": { ... }, // Filtered request data (JSON object).
       "response": { ... }, // Filtered response data (JSON object).
       "golden_response": { ... }, // Filtered golden response data (JSON object).
-      "tracing_id": "string" // Unique ID for tracing the request in proxy logs.
+      "tracing_id": "string", // Unique ID for tracing the request in proxy logs.
+      "flagged": "boolean", // Whether the test case is flagged.
+      "rating": "integer", // Rating of the test case (1-5).
+      "comments": ["string", ...], // Comments on the test case.
+      "comment_count": "integer" // Number of comments on the test case.
     },
     ...
   ]
@@ -308,7 +312,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 5.2 Get Run Status Fields
 
-**Endpoint:** `/run_status_fields/<run_id>`
+**Endpoint:** `/runs/status_fields/<run_id>`
 
 **Method:** `GET`
 
@@ -336,7 +340,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 5.3 Get Results for All Runs of a Template
 
-**Endpoint:** `/all_run_results/<template_id>`
+**Endpoint:** `/runs/all_results/<template_id>`
 
 **Method:** `GET`
 
@@ -377,7 +381,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 #### 6.1 Get Proxy Data
 
-**Endpoint:** `/proxy_data`
+**Endpoint:** `/proxy/data`
 
 **Method:** `GET`
 
@@ -400,9 +404,34 @@ Authorization: Basic YWRtaW46YWRtaW4=
 - `400 Bad Request`: Missing `date` parameter.
 - `500 Internal Server Error`: Error querying BigQuery.
 
-#### 6.2 Get Aggregated Proxy Data
+#### 6.2 Get Litmus Data
 
-**Endpoint:** `/proxy_agg`
+**Endpoint:** `/proxy/litmus_data`
+
+**Method:** `GET`
+
+**Description:** Retrieves Litmus log data from BigQuery for a specific date, optionally filtered by Litmus context and flattened.
+
+**Query Parameters:**
+
+- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
+- `flatten` (optional): Whether to flatten the JSON structure of the results (default: `False`).
+
+**Response:**
+
+- **If `flatten` is `False` (default):** Returns an array of JSON objects, each representing a log entry.
+- **If `flatten` is `True`:** Returns an array of flattened JSON objects, where nested keys are concatenated with underscores (e.g., `requestHeaders_user_agent`).
+
+**Status Codes:**
+
+- `200 OK`: Litmus data retrieved successfully.
+- `400 Bad Request`: Missing `date` parameter.
+- `500 Internal Server Error`: Error querying BigQuery.
+
+#### 6.3 Get Aggregated Proxy Data
+
+**Endpoint:** `/proxy/agg`
 
 **Method:** `GET`
 
@@ -437,7 +466,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 ### 7. List Proxy Services
 
-**Endpoint:** `/list_proxy_services`
+**Endpoint:** `/proxy/list_services`
 
 **Method:** `GET`
 
@@ -466,7 +495,103 @@ Authorization: Basic YWRtaW46YWRtaW4=
 - `200 OK`: List of proxy services retrieved successfully.
 - `500 Internal Server Error`: Error listing Cloud Run services.
 
-### 8. Version
+### 8. Flag a Test Case
+
+**Endpoint:** `/runs/<run_id>/<case_id>/flag`
+
+**Method:** `PUT`
+
+**Description:** Toggles the flagged status of a test case.
+
+**Path Parameters:**
+
+- `run_id`: The ID of the run containing the test case.
+- `case_id`: The ID of the test case.
+
+**Response:**
+
+```json
+{
+  "message": "string" // Success message.
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Test case flag status updated successfully.
+- `404 Not Found`: Test case not found.
+
+### 9. Rate a Test Case
+
+**Endpoint:** `/runs/<run_id>/<case_id>/rate`
+
+**Method:** `PUT`
+
+**Description:** Rates a test case (1-5 stars).
+
+**Path Parameters:**
+
+- `run_id`: The ID of the run containing the test case.
+- `case_id`: The ID of the test case.
+
+**Request Body:**
+
+```json
+{
+  "rating": "integer" // Rating (1-5).
+}
+```
+
+**Response:**
+
+```json
+{
+  "message": "string" // Success message.
+}
+```
+
+**Status Codes:**
+
+- `200 OK`: Test case rated successfully.
+- `400 Bad Request`: Missing or invalid rating.
+- `404 Not Found`: Test case not found.
+
+### 10. Add Comment to a Test Case
+
+**Endpoint:** `/runs/<run_id>/<case_id>/comment`
+
+**Method:** `POST`
+
+**Description:** Adds a comment to a test case.
+
+**Path Parameters:**
+
+- `run_id`: The ID of the run containing the test case.
+- `case_id`: The ID of the test case.
+
+**Request Body:**
+
+```json
+{
+  "comment": "string" // Comment text.
+}
+```
+
+**Response:**
+
+```json
+{
+  "message": "string" // Success message.
+}
+```
+
+**Status Codes:**
+
+- `201 Created`: Comment added successfully.
+- `400 Bad Request`: Missing comment.
+- `404 Not Found`: Test case not found.
+
+### 11. Version
 
 **Endpoint:** `/version`
 

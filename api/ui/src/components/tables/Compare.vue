@@ -76,7 +76,7 @@ const fetchTemplates = () => {
   // Show the loading spinner
   show.value = true;
   // Fetch the templates from the backend API
-  fetch('/templates')
+  fetch('/templates/')
     .then((response) => response.json())
     .then((data) => {
       // Update the templates ref with the fetched data

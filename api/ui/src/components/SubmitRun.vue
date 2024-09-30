@@ -171,7 +171,7 @@ const templateOptions = ref<TemplateOption[]>([]);
 // Function to fetch available templates from the API
 const getTemplates = async () => {
   try {
-    const response = await fetch('/templates');
+    const response = await fetch('/templates/');
     const data = await response.json();
     // Extract template IDs from the 'templates' array
     templateOptions.value = data.templates.map((template: { template_id: string; template_type: string }) => ({
@@ -217,7 +217,7 @@ const submitForm = async () => {
           formData.value.post_request = templateData.value.test_post_request;
         }
         // Send the test run data to the API
-        const response = await fetch('/submit_run', {
+        const response = await fetch('/runs/submit', {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json'

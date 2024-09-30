@@ -190,7 +190,7 @@ const fetchProxies = () => {
   show.value = true;
 
   // Fetch the proxies from the API
-  fetch('/list_proxy_services')
+  fetch('/proxy/list_services')
     .then((response) => response.json())
     .then((data) => {
       // Update the proxies variable with the fetched data

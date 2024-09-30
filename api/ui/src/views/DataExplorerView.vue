@@ -1,4 +1,4 @@
-<!-- 
+<!--
 Copyright 2024 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +11,7 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License. 
+limitations under the License.
 -->
 
 <template>
@@ -22,7 +22,9 @@ limitations under the License.
         <v-card elevation="0" variant="text">
           <v-row no-gutters class="align-center">
             <v-col sm="12">
-              <h3 class="text-h3 mt-1 mb-0">{{ selectedDataSource === 'proxy_data' ? 'Proxy Data' : 'Litmus Data' }}</h3>
+              <h3 class="text-h3 mt-1 mb-0">
+                {{ selectedDataSource === 'proxy/data' ? 'Proxy Data' : 'Litmus Data' }}
+              </h3>
             </v-col>
           </v-row>
         </v-card>
@@ -36,8 +38,8 @@ limitations under the License.
         class="litmus-data-selector"
         v-model:value="selectedDataSource"
         :options="[
-          { label: 'Litmus Data', value: 'litmus_data' },
-          { label: 'Proxy Data', value: 'proxy_data' }
+          { label: 'Litmus Data', value: 'proxy/litmus_data' },
+          { label: 'Proxy Data', value: 'proxy/data' }
         ]"
       />
       <!-- Date picker for filtering by date (uses Unix timestamp internally) -->
@@ -129,6 +131,7 @@ limitations under the License.
 <script lang="ts" setup>
 // Import necessary components and functions from UI libraries
 import { NTable, NInput, NSpin, NDatePicker, NCheckbox, NIcon, NCollapse, NCollapseItem, NSwitch, NSelect } from 'naive-ui';
+// Import reactivity functions from Vue
 import { ref, onMounted, computed, watch } from 'vue';
 // Import icons from icon libraries
 import { CaretUpOutline, CaretDownOutline, WarningOutline } from '@vicons/ionicons5';
@@ -165,7 +168,7 @@ const sortDirection = ref<'asc' | 'desc'>('asc'); // Stores the sort direction (
 const collapseExpanded = ref(['select-fields']); // Controls the expansion state of the collapse panel
 
 // Data Source Selection: Stores the currently selected data source (Litmus or Proxy)
-const selectedDataSource = ref('litmus_data'); // Default to litmus_data
+const selectedDataSource = ref('proxy/data'); // Default to proxy/data
 
 // Watch for changes in collapse panel expansion
 watch(collapseExpanded, (value) => {

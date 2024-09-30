@@ -16,12 +16,12 @@
 
 import json
 import os
+import re
 from datetime import datetime
 from uuid import uuid4
 
 import requests
-from google.cloud import firestore
-from google.cloud import logging
+from google.cloud import firestore, logging, storage
 
 from util.assess import (
     ask_llm_against_golden,
@@ -45,6 +45,14 @@ worker_logger = logging_client.logger(WORKER_LOG_NAME)
 # Writes a log entry indicating the worker is starting
 worker_logger.log_text("### Litmus-worker starting ###")
 
+# Initialize Storage client
+storage_client = storage.Client()
+
+# Get the files bucket name and prefix from environment variable
+files_bucket_name = os.environ.get("FILES_BUCKET")
+files_prefix = os.environ.get("FILES_PREFIX", "")  # Default to no prefix
+files_bucket = storage_client.bucket(files_bucket_name)
+
 
 def execute_request(request_data):
     """Executes a given HTTP request and returns the response.
@@ -58,8 +66,9 @@ def execute_request(request_data):
             - tracing_id (str, optional): A unique ID for tracing the request.
 
     Returns:
-        dict: The JSON response from the server if successful.
-        dict: An error message if the request fails.
+        tuple: A tuple containing:
+            - dict: The JSON response from the server if successful, or an error message if the request fails.
+            - int: The HTTP status code (or 0 if an exception occurs).
     """
 
     url = request_data.get("url")
@@ -72,7 +81,11 @@ def execute_request(request_data):
     if tracing_id:
         headers["X-Litmus-Request"] = tracing_id
 
+    # Process file references in the request body
+    body = process_file_references(body)
+
     start_time = datetime.utcnow()
+    status_code = 0  # Default status code in case of exceptions
 
     try:
         # Send the HTTP request based on the specified method
@@ -87,20 +100,90 @@ def execute_request(request_data):
         else:
             raise ValueError(f"Unsupported HTTP method: {method}")
 
-        response.raise_for_status()
+        status_code = response.status_code
+        response.raise_for_status()  # Raise an exception for bad status codes
 
         end_time = datetime.utcnow()
         log_request_and_response(
             request_data, response, start_time, end_time
         )  # Log the request and response
 
-        return response.json()
+        return response.json(), status_code
     except requests.exceptions.RequestException as e:
         end_time = datetime.utcnow()
         log_request_and_response(
             request_data, None, start_time, end_time, error=str(e)
         )  # Log the error
-        return {"status": "Failed", "error": str(e)}
+        return {"status": "Failed", "error": str(e)}, status_code
+    except Exception as e:
+        end_time = datetime.utcnow()
+        log_request_and_response(
+            request_data, None, start_time, end_time, error=str(e)
+        )  # Log the error
+        return {"status": "Failed", "error": str(e)}, status_code
+
+
+def process_file_references(data):
+    """Replaces file references in the data with the content of the referenced files.
+
+    Args:
+        data: The request data (could be a string, dictionary, or list).
+
+    Returns:
+        The processed data with file references replaced.
+    """
+    if isinstance(data, str):
+        return replace_file_reference_in_string(data)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            data[key] = process_file_references(value)
+        return data
+    elif isinstance(data, list):
+        return [process_file_references(item) for item in data]
+    else:
+        return data
+
+
+def replace_file_reference_in_string(text):
+    """
+    Replaces file references in a string with the content of the referenced file.
+
+    Args:
+        text (str): The text that may contain file references.
+
+    Returns:
+        str: The text with file references replaced.
+    """
+
+    pattern = r"\[FILE:\s*(.+?)\]"
+    matches = re.findall(pattern, text)
+
+    for match in matches:
+        file_content = read_file_from_gcs(f"{files_prefix}{match}")
+
+        text = text.replace(f"[FILE: {match}]", file_content)
+
+    return text
+
+
+def read_file_from_gcs(file):
+    """Reads the content of a file from Google Cloud Storage.
+
+    Args:
+        gcs_path: The full GCS path to the file (e.g., "gs://my-bucket/my-file.txt").
+
+    Returns:
+        str: The content of the file, or an error message if reading fails.
+    """
+
+    try:
+        blob = files_bucket.blob(file)  # Remove "gs://" prefix
+        return blob.download_as_text()
+    except Exception as e:
+        worker_logger.log_text(
+            f"Error reading file from GCS: {file}, {str(e)}", severity="ERROR"
+        )
+        return f"Error reading file: {file}"
 
 
 def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
@@ -111,6 +194,9 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
         test_case (dict): Data for the current test case.
         test_case_ref (firestore.DocumentReference): Reference to the test case document.
         tracing_id (str): Unique ID for tracing requests.
+
+    Returns:
+        dict: The test mission result, including status, conversation history, assessment, and payloads.
     """
 
     mission_duration = run_data.get("mission_duration")
@@ -122,35 +208,55 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
     for turn in range(mission_duration):
         worker_logger.log_text(f"Mission turn: {turn+1}/{mission_duration}")
 
-        # Ask LLM for the next action based on conversation history
-        llm_action = ask_llm_for_action(mission_description, conversation_history)
-
-        # Handle cases where LLM doesn't provide a valid action
-        if not llm_action or "request" not in llm_action:
-            worker_logger.log_text(
-                f"Error: LLM returned invalid action: {llm_action}",
-                severity="ERROR",
-            )
-            test_result = {
-                "status": "Error",
-                "error": f"Invalid LLM action on turn {turn+1}",
-            }
-            break
-
-        request_data = test_case.get("request")
-        request_data["tracing_id"] = tracing_id
-        json_string = json.dumps(request_data)
-        json_string = json_string.replace(f"{{query}}", str(llm_action["request"]))
-        request_data = json.loads(json_string)
-        conversation_history.append({"role": "user", "content": llm_action["request"]})
-
         try:
-            # Execute the request suggested by the LLM
-            actual_response = execute_request(request_data)
-            # Store request - response pair
-            request_response_history.append(
-                {"request": request_data, "response": actual_response}
+            # Ask LLM for the next action based on conversation history
+            llm_action = ask_llm_for_action(mission_description, conversation_history)
+
+            # Handle cases where LLM doesn't provide a valid action
+            if not llm_action or "request" not in llm_action:
+                worker_logger.log_text(
+                    f"Error: LLM returned invalid action: {llm_action}",
+                    severity="ERROR",
+                )
+                test_result = {
+                    "status": "Error",
+                    "error": f"Invalid LLM action on turn {turn+1}",
+                }
+                break
+
+            request_data = test_case.get("request")
+            request_data["tracing_id"] = tracing_id
+            json_string = json.dumps(request_data)
+            json_string = json_string.replace(f"{{query}}", str(llm_action["request"]))
+            request_data = json.loads(json_string)
+            conversation_history.append(
+                {"role": "user", "content": llm_action["request"]}
             )
+
+            # Execute the request suggested by the LLM
+            actual_response, status_code = execute_request(request_data)
+
+            # Store request - response pair with status code
+            request_response_history.append(
+                {
+                    "request": request_data,
+                    "response": actual_response,
+                    "status_code": status_code,
+                }
+            )
+
+            # Handle potential errors in the API response
+            if "status" in actual_response and actual_response["status"] == "Failed":
+                worker_logger.log_text(
+                    f"API request failed on turn {turn+1}: {actual_response['error']}",
+                    severity="ERROR",
+                )
+                test_result = {
+                    "status": "Failed",
+                    "error": f"API request failed: {actual_response['error']}",
+                }
+                break
+
             # Add the response to the conversation history
             actual_filtered_response = filter_json(
                 actual_response, run_data.get("template_output_field")
@@ -183,9 +289,9 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
                 }
                 break
 
-        except requests.exceptions.RequestException as e:
+        except Exception as e:
             worker_logger.log_text(
-                f"Error in API request on turn {turn+1}: {str(e)}",
+                f"Error in mission execution on turn {turn+1}: {str(e)}",
                 severity="ERROR",
             )
             test_result = {"status": "Failed", "error": str(e)}
@@ -232,7 +338,16 @@ def execute_test_run(run_data, test_case, tracing_id):
 
     try:
         # Execute the main request
-        actual_response = execute_request(request_data)
+        actual_response, status_code = execute_request(request_data)
+
+        # Handle potential errors in the API response
+        if "status" in actual_response and actual_response["status"] == "Failed":
+            return {
+                "status": "Failed",
+                "error": f"API request failed: {actual_response['error']}",
+                "status_code": status_code,
+            }
+
         output_field = run_data.get("template_output_field")
         template_llm_prompt = run_data.get("template_llm_prompt")
         actual_filtered_response = filter_json(
@@ -256,6 +371,7 @@ def execute_test_run(run_data, test_case, tracing_id):
                             "status": "Passed",
                             "response": actual_response,
                             "assessment": llm_assessment,
+                            "status_code": status_code,
                         }
                     else:
                         test_result = {
@@ -263,6 +379,7 @@ def execute_test_run(run_data, test_case, tracing_id):
                             "expected": golden_response,
                             "response": actual_response,
                             "assessment": llm_assessment,
+                            "status_code": status_code,
                         }
                 else:
                     # Handle invalid LLM assessment
@@ -270,6 +387,7 @@ def execute_test_run(run_data, test_case, tracing_id):
                         "status": "Error",
                         "response": actual_response,
                         "error": "LLM assessment returned an invalid response",
+                        "status_code": status_code,
                     }
 
             except Exception as e:
@@ -282,6 +400,7 @@ def execute_test_run(run_data, test_case, tracing_id):
                     "status": "Error",
                     "response": actual_response,
                     "error": f"Error during LLM assessment: {str(e)}",
+                    "status_code": status_code,
                 }
         elif actual_filtered_response:
             # Handle cases where no golden response is provided
@@ -289,16 +408,18 @@ def execute_test_run(run_data, test_case, tracing_id):
                 "status": "Passed",
                 "response": actual_response,
                 "note": "No golden response available",
+                "status_code": status_code,
             }
         else:
             test_result = {
                 "status": "Failed",
                 "response": actual_response,
                 "note": "No response available",
+                "status_code": status_code,
             }
 
-    except requests.exceptions.RequestException as e:
-        test_result = {"status": "Failed", "error": str(e)}
+    except Exception as e:
+        test_result = {"status": "Failed", "error": str(e), "status_code": status_code}
 
     return test_result
 
@@ -337,26 +458,34 @@ def execute_tests_and_store_results(run_id, template_id):
     for i, test_case in enumerate(test_cases):
         tracing_id = str(uuid4())  # Generate a unique tracing ID
 
-        # Execute pre-request hook if defined
-        if test_case.get("pre_request"):
-            test_case["pre_request"]["tracing_id"] = tracing_id
-            execute_request(test_case["pre_request"])
+        try:
+            # Execute pre-request hook if defined
+            if test_case.get("pre_request"):
+                test_case["pre_request"]["tracing_id"] = tracing_id
+                execute_request(test_case["pre_request"])
 
-        # If "Test Mission" - execute_test_mission
-        if run_data.get("template_type") == "Test Mission":
-            test_result = execute_test_mission(
-                run_data,
-                test_case,
-                test_cases_ref.document(f"test_case_{i+1}"),
-                tracing_id,
+            # If "Test Mission" - execute_test_mission
+            if run_data.get("template_type") == "Test Mission":
+                test_result = execute_test_mission(
+                    run_data,
+                    test_case,
+                    test_cases_ref.document(f"test_case_{i+1}"),
+                    tracing_id,
+                )
+            else:  # "Test Run"
+                test_result = execute_test_run(run_data, test_case, tracing_id)
+
+            # Execute post-request hook if defined
+            if test_case.get("post_request"):
+                test_case["post_request"]["tracing_id"] = tracing_id
+                execute_request(test_case["post_request"])
+
+        except Exception as e:
+            # Log and store any errors that occur during test execution
+            worker_logger.log_text(
+                f"Error executing test case {i+1}: {str(e)}", severity="ERROR"
             )
-        else:  # "Test Run"
-            test_result = execute_test_run(run_data, test_case, tracing_id)
-
-        # Execute post-request hook if defined
-        if test_case.get("post_request"):
-            test_case["post_request"]["tracing_id"] = tracing_id
-            execute_request(test_case["post_request"])
+            test_result = {"status": "Failed", "error": str(e)}
 
         # Store the test result in Firestore
         test_case_ref = db.collection(f"test_cases_{run_id}").document(

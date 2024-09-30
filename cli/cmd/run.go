@@ -38,7 +38,7 @@ func OpenRun(projectID, runID string) error {
 		return fmt.Errorf("error getting authentication credentials: %w", err)
 	}
 
-	runURL := fmt.Sprintf("%s/run_status/%s", serviceURL, runID)
+	runURL := fmt.Sprintf("%s/runs/status/%s", serviceURL, runID)
 	fmt.Println(runURL)
 
 	// Create HTTP client
