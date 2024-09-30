@@ -66,13 +66,6 @@ limitations under the License.
       </div>
       <!-- Data table section (shown if data is available) -->
       <div v-else-if="showData">
-        <!-- Test Info Section: Displays proxy/agg data when proxyData is available -->
-        <div v-if="proxyData.length > 0" class="test-info">
-          <strong>Total Tokens:</strong> {{ testInfo.total_token_count }} | <strong>Prompt Tokens:</strong>
-          {{ testInfo.prompt_token_count }} | <strong>Candidate Tokens:</strong> {{ testInfo.candidates_token_count }} |
-          <strong>Latency (ms):</strong> {{ testInfo.average_latency }}
-        </div>
-
         <!-- Field Selection Collapse Panel: Allows users to select fields to display -->
         <n-collapse v-model:expanded="collapseExpanded">
           <n-collapse-item title="Select Fields" name="select-fields">
@@ -137,7 +130,7 @@ limitations under the License.
 
 <script lang="ts" setup>
 // Import necessary components and functions from UI libraries
-import { NTable, NInput, NSpin, NDatePicker, NCheckbox, NIcon, NCollapse, NCollapseItem, NSwitch, NSelect, useMessage } from 'naive-ui';
+import { NTable, NInput, NSpin, NDatePicker, NCheckbox, NIcon, NCollapse, NCollapseItem, NSwitch, NSelect } from 'naive-ui';
 // Import reactivity functions from Vue
 import { ref, onMounted, computed, watch } from 'vue';
 // Import icons from icon libraries
@@ -157,8 +150,6 @@ const selectedFields = ref<{ [key: string]: boolean }>({}); // Stores the fields
 const contextFilter = ref(''); // Stores the context filter value
 const showLoading = ref(false); // Controls the visibility of the loading spinner
 const showData = ref(false); // Controls the visibility of the data table section
-// Get the message instance from Naive UI
-const message = useMessage(); // Import useMessage
 
 // Error handling variables
 const showError = ref(false); // Controls the visibility of the error message section
@@ -179,9 +170,6 @@ const collapseExpanded = ref(['select-fields']); // Controls the expansion state
 // Data Source Selection: Stores the currently selected data source (Litmus or Proxy)
 const selectedDataSource = ref('proxy/data'); // Default to proxy/data
 
-// Reactive object to store test info from the API
-const testInfo = ref<Record<string, any>>({});
-
 // Watch for changes in collapse panel expansion
 watch(collapseExpanded, (value) => {
   // Ensure that only the "Select Fields" panel can be expanded at a time
@@ -191,21 +179,6 @@ watch(collapseExpanded, (value) => {
     collapseExpanded.value = [];
   }
 });
-
-// Watch for changes in proxyData to fetch testInfo
-watch(
-  proxyData,
-  (newProxyData) => {
-    if (newProxyData.length > 0 && contextFilter.value) {
-      // Fetch test info if context filter is available
-      showTestInfo();
-    } else {
-      // Reset test info when proxyData is empty or no context filter
-      testInfo.value = {};
-    }
-  },
-  { deep: true }
-);
 
 // Computed Properties for Data Transformations
 
@@ -319,26 +292,6 @@ const isImportantField = (field: string): boolean => {
   // Define keywords that indicate important fields
   const keywords = ['_text', 'timestamp', 'totaltokencount'];
   return keywords.some((keyword) => field.toLowerCase().includes(keyword));
-};
-
-/**
- * Fetches test information from the proxy/agg endpoint.
- */
-const showTestInfo = async () => {
-  try {
-    const date = format(new Date(selectedDate.value), 'yyyyMMdd');
-    const response = await fetch(`/proxy/agg?date=${date}&context=${contextFilter.value}`);
-    if (!response.ok) {
-      throw new Error('Failed to fetch test info');
-    }
-    const data = await response.json();
-
-    // Update the testInfo reactive object with the fetched data
-    testInfo.value = data.length > 0 ? data[0] : {};
-  } catch (error) {
-    console.error('Error fetching test info:', error);
-    message.error('Failed to fetch test info');
-  }
 };
 
 // Data Table Sorting Function
@@ -480,10 +433,5 @@ td {
 
 .litmus-data-selector {
   width: 30%;
-}
-
-/* Style for test info section */
-.test-info {
-  margin-bottom: 15px; /* Add spacing between test info and table */
 }
 </style>

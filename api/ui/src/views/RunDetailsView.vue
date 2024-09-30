@@ -38,9 +38,12 @@ limitations under the License.
         clearable
         @change="fetchRunDetails"
       />
+      <!-- Rating Filter -->
+      <n-rate v-model:value="ratingFilter" @update:value="fetchRunDetails" />
       <!-- Show Only Flagged Toggle -->
       <n-switch v-model:value="showOnlyFlagged" @update:value="fetchRunDetails" />
       <span><v-icon>mdi-flag</v-icon></span>
+
       <!-- Clear Filters Button -->
       <v-btn variant="flat" color="primary" @click="clearFilter"> Clear Filters </v-btn>
       <!-- Export Test Cases Button -->
@@ -344,6 +347,8 @@ const templateId = ref('');
 const goldenResponsesFilter = ref('');
 // Filter to show only flagged runs
 const showOnlyFlagged = ref(false);
+// Rating Filter
+const ratingFilter = ref(0); // 0 means no rating filter
 
 // Data Table Field Management
 // List of available fields in the drawer data
@@ -478,7 +483,6 @@ function convertDate(dateString: string): string {
  */
 const fetchRunDetails = () => {
   show.value = true; // Show loading spinner
-  // Construct the filter string for the API request
   let filterString = `response_filter=${responseFilter.value}&request_filter=${requestFilter.value}&golden_responses_filter=${goldenResponsesFilter.value}`;
 
   // Add flagged filter if enabled
@@ -486,19 +490,22 @@ const fetchRunDetails = () => {
     filterString += '&flagged=true';
   }
 
-  // Fetch run details from the API
+  // Add rating filter if a rating is selected
+  if (ratingFilter.value > 0) {
+    filterString += `&rating=${ratingFilter.value}`;
+  }
+
   fetch(`/runs/status/${runId}?${filterString}`)
     .then((response) => response.json())
     .then((data) => {
-      // Update testCases with fetched data, adding user interaction details
       testCases.value = (data.testCases as TestCase[]).map((testCase) => ({
         ...testCase
       }));
-      show.value = false; // Hide loading spinner after data is fetched
+      show.value = false;
     })
     .catch((error) => {
       console.error('Error fetching run details:', error);
-      show.value = false; // Hide loading spinner on error
+      show.value = false;
     });
 };
 
@@ -506,11 +513,12 @@ const fetchRunDetails = () => {
  * Clears all applied filters and re-fetches the run details.
  */
 const clearFilter = () => {
-  responseFilter.value = 'response'; // Reset response filter
-  requestFilter.value = ''; // Reset request filter
-  goldenResponsesFilter.value = ''; // Reset golden response filter
-  showOnlyFlagged.value = false; // Reset flagged filter
-  fetchRunDetails(); // Refetch data with cleared filters
+  responseFilter.value = 'response';
+  requestFilter.value = '';
+  goldenResponsesFilter.value = '';
+  showOnlyFlagged.value = false;
+  ratingFilter.value = 0; // Reset rating filter
+  fetchRunDetails();
 };
 
 /**
@@ -595,7 +603,7 @@ const fetchRunFields = () => {
 const showTestInfo = async (traceId: string) => {
   try {
     const date = convertDate(selectedDate.value);
-    const response = await fetch(`/proxy/agg?date=${date}&context=${traceId}`);
+    const response = await fetch(`/proxy/agg?date=${selectedDate.value}&context=${traceId}`);
     if (!response.ok) {
       throw new Error('Failed to fetch test info');
     }
@@ -790,7 +798,7 @@ const rateTestCase = async (testCaseId: string) => {
     if (response.ok) {
       message.success('Test case rated successfully!');
       // After a successful rating update, re-fetch the run details
-      fetchRunDetails();
+      //fetchRunDetails();
     } else {
       const errorData = await response.json();
       message.error(`Error rating test case: ${errorData.error}`);

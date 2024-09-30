@@ -318,6 +318,22 @@ def get_run_status(run_id):
 
     # Get test case details
     test_cases_query = db.collection(f"test_cases_{run_id}")
+
+    # Apply filter for flagged test cases
+    flagged_filter = request.args.get("flagged")
+    if flagged_filter is not None:
+        flagged_filter = flagged_filter.lower() == "true"
+        test_cases_query = test_cases_query.where("flagged", "==", flagged_filter)
+
+    # Apply filter for rating
+    rating_filter = request.args.get("rating")
+    if rating_filter is not None:
+        try:
+            rating_filter = int(rating_filter)
+            test_cases_query = test_cases_query.where("rating", "==", rating_filter)
+        except ValueError:
+            return jsonify({"error": "Invalid rating filter value"}), 400
+
     test_cases = []
     for doc in test_cases_query.stream():
         case_data = doc.to_dict()
