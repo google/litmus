@@ -149,7 +149,7 @@ limitations under the License.
             <json-editor-vue v-model="templateData.test_post_request" mode="text"></json-editor-vue>
           </n-tab-pane>
 
-          <n-tab-pane name="LLM Evaluation Prompt" tab="LLM Evaluation Prompt">
+          <n-tab-pane name="Evaluation" tab="Evaluation">
             <div v-if="templateData.template_type === 'Test Run'">
               <h3>Evaluation Types</h3>
               <!-- Evaluation Types Checkboxes -->
@@ -160,7 +160,7 @@ limitations under the License.
                 Custom LLM Evaluation
               </n-checkbox>
               <n-checkbox @update:checked="updateEvaluationType('ragas', $event)" :checked="templateData.evaluation_types.ragas">
-                RAGAS
+                Ragas
               </n-checkbox>
               <n-checkbox @update:checked="toggleDeepEvalOptions($event)" :checked="showDeepEvalOptions"> DeepEval </n-checkbox>
 

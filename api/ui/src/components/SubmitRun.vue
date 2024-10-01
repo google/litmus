@@ -61,7 +61,7 @@ limitations under the License.
             </n-tab-pane>
 
             <!-- Evaluation Types Tab -->
-            <n-tab-pane name="Evaluation Types" tab="Evaluation Types">
+            <n-tab-pane name="Evaluation" tab="Evaluation">
               <!-- Evaluation Types Checkboxes -->
               <h3>Evaluation Types</h3>
               <n-checkbox
@@ -71,7 +71,7 @@ limitations under the License.
                 Custom LLM Evaluation
               </n-checkbox>
               <n-checkbox @update:checked="updateEvaluationType('ragas', $event)" :checked="formData.evaluation_types.ragas">
-                RAGAS
+                Ragas
               </n-checkbox>
               <n-checkbox @update:checked="toggleDeepEvalOptions($event)" :checked="showDeepEvalOptions"> DeepEval </n-checkbox>
 

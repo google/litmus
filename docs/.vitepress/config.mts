@@ -80,6 +80,14 @@ export default defineConfig({
           ],
         },
         {
+          text: "Evaluation Types",
+          items: [
+            { text: "Custom", link: "/evaluate-custom" },
+            { text: "DeepEval", link: "/evaluate-deepeval" },
+            { text: "Ragas", link: "/evaluate-ragas" },
+          ],
+        },
+        {
           text: "Using Litmus",
           items: [
             { text: "Adding Templates", link: "/ui-adding-templates" },
