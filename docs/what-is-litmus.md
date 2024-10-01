@@ -20,28 +20,43 @@ Litmus addresses these challenges with a suite of features designed to streamlin
 
 **1. Flexible Test Templates:**
 
-- Create reusable test templates with various parameters and inputs to cover diverse scenarios.
-- Define evaluation criteria and metrics tailored to your specific application requirements.
+- Create reusable test templates for both single-turn and multi-turn interactions.
+- Define diverse scenarios and customize parameters and inputs.
+- Specify evaluation criteria and metrics tailored to your application's needs.
 
 **2. Automated Test Execution:**
 
-- Submit test runs using templates and provide test data, automating the execution process.
-- Monitor progress and receive notifications upon completion.
+- Automate the execution of test cases using your defined templates and test data.
+- Effortlessly submit test runs and monitor progress with real-time status updates.
 
 **3. Detailed Result Analysis:**
 
-- Visualize detailed results with clear pass/fail indicators and LLM assessments.
-- Gain insights into model performance, identify areas for improvement, and track progress over time.
+- Visualize comprehensive test results with clear pass/fail indicators and AI-driven assessments.
+- Gain in-depth insights into model performance, identify areas for improvement, and track progress over time.
+- Compare different test runs to analyze how your model performs across various versions or configurations.
+- Leverage interactive charts and filter results to focus on specific metrics or request/response patterns.
 
-**4. Proxy Service for Enhanced Monitoring:**
+**4. Diverse LLM Evaluation Methods:**
 
-- Capture and analyze LLM interactions through a proxy service.
-- Explore proxy logs to understand LLM usage patterns, debug issues, and optimize performance.
+- **Custom LLM Evaluation:** Employ a separate LLM to assess responses against golden answers, using customizable prompts to tailor evaluations.
+- **Ragas Evaluation:** Utilize a comprehensive set of Ragas metrics to assess answer relevancy, context recall, precision, harmfulness, and similarity to reference answers.
+- **DeepEval Evaluation:** Leverage DeepEval's LLM-powered metrics to delve deeper into aspects like faithfulness, contextual relevance, hallucination, bias, and toxicity.
 
-**5. AI-Powered Evaluation:**
+**5. Proxy Service for Enhanced Monitoring:**
 
-- Leverage AI-powered tools to assess the quality, relevance, and safety of LLM outputs.
-- Detect biases, identify hallucinations, and ensure the responsible use of your AI models.
+- Gain deeper insights into LLM usage patterns through a dedicated proxy service.
+- Capture detailed request and response logs for analysis, debugging, and optimization.
+- Explore proxy data in the Litmus UI to understand how your LLMs are being utilized and identify areas for refinement.
+
+**6. Cloud Integration:**
+
+- Seamlessly integrate with Google Cloud Platform services, including Firestore for data storage, Cloud Run for job execution, BigQuery for proxy log analysis, and Vertex AI for accessing powerful LLMs.
+- Benefit from the scalability, reliability, and security of Google Cloud.
+
+**7. Quick and Easy Deployment:**
+
+- Effortlessly set up Litmus using the Litmus CLI tool, which automates the deployment process and configures necessary resources.
+- Alternatively, follow the manual setup guide for more customized deployment options.
 
 ## Benefits of Using Litmus
 

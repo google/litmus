@@ -18,6 +18,10 @@ A "Test Run" template in Litmus consists of the following key components:
 - **Pre-Request and Post-Request (optional):** JSON objects defining optional requests to be executed before and after the main test request, respectively. These are useful for setting up or cleaning up your testing environment.
 - **LLM Evaluation Prompt (optional):** A prompt guiding the LLM in assessing the similarity between the actual responses and the golden responses. This allows for a more nuanced evaluation beyond simple equality checks.
 - **Input and Output Field Selection:** Specifies the exact fields within the request and response payloads to use as input and output for the test cases and LLM assessment.
+- **Evaluation Types (optional):** A dictionary specifying the evaluation methods to use for assessing the LLM responses. This can include:
+  - **Custom LLM Evaluation:** Enabled by setting `"llm_assessment": True`. Uses the "LLM Evaluation Prompt" to guide the assessment.
+  - **Ragas Evaluation:** Enabled by setting `"ragas": True`. Applies the default set of Ragas metrics.
+  - **DeepEval Evaluation:** Enabled by providing a list of desired DeepEval metrics within a `"deepeval"` list (e.g., `"deepeval": ["answer_relevancy", "faithfulness"]`).
 
 ## Purpose
 
@@ -27,6 +31,7 @@ The primary purpose of a "Test Run" template is to:
 - **Verify expected behavior:** Ensure your model responds as intended for a range of input queries.
 - **Identify inconsistencies and regressions:** Detect deviations from the expected outputs, highlighting potential issues or regressions in your model.
 - **Facilitate model improvement:** Use the results to refine your model's training data or adjust its parameters.
+- **Employ multiple LLM evaluation methods:** Apply custom prompts, Ragas metrics, and DeepEval evaluations to gain comprehensive insights into your model's performance.
 
 ## Scenarios
 
@@ -71,7 +76,12 @@ The primary purpose of a "Test Run" template is to:
      "template_id": "your-template-id",
      "pre_request": { ... }, // Optional
      "post_request": { ... }, // Optional
-     "test_request": { ... }
+     "test_request": { ... },
+     "evaluation_types": { // Optional - specify desired evaluation methods
+         "llm_assessment": True,
+         "ragas": True,
+         "deepeval": ["answer_relevancy", "faithfulness"]
+     }
    }
    ```
 2. Send a POST request to the `/runs/submit` endpoint of the Litmus API.
@@ -82,7 +92,8 @@ The primary purpose of a "Test Run" template is to:
 2. Select your "Test Run" template from the dropdown.
 3. Enter your `RUN_ID`.
 4. Review and modify the request payload if needed.
-5. Submit the run.
+5. (Optional) Configure the evaluation types you want to use.
+6. Submit the run.
 
 ## Configuration
 
@@ -93,14 +104,18 @@ You can configure various aspects of a "Test Run" template in the UI, including:
 1. **Modifying the Template Data:** In the **Test Cases** tab, define or update test cases by adding or removing data items. Each test case item requires a query and an expected response. You can optionally provide additional data like Filter, Source, Block, and Category for each test case item.
 2. **Modifying the Request Payload:** In the **Request Payload** tab, modify the `Request Payload` to match your API requirements by using the built-in JSON editor. Use placeholders (e.g., `{query}`) for dynamic values from your test cases or missions.
 3. **Defining or updating the Pre-Request and Post-Request:** Navigate to the **Pre-Request** and **Post-Request** tabs and use the built-in JSON editor to define or update the pre-request and post-request payloads.
-4. **Crafting the LLM Evaluation Prompt:** In the **LLM Evaluation Prompt** tab, enter your prompt in the text area.
+4. **Crafting the LLM Evaluation Prompt:** In the **LLM Evaluation Prompt** tab, enter your prompt in the text area. This prompt will be used if you enable **Custom LLM Evaluation** in the **Evaluation Types**.
 5. **Selecting the appropriate Input Field and Output Field:**
    - Click on the "Input Field" button. A drawer will open displaying the "Request Payload" as a JSON Tree. Click on the node representing the field you want to use as input.
    - Click on the "Output Field" button. Before selecting an output field, you need to run the request to get an example response. Once you have an example response, a drawer will open displaying the "Response Payload" as a JSON Tree. Click on the node representing the field you want to use as output for the assessment.
+6. **Selecting Evaluation Types:**
+   - In the "LLM Evaluation Prompt" tab, you can choose which evaluation methods you want to apply.
+   - You can select any combination of **Custom LLM Evaluation**, **Ragas**, and **DeepEval**.
+   - For DeepEval, you can choose specific metrics from the available list.
 
 ## Example
 
-Let's say you're testing a language translation model. A test case might involve a query in English ("Hello, world!") and its expected translation in Spanish ("¡Hola, mundo!"). You'd define the `Request Payload` to include the English query as `{query}`, and the model's response would be compared to the expected Spanish translation.
+Let's say you're testing a language translation model. A test case might involve a query in English ("Hello, world!") and its expected translation in Spanish ("¡Hola, mundo!"). You'd define the `Request Payload` to include the English query as `{query}`, and the model's response would be compared to the expected Spanish translation. You can then choose to evaluate the response using any of the available LLM evaluation methods or a combination of them.
 
 ## Restarting and Deleting
 
@@ -109,6 +124,6 @@ Let's say you're testing a language translation model. A test case might involve
 
 ## Additional Information
 
-- The results of each test case, including the LLM assessment, are stored in Firestore.
+- The results of each test case, including the LLM assessment, Ragas evaluation, and DeepEval results (if selected), are stored in Firestore.
 - You can filter and analyze test run results using the UI or by querying the Firestore database directly.
 - Consider organizing your test cases using the optional `Filter` and `Category` fields for better management and analysis.

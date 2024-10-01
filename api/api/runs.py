@@ -50,6 +50,8 @@ def submit_run(data=None):
                                      Defaults to "Test Run" if not provided.
         - mission_duration (optional): Number of interaction loops for a "Test Mission". Required if
                                         template_type is "Test Mission".
+        - evaluation_types (optional): Dictionary specifying evaluation methods.
+                                        Example: {"ragas": True, "deepeval": ["answer_relevancy", "faithfulness"]}
 
     Returns:
         JSON response indicating success or failure.
@@ -63,6 +65,9 @@ def submit_run(data=None):
     post_request = data.get("post_request")
     test_request = data.get("test_request")
     auth_token = data.get("auth_token")
+    evaluation_types = data.get(
+        "evaluation_types", {}
+    )  # Get evaluation_types, default to empty dict
 
     # Input validation
     if not run_id or not template_id:
@@ -145,6 +150,7 @@ def submit_run(data=None):
             "template_llm_prompt": template_data.get("template_llm_prompt"),
             "template_type": template_type,
             "mission_duration": template_data.get("mission_duration"),
+            "evaluation_types": evaluation_types,  # Store evaluation_types in the run data
         }
     )
 
@@ -211,8 +217,17 @@ def submit_simple():
         "test_request": template_data.get("test_request"),
         "pre_request": template_data.get("test_pre_request"),
         "post_request": template_data.get("test_post_request"),
+        "template_llm_prompt": template_data.get("template_llm_prompt"),
+        "template_input_field": template_data.get("template_input_field"),
+        "template_output_field": template_data.get("template_output_field"),
+        "template_type": template_data.get("template_type"),
+        "evaluation_types": template_data.get("evaluation_types", {}),
         "auth_token": auth_token,
     }
+
+    # Add mission_duration only if the template type is "Test Mission"
+    if submit_data["template_type"] == "Test Mission":
+        submit_data["mission_duration"] = template_data.get("mission_duration")
 
     # Call submit_run() with constructed data
     return submit_run(submit_data)

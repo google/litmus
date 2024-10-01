@@ -1,4 +1,4 @@
-<!-- 
+<!--
 Copyright 2024 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +11,7 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License. 
+limitations under the License.
 -->
 
 <template>
@@ -40,7 +40,7 @@ limitations under the License.
             >
           </div>
 
-          <!-- Tabs for Request Payload, Pre-Request, and Post-Request -->
+          <!-- Tabs for Request Payload, Pre-Request, and Post-Request, Evaluation Types -->
           <n-tabs type="line" animated>
             <!-- Request Payload tab -->
             <n-tab-pane name="Request Payload" tab="Request Payload">
@@ -59,6 +59,34 @@ limitations under the License.
               <!-- JSON editor for editing the post-request payload (optional) -->
               <json-editor-vue v-model="templateData.test_post_request" mode="text"></json-editor-vue>
             </n-tab-pane>
+
+            <!-- Evaluation Types Tab -->
+            <n-tab-pane name="Evaluation" tab="Evaluation">
+              <!-- Evaluation Types Checkboxes -->
+              <h3>Evaluation Types</h3>
+              <n-checkbox
+                @update:checked="updateEvaluationType('llm_assessment', $event)"
+                :checked="formData.evaluation_types.llm_assessment"
+              >
+                Custom LLM Evaluation
+              </n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)" :checked="formData.evaluation_types.ragas">
+                Ragas
+              </n-checkbox>
+              <n-checkbox @update:checked="toggleDeepEvalOptions($event)" :checked="showDeepEvalOptions"> DeepEval </n-checkbox>
+
+              <div v-if="showDeepEvalOptions">
+                <h4>DeepEval Metrics</h4>
+                <n-checkbox
+                  v-for="metric in deepevalMetrics"
+                  :key="metric"
+                  :checked="formData.evaluation_types.deepeval.includes(metric)"
+                  @update:checked="updateDeepEvalMetric(metric, $event)"
+                >
+                  {{ metric }}
+                </n-checkbox>
+              </div>
+            </n-tab-pane>
           </n-tabs>
         </n-card>
 
@@ -70,8 +98,8 @@ limitations under the License.
 </template>
 
 <script lang="ts" setup>
-import { NTabs, NCard, NTabPane, NForm, NFormItem, NInput, NSelect, useMessage, NSpin } from 'naive-ui';
-import { ref, onMounted } from 'vue';
+import { NTabs, NCard, NTabPane, NForm, NFormItem, NInput, NSelect, useMessage, NSpin, NCheckbox } from 'naive-ui';
+import { ref, onMounted, watch } from 'vue';
 import { useRouter } from 'vue-router';
 import JsonEditorVue from 'json-editor-vue';
 
@@ -111,6 +139,11 @@ interface TemplateData {
   template_llm_prompt: string; // LLM prompt for the template
   template_type: string; // Template type (e.g., 'Test Run', 'Test Mission')
   mission_duration?: number; // Mission duration (optional, for 'Test Mission' type)
+  evaluation_types: {
+    llm_assessment: boolean;
+    ragas: boolean;
+    deepeval: string[];
+  };
 }
 
 // Reactive variable for storing template data
@@ -121,7 +154,12 @@ const templateData = ref<TemplateData>({
   template_output_field: '',
   template_llm_prompt: '',
   template_type: '',
-  mission_duration: undefined
+  mission_duration: undefined,
+  evaluation_types: {
+    llm_assessment: false,
+    ragas: false,
+    deepeval: []
+  }
 } as TemplateData);
 
 // Reactive variable to control loading spinner visibility
@@ -136,14 +174,41 @@ const message = useMessage();
 // Reference to the form element
 const formRef = ref();
 
+// Define the type for evaluation_types
+type EvaluationTypes = {
+  llm_assessment: boolean;
+  ragas: boolean;
+  deepeval: string[];
+};
+
 // Reactive variable for storing form data
 const formData = ref({
-  template_id: '', // Selected template ID
-  run_id: '', // User-defined run ID
-  test_request: {}, // Test request payload
-  pre_request: {}, // Pre-request payload (optional)
-  post_request: {} // Post-request payload (optional)
+  template_id: '',
+  run_id: '',
+  test_request: {},
+  pre_request: {},
+  post_request: {},
+  evaluation_types: {
+    llm_assessment: false,
+    ragas: false,
+    deepeval: [] as string[]
+  } as EvaluationTypes // Apply the EvaluationTypes type here
 });
+
+// DeepEval Metrics
+const deepevalMetrics = [
+  'answer_relevancy',
+  'faithfulness',
+  'contextual_precision',
+  'contextual_recall',
+  'contextual_relevancy',
+  'hallucination',
+  'bias',
+  'toxicity'
+];
+
+// Control visibility of DeepEval metric options
+const showDeepEvalOptions = ref(false);
 
 // Form validation rules
 const rules = {
@@ -193,6 +258,10 @@ const getTemplate = async (value: string) => {
     }
     const data = await response.json();
     templateData.value = data;
+
+    // Update formData.evaluation_types with values from the template
+    formData.value.evaluation_types = { ...templateData.value.evaluation_types };
+
     if (!data.template_data) {
       templateData.value.template_data = [];
     }
@@ -216,6 +285,7 @@ const submitForm = async () => {
         if (templateData.value.test_post_request) {
           formData.value.post_request = templateData.value.test_post_request;
         }
+
         // Send the test run data to the API
         const response = await fetch('/runs/submit', {
           method: 'POST',
@@ -241,10 +311,52 @@ const submitForm = async () => {
   });
 };
 
+// Function to update evaluation types in formData
+const updateEvaluationType = (type: keyof EvaluationTypes, checked: boolean) => {
+  if (type === 'deepeval') {
+    // Handle deepeval (string array) case
+    if (checked) {
+      // If checked, add all deepevalMetrics to the array
+      formData.value.evaluation_types.deepeval = [...deepevalMetrics];
+    } else {
+      // If unchecked, clear the deepeval array
+      formData.value.evaluation_types.deepeval = [];
+    }
+  } else {
+    // Handle llm_assessment and ragas (boolean) cases
+    formData.value.evaluation_types[type] = checked;
+  }
+};
+
+// Function to toggle DeepEval options visibility
+const toggleDeepEvalOptions = (checked: boolean) => {
+  showDeepEvalOptions.value = checked;
+};
+
+// Function to update DeepEval metrics in formData
+const updateDeepEvalMetric = (metric: string, checked: boolean) => {
+  if (checked) {
+    formData.value.evaluation_types.deepeval.push(metric);
+  } else {
+    const index = formData.value.evaluation_types.deepeval.indexOf(metric);
+    if (index > -1) {
+      formData.value.evaluation_types.deepeval.splice(index, 1);
+    }
+  }
+};
+
 const noSpace = (value: string) => !/ /g.test(value);
 
 // Fetch available templates when the component is mounted
 onMounted(() => {
   getTemplates();
+});
+
+// Watch for changes in showDeepEvalOptions
+watch(showDeepEvalOptions, (newValue) => {
+  // If showDeepEvalOptions is false, clear the selected DeepEval metrics
+  if (!newValue) {
+    formData.value.evaluation_types.deepeval = [];
+  }
 });
 </script>

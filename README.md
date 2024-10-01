@@ -6,22 +6,24 @@
 
 [![Litmus Video](/docs/public/img/litmus-video-piay.png)](https://google.github.io/litmus/what-is-litmus)
 
-Litmus is a comprehensive tool designed for testing and evaluating HTTP Requests and Responses, especially for Large Language Models (LLMs).
-It combines a powerful API, a robust worker service, a user-friendly web interface, and an optional proxy service to streamline the testing process.
+Litmus is a comprehensive tool designed for testing and evaluating HTTP Requests and Responses, especially for Large Language Models (LLMs). It combines a powerful API, a robust worker service, a user-friendly web interface, and an optional proxy service to streamline the testing process.
 
 ![Litmus LLM Testing](/docs/public/img/litmus.png)
 
 ## Features
 
 - **Automated Test Execution:** Submit test runs using pre-defined templates to evaluate responses against golden answers using AI.
-- **Flexible Test Templates:** Define and manage test templates specifying the structure and parameters of your tests.
+- **Flexible Test Templates:** Define and manage test templates specifying the structure and parameters of your tests. You can choose between two template types: "Test Run" for single-turn interactions and "Test Mission" for multi-turn interactions where the LLM generates its requests.
 - **User-Friendly Web Interface:** Interact with the Litmus platform through a visually appealing and intuitive web interface.
 - **Detailed Results:** View the status, progress, and detailed results of your test runs.
 - **Advanced Filtering:** Filter responses from test runs based on specific JSON paths for in-depth analysis.
 - **Performance Monitoring:** Track the performance of your responses and identify areas for improvement by using AI.
-- **LLM Evaluation with Customizable Prompts:** Leverage LLMs to compare actual responses with expected (golden) responses, using flexible prompts tailored to your evaluation needs.
+- **Multiple LLM Evaluation Methods:** Leverage a variety of LLM evaluation methods:
+  - **Custom LLM Evaluation with Customizable Prompts:** Use an LLM to compare actual responses with expected (golden) responses, utilizing flexible prompts tailored to your evaluation needs.
+  - **Ragas Evaluation:** Apply Ragas metrics, including answer relevancy, context recall, context precision, harmfulness, and answer similarity.
+  - **DeepEval Evaluation:** Leverage DeepEval's LLM-based metrics, such as answer relevancy, faithfulness, contextual precision, contextual recall, hallucination, bias, and toxicity.
 - **Proxy Service for Enhanced LLM Monitoring:** Analyze your LLM interactions in greater detail with the optional proxy service, capturing comprehensive logs of requests and responses.
-- **Cloud Integration:** Leverage the power of Google Cloud Platform (Firestore, Cloud Run, BigQuery) for efficient data storage, execution, and analysis.
+- **Cloud Integration:** Leverage the power of Google Cloud Platform (Firestore, Cloud Run, BigQuery, Vertex AI) for efficient data storage, execution, and analysis.
 - **Quick Deployment:** Use the provided deployment tool for a streamlined setup.
 
 ## Architecture
@@ -40,7 +42,7 @@ Litmus consists of four core components:
    - Uses Firestore for data storage.
 3. **Worker Service:**
    - Executes test cases based on templates and provided test data.
-   - Invokes the LLM and compares its responses against golden answers using customizable prompts.
+   - Invokes the LLM and compares its responses against golden answers using customizable prompts and other evaluation methods (DeepEval, Ragas).
    - Stores test results in Firestore.
 4. **User Interface:**
    - Allows users to interact with the Litmus platform.
@@ -94,6 +96,7 @@ Litmus consists of four core components:
 
 - Access the web interface.
 - Create and manage test templates, defining test requests, expected responses, and LLM evaluation prompts.
+- Select your desired evaluation methods in your templates (Custom LLM Evaluation, Ragas, DeepEval).
 - Optionally configure your LLM client to use the proxy service.
 - Submit test runs, monitor progress, and analyze the detailed results, including LLM-based assessments.
 - Explore proxy data and understand your LLM usage patterns.

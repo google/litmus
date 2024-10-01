@@ -24,7 +24,7 @@ def cleanup_json(x: str):
         x (str): String containing a JSON structure. May contain leading and trailing characters outside of JSON.
 
     Returns:
-        str: Retuns the substring representig the JSON structure. Returns None if JSON could not be found.
+        str: Returns the substring representing the JSON structure. Returns None if JSON could not be found.
     """
     y = x.replace("'", "")
     startBrace = y.find("{")
@@ -39,13 +39,13 @@ def cleanup_json(x: str):
 
 
 def strip_references(statement: str):
-    """Strips reference notation elements (e.g. [3]) from a string.
+    """Strips reference notation elements (e.g., [3]) from a string.
 
     Args:
         statement (str): The string that could contain references
 
     Returns:
-        The string with any references removed.
+        str: The string with any references removed.
     """
     out = ""
     p = 0
@@ -65,20 +65,33 @@ def strip_references(statement: str):
 
 
 def find_citations(text_with_citations) -> list[tuple]:
+    """Finds all citations in the text and returns their locations and values.
+
+    Args:
+        text_with_citations (str): Text potentially containing citations in the form [number].
+
+    Returns:
+        list[tuple]: A list of tuples, each representing a citation.
+                     Each tuple contains:
+                         - start position (int): The starting index of the citation in the text.
+                         - end position (int): The ending index of the citation in the text.
+                         - citation value (int): The numerical value of the citation.
+    """
+
     # Find all citations in the text
     citations = []
     p = 0
     q = -1
     while True:
-        # find a citation
+        # Find a citation
         p = text_with_citations.find("[", q + 1)
         if p < 0:  # no (more) citations
             break
-        # find the end of this particular citation
+        # Find the end of this particular citation
         q = text_with_citations.find("]", p)
-        if q < 0:  # in case we have a missing closing bracket
+        if q < 0:  # In case we have a missing closing bracket
             break
-        # now iterate
+        # Now iterate
         p += 1
         while p < q:
             r = p
@@ -92,7 +105,7 @@ def find_citations(text_with_citations) -> list[tuple]:
             else:
                 break
         p = q + 1
-    # now we have a list of citation locations
+    # Now we have a list of citation locations
     citations.reverse()
     return citations
 
@@ -100,16 +113,36 @@ def find_citations(text_with_citations) -> list[tuple]:
 def replace_citation(
     text_with_citations: str, startpos: int, endpos: int, newValue: int
 ) -> str:
+    """Replaces a citation in a string with a new value.
+
+    Args:
+        text_with_citations (str): The text containing the citation to be replaced.
+        startpos (int): The starting index of the citation.
+        endpos (int): The ending index of the citation.
+        newValue (int): The new value to replace the existing citation with.
+
+    Returns:
+        str: The updated string with the replaced citation.
+    """
     return (
         text_with_citations[0:startpos] + str(newValue) + text_with_citations[endpos:]
     )
 
 
 def renumber_citations(search_result, offset: int):
+    """Renumbers the citations in a search result by a given offset.
+
+    Args:
+        search_result (str): The search result text potentially containing citations.
+        offset (int): The amount to add to each citation number.
+
+    Returns:
+        str: The search result with renumbered citations.
+    """
     # Find all citations in the text
     citations = find_citations(search_result)
     searchresponse = search_result
-    # replace all citations with new values
+    # Replace all citations with new values
     for cit_start, cit_end, cit_value in citations:
         cit_value += offset
         searchresponse = replace_citation(searchresponse, cit_start, cit_end, cit_value)
@@ -117,7 +150,15 @@ def renumber_citations(search_result, offset: int):
 
 
 def insert_citations(response: str, citations: [GroundingCitation]):
-    """insert citations from citations into text"""
+    """Inserts citations from a list of GroundingCitation objects into the text.
+
+    Args:
+        response (str): The text where citations should be inserted.
+        citations (list[GroundingCitation]): A list of GroundingCitation objects from an LLM response.
+
+    Returns:
+        str: The text with citations inserted in the form [number] at their corresponding locations.
+    """
     cits = [
         {"start": c.start_index, "end": c.end_index, "id": i}
         for i, c in enumerate(citations, start=1)
@@ -130,12 +171,26 @@ def insert_citations(response: str, citations: [GroundingCitation]):
 
 
 def get_doc_cit(doc):
+    """Extracts the citation number from a document name in the search results.
+
+    Args:
+        doc (dict): A document dictionary from the search results, containing a 'name' field.
+
+    Returns:
+        int: The citation number extracted from the document name.
+    """
     n = doc["name"]
     p = n.find("]")
     return int(n[1:p])
 
 
 def renumber_docs(search_result, offset: int):
+    """Renumbers the citations within document names in a search result.
+
+    Args:
+        search_result (dict): The search result potentially containing documents with citations in their names.
+        offset (int): The amount to add to each citation number within document names.
+    """
     for doc in search_result.get("documents", []):
         n = doc["name"]
         p = n.find("]")
@@ -143,19 +198,18 @@ def renumber_docs(search_result, offset: int):
 
 
 def compact_docs(documents: list[dict], citations: list[tuple]):
-    """Compacts the list of documents by removing all documents not mentioned by citations.
+    """Compacts the list of documents by removing documents not referenced in the citations.
 
     Args:
-        documents (list[dict]): List of documents as returned by e.g., search_engine_summary
-        citations (list[tuple]): List of citations as returned by find_citations
+        documents (list[dict]): List of documents from search results, each with a 'name' field containing a citation.
+        citations (list[tuple]): List of citations found in the text.
 
-    Returns:
-        No return but manipulates the list of documents (reduces it)
+    This function modifies the `documents` list in-place, removing documents that are not cited.
     """
-    # set of unique citation ids
+    # Set of unique citation IDs
     cits = set([v for _, _, v in citations])
     for i in range(len(documents) - 1, -1, -1):
-        if not get_doc_cit(documents[i]) in cits:
+        if get_doc_cit(documents[i]) not in cits:
             documents.pop(i)
 
 
@@ -163,17 +217,17 @@ def extract_article_id(url):
     """Extracts the 8-digit number from a Blick.ch URL.
 
     Args:
-    url: The URL string.
+        url (str): The URL string.
 
     Returns:
-    The extracted number as a string, or None if no match is found.
+        str or None: The extracted 8-digit number as a string, or None if no match is found.
     """
     id_pattern = r"(\d{8})(?=\D|$)"
 
-    # Search for the pattern in each URL and extract the ID numbers.
+    # Search for the pattern in the URL and extract ID numbers.
     matched_ids = re.findall(id_pattern, url)
 
-    # Sometimes, the pattern might match multiple IDs; we assume the first one is the correct ID.
+    # Return the first matched ID, or None if no match is found.
     extracted_id = matched_ids[0] if matched_ids else None
 
     return extracted_id
@@ -183,14 +237,14 @@ def date_str_to_unix_int(date_str):
     """Converts a date string in YYYY-MM-DD format to a Unix timestamp integer.
 
     Args:
-      date_str: The date string to convert.
+        date_str (str): The date string to convert.
 
     Returns:
-      The Unix timestamp as an integer.
+        int or None: The Unix timestamp as an integer, or None if the input is invalid.
     """
     try:
         datetime_obj = datetime.datetime.strptime(date_str, "%Y-%m-%d")
         unix_timestamp = int(datetime_obj.timestamp())
         return unix_timestamp
     except ValueError:
-        return None  # Or raise an exception if preferred
+        return None
