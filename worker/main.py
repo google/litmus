@@ -303,14 +303,23 @@ def execute_test_run(run_data, test_case, tracing_id):
         evaluation_types = run_data.get("evaluation_types", [])
 
         # If no assessment is done, just return the response
-        if not evaluation_types:
+        if evaluation_types == {
+            "llm_assessment": False,
+            "ragas": False,
+            "deepeval": [],
+        }:
             test_result = {
                 "status": "Completed",
                 "response": actual_response,
                 "status_code": status_code,
             }
         else:
-            test_result["assessment"] = {}
+            test_result = {
+                "status": "Completed",
+                "response": actual_response,
+                "status_code": status_code,
+                "assessment": {},
+            }
 
         # Evaluate with RAGAS
         if "ragas" in evaluation_types:
