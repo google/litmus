@@ -217,8 +217,17 @@ def submit_simple():
         "test_request": template_data.get("test_request"),
         "pre_request": template_data.get("test_pre_request"),
         "post_request": template_data.get("test_post_request"),
+        "template_llm_prompt": template_data.get("template_llm_prompt"),
+        "template_input_field": template_data.get("template_input_field"),
+        "template_output_field": template_data.get("template_output_field"),
+        "template_type": template_data.get("template_type"),
+        "evaluation_types": template_data.get("evaluation_types", {}),
         "auth_token": auth_token,
     }
+
+    # Add mission_duration only if the template type is "Test Mission"
+    if submit_data["template_type"] == "Test Mission":
+        submit_data["mission_duration"] = template_data.get("mission_duration")
 
     # Call submit_run() with constructed data
     return submit_run(submit_data)
