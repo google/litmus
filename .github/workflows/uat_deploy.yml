@@ -187,6 +187,7 @@ jobs:
         run: |
           wget https://storage.googleapis.com/litmus-cloud/uat/linux/litmus
           chmod 755 ./litmus
+          ./litmus destroy uat --project litmusai-uat --quiet
           ./litmus deploy uat --project litmusai-uat --quiet
           ./litmus proxy destroy-all --project litmusai-uat --quiet
           ./litmus proxy deploy --upstreamURL us-central1-aiplatform.googleapis.com --project litmusai-uat --quiet
