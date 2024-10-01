@@ -41,6 +41,8 @@ def add_template():
         - template_type: The type of template. Can be "Test Run" or "Test Mission".
         - mission_duration (optional): Number of interaction loops for a "Test Mission". Required if
                                         template_type is "Test Mission".
+        - evaluation_types (optional): Dictionary specifying evaluation methods.
+                                        Example: {"ragas": True, "deepeval": ["answer_relevancy", "faithfulness"]}
 
     Returns:
         JSON response indicating success or failure.
@@ -58,6 +60,9 @@ def add_template():
     mission_duration = (
         data.get("mission_duration") if template_type == "Test Mission" else None
     )
+    evaluation_types = data.get(
+        "evaluation_types", {}
+    )  # Get evaluation_types, default to empty dict
 
     # Input validation
     if not template_id:
@@ -108,6 +113,7 @@ def add_template():
             "template_output_field": template_output_field,
             "template_type": template_type,  # Store the template type
             "mission_duration": mission_duration,  # Store mission duration, if applicable
+            "evaluation_types": evaluation_types,  # Store evaluation_types in the template data
         }
     )
     return jsonify({"message": f"Template '{template_id}' added successfully"})
@@ -131,6 +137,8 @@ def update_template():
         - template_type (optional): The type of template. Can be "Test Run" or "Test Mission".
         - mission_duration (optional): Number of interaction loops for a "Test Mission". Required if
                                         template_type is updated to "Test Mission" and not previously set.
+        - evaluation_types (optional): Dictionary specifying evaluation methods.
+                                        Example: {"ragas": True, "deepeval": ["answer_relevancy", "faithfulness"]}
 
     Returns:
         JSON response indicating success or failure.
@@ -146,6 +154,9 @@ def update_template():
     template_output_field = data.get("template_output_field")
     template_type = data.get("template_type")
     mission_duration = data.get("mission_duration")
+    evaluation_types = data.get(
+        "evaluation_types", {}
+    )  # Get evaluation_types, default to empty dict
 
     # Input validation
     if not template_id:
@@ -183,6 +194,7 @@ def update_template():
             template_output_field,
             template_type,
             mission_duration,
+            evaluation_types,
         ]
     ):
         return jsonify({"error": "No fields provided for update"}), 400
@@ -206,6 +218,8 @@ def update_template():
         update_data["template_type"] = template_type
     if mission_duration is not None:
         update_data["mission_duration"] = mission_duration
+    if evaluation_types:  # Only update if evaluation_types is not empty
+        update_data["evaluation_types"] = evaluation_types
 
     template_ref.update(update_data)
     return jsonify({"message": f"Template '{template_id}' updated successfully"})

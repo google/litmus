@@ -1,4 +1,4 @@
-<!-- 
+<!--
 Copyright 2024 Google LLC
 
 Licensed under the Apache License, Version 2.0 (the "License");
@@ -11,7 +11,7 @@ Unless required by applicable law or agreed to in writing, software
 distributed under the License is distributed on an "AS IS" BASIS,
 WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 See the License for the specific language governing permissions and
-limitations under the License. 
+limitations under the License.
 -->
 
 <template>
@@ -149,9 +149,36 @@ limitations under the License.
             <json-editor-vue v-model="templateData.test_post_request" mode="text"></json-editor-vue>
           </n-tab-pane>
 
-          <!-- LLM Evaluation Prompt (Optional) Tab -->
-          <n-tab-pane name="LLM Evaluation Prompt" tab="LLM Evaluation Prompt">
+          <n-tab-pane name="Evaluation" tab="Evaluation">
+            <div v-if="templateData.template_type === 'Test Run'">
+              <h3>Evaluation Types</h3>
+              <!-- Evaluation Types Checkboxes -->
+              <n-checkbox
+                @update:checked="updateEvaluationType('llm_assessment', $event)"
+                :checked="templateData.evaluation_types.llm_assessment"
+              >
+                Custom LLM Evaluation
+              </n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)" :checked="templateData.evaluation_types.ragas">
+                Ragas
+              </n-checkbox>
+              <n-checkbox @update:checked="toggleDeepEvalOptions($event)" :checked="showDeepEvalOptions"> DeepEval </n-checkbox>
+
+              <div v-if="showDeepEvalOptions">
+                <h4>DeepEval Metrics</h4>
+                <n-checkbox
+                  v-for="metric in deepevalMetrics"
+                  :key="metric"
+                  :checked="templateData.evaluation_types.deepeval.includes(metric)"
+                  @update:checked="updateDeepEvalMetric(metric, $event)"
+                >
+                  {{ metric }}
+                </n-checkbox>
+              </div>
+            </div>
+            <n-divider></n-divider>
             <!-- Textarea for LLM Evaluation Prompt -->
+            <h3>Custom LLM Evalutation Prompt</h3>
             <n-input
               v-model:value="templateData.template_llm_prompt"
               type="textarea"
@@ -217,25 +244,29 @@ import {
   NDivider,
   useMessage,
   NSelect,
-  NInputNumber
+  NInputNumber,
+  NCheckbox
 } from 'naive-ui';
 import type { TabsInst } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
-import { ref, onMounted, onUnmounted, nextTick } from 'vue';
+import { ref, onMounted, onUnmounted, nextTick, watch } from 'vue';
 import JsonEditorVue from 'json-editor-vue';
 import { JsonTreeView } from 'json-tree-view-vue3';
 import 'json-tree-view-vue3/dist/style.css';
 
+// Define a ref for the templateTabs component
 const templateTabs = ref<TabsInst | null>(null);
 const tabvalue = ref();
 
-// Syncing correct Tabs
+// Function to synchronize the tabs
 const syncTabs = (value: string) => {
+  // Update tabvalue based on template type
   if (value == 'Test Mission') {
     tabvalue.value = 'Missions';
   } else {
     tabvalue.value = 'Test Cases';
   }
+  // Ensure the tab bar position is synced after the next DOM update
   nextTick(() => templateTabs.value?.syncBarPosition());
 };
 
@@ -248,6 +279,13 @@ interface DataItem {
   block: boolean;
   category: string;
 }
+
+// Define the type for evaluation_types
+type EvaluationTypes = {
+  llm_assessment: boolean;
+  ragas: boolean;
+  deepeval: string[];
+};
 
 // Type for Primitive Data Types
 type PrimitiveTypes = string | number | boolean | null;
@@ -264,17 +302,22 @@ interface TemplateData {
   template_id: string;
   test_pre_request?: [];
   test_post_request?: [];
-  test_request?: string;
+  test_request: any;
   template_data: DataItem[];
   template_input_field: string;
   template_output_field: string;
   template_llm_prompt: string;
   template_type: string; // Added template type
   mission_duration?: number; // Added mission duration, optional
+  evaluation_types: {
+    llm_assessment: boolean;
+    ragas: boolean;
+    deepeval: string[];
+  };
 }
 
 // Emits 'close' event to parent component
-const emit = defineEmits(['close']);
+const emit = defineEmits(['close', 'updateSuccess']);
 
 // Refs for Form, Loading State, UI Elements
 const formRef = ref();
@@ -286,7 +329,7 @@ const showOutputUI = ref(false);
 const message = useMessage();
 
 // Test Response Data
-let test_response: string = '';
+let test_response: any = '';
 
 // Template Type Options for Dropdown
 const templateTypeOptions = [
@@ -300,16 +343,36 @@ const templateTypeOptions = [
   }
 ];
 
+// DeepEval Metrics
+const deepevalMetrics = [
+  'answer_relevancy',
+  'faithfulness',
+  'contextual_precision',
+  'contextual_recall',
+  'contextual_relevancy',
+  'hallucination',
+  'bias',
+  'toxicity'
+];
+
+// Control visibility of DeepEval metric options
+const showDeepEvalOptions = ref(false);
+
 // Template Data Object with Default Values
 const templateData = ref<TemplateData>({
   template_id: '',
   template_data: [],
-  test_request: '',
+  test_request: {},
   template_input_field: '',
   template_output_field: '',
   template_llm_prompt: '',
   template_type: 'Test Run', // Default template type
-  mission_duration: undefined // Mission duration is optional
+  mission_duration: undefined, // Mission duration is optional
+  evaluation_types: {
+    llm_assessment: false,
+    ragas: false,
+    deepeval: [] // Initialize deepeval as an empty array
+  }
 });
 
 // Edit Mode Flag
@@ -398,12 +461,26 @@ const getTemplate = async (templateId: string) => {
     }
     const data = await response.json();
     templateData.value = data;
+
     if (props.templateId) {
       templateData.value.template_id = props.templateId;
     }
     if (!data.template_data) {
       templateData.value.template_data = [];
     }
+
+    // If evaluation_types is not defined in the fetched data, initialize it
+    if (!templateData.value.evaluation_types) {
+      templateData.value.evaluation_types = {
+        llm_assessment: false,
+        ragas: false,
+        deepeval: []
+      };
+    } else {
+      // Ensure deepeval is an array even if it's not defined in the fetched data
+      templateData.value.evaluation_types.deepeval = templateData.value.evaluation_types.deepeval || [];
+    }
+
     editMode.value = true;
     syncTabs(templateData.value.template_type);
   } catch (error) {
@@ -418,12 +495,14 @@ const submitForm = async () => {
   loading.value = true;
 
   try {
+    // Include evaluation_types in dataToSend
     const dataToSend = {
       ...templateData.value,
       template_data: templateData.value.template_data.map((item) => ({
         ...item,
         filter: typeof item.filter === 'string' ? item.filter.split(',') : []
-      }))
+      })),
+      evaluation_types: templateData.value.evaluation_types // Add this line
     };
 
     const response = await fetch(editMode.value ? '/templates/update' : '/templates/add', {
@@ -431,7 +510,7 @@ const submitForm = async () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(dataToSend)
+      body: JSON.stringify(dataToSend) // Send updated data
     });
 
     if (!response.ok) {
@@ -440,8 +519,12 @@ const submitForm = async () => {
 
     const responseData = await response.json();
     console.log('Form submitted successfully:', responseData);
+
+    // Emit the updateSuccess event to notify the parent component
+    emit('updateSuccess');
   } catch (error) {
     console.error('Error submitting form:', error);
+    message.error('Failed to submit form.');
   } finally {
     loading.value = false;
     emit('close');
@@ -452,7 +535,7 @@ const submitForm = async () => {
  * Adds a new empty test case item to the template data.
  */
 const addItem = () => {
-  if (templateData.value.template_type == 'Test Run') {
+  if (templateData.value.template_type === 'Test Run') {
     templateData.value.template_data.push({
       query: 'Enter your query',
       response: '',
@@ -539,6 +622,8 @@ const props = defineProps({
 const removeItem = (index: number) => {
   templateData.value.template_data.splice(index, 1);
 };
+
+const noSpace = (value: string) => !/ /g.test(value);
 
 // Lifecycle Hook: onMounted
 onMounted(() => {
@@ -661,12 +746,51 @@ Comparison result:
       template_input_field: 'INCOMPLETE',
       template_output_field: 'INCOMPLETE',
       template_type: 'Test Run', // Default template type
-      mission_duration: undefined // Mission duration is optional
+      mission_duration: undefined, // Mission duration is optional
+      evaluation_types: {
+        llm_assessment: false,
+        ragas: false,
+        deepeval: []
+      }
     };
   }
 });
 
-const noSpace = (value: string) => !/ /g.test(value);
+// Function to update evaluation types in templateData
+const updateEvaluationType = (type: keyof EvaluationTypes, checked: boolean) => {
+  if (type === 'deepeval') {
+    // For DeepEval, toggle all metrics on/off
+    templateData.value.evaluation_types.deepeval = checked ? [...deepevalMetrics] : [];
+  } else {
+    // For other types, update the specific property
+    templateData.value.evaluation_types[type] = checked;
+  }
+};
+
+// Function to toggle DeepEval options visibility
+const toggleDeepEvalOptions = (checked: boolean) => {
+  showDeepEvalOptions.value = checked;
+};
+
+// Function to update DeepEval metrics in templateData
+const updateDeepEvalMetric = (metric: string, checked: boolean) => {
+  if (checked) {
+    templateData.value.evaluation_types.deepeval.push(metric);
+  } else {
+    const index = templateData.value.evaluation_types.deepeval.indexOf(metric);
+    if (index > -1) {
+      templateData.value.evaluation_types.deepeval.splice(index, 1);
+    }
+  }
+};
+
+// Watch for changes in showDeepEvalOptions
+watch(showDeepEvalOptions, (newValue) => {
+  // If showDeepEvalOptions is false, clear the selected DeepEval metrics
+  if (!newValue) {
+    templateData.value.evaluation_types.deepeval = [];
+  }
+});
 
 // Lifecycle Hook: onUnmounted
 onUnmounted(() => {

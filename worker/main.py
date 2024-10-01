@@ -19,6 +19,7 @@ import os
 import re
 from datetime import datetime
 from uuid import uuid4
+import numpy as np
 
 import requests
 from google.cloud import firestore, logging, storage
@@ -29,6 +30,9 @@ from util.assess import (
     is_mission_done,
     evaluate_mission,
 )
+from util.ragas_eval import evaluate_ragas
+from util.deepeval_eval import evaluate_deepeval, deepeval_metric_factory
+
 
 # Setup logging
 # Instantiates a logging client
@@ -85,7 +89,6 @@ def execute_request(request_data):
     body = process_file_references(body)
 
     start_time = datetime.utcnow()
-    status_code = 0  # Default status code in case of exceptions
 
     try:
         # Send the HTTP request based on the specified method
@@ -123,69 +126,6 @@ def execute_request(request_data):
         return {"status": "Failed", "error": str(e)}, status_code
 
 
-def process_file_references(data):
-    """Replaces file references in the data with the content of the referenced files.
-
-    Args:
-        data: The request data (could be a string, dictionary, or list).
-
-    Returns:
-        The processed data with file references replaced.
-    """
-    if isinstance(data, str):
-        return replace_file_reference_in_string(data)
-    elif isinstance(data, dict):
-        for key, value in data.items():
-            data[key] = process_file_references(value)
-        return data
-    elif isinstance(data, list):
-        return [process_file_references(item) for item in data]
-    else:
-        return data
-
-
-def replace_file_reference_in_string(text):
-    """
-    Replaces file references in a string with the content of the referenced file.
-
-    Args:
-        text (str): The text that may contain file references.
-
-    Returns:
-        str: The text with file references replaced.
-    """
-
-    pattern = r"\[FILE:\s*(.+?)\]"
-    matches = re.findall(pattern, text)
-
-    for match in matches:
-        file_content = read_file_from_gcs(f"{files_prefix}{match}")
-
-        text = text.replace(f"[FILE: {match}]", file_content)
-
-    return text
-
-
-def read_file_from_gcs(file):
-    """Reads the content of a file from Google Cloud Storage.
-
-    Args:
-        gcs_path: The full GCS path to the file (e.g., "gs://my-bucket/my-file.txt").
-
-    Returns:
-        str: The content of the file, or an error message if reading fails.
-    """
-
-    try:
-        blob = files_bucket.blob(file)  # Remove "gs://" prefix
-        return blob.download_as_text()
-    except Exception as e:
-        worker_logger.log_text(
-            f"Error reading file from GCS: {file}, {str(e)}", severity="ERROR"
-        )
-        return f"Error reading file: {file}"
-
-
 def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
     """Executes a test mission, interacting with the LLM iteratively.
 
@@ -204,6 +144,7 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
     conversation_history = []
     request_response_history = []
     test_result = {}
+    status_code = 0  # Initialize status_code here
 
     for turn in range(mission_duration):
         worker_logger.log_text(f"Mission turn: {turn+1}/{mission_duration}")
@@ -221,6 +162,7 @@ def execute_test_mission(run_data, test_case, test_case_ref, tracing_id):
                 test_result = {
                     "status": "Error",
                     "error": f"Invalid LLM action on turn {turn+1}",
+                    "status_code": status_code,  # Add status_code here
                 }
                 break
 
@@ -335,6 +277,8 @@ def execute_test_run(run_data, test_case, tracing_id):
     request_data = test_case.get("request")
     request_data["tracing_id"] = tracing_id
     golden_response = test_case.get("golden_response")
+    test_result = {}  # Initialize an empty dictionary to store the test result
+    status_code = 0  # Initialize status_code here
 
     try:
         # Execute the main request
@@ -349,74 +293,124 @@ def execute_test_run(run_data, test_case, tracing_id):
             }
 
         output_field = run_data.get("template_output_field")
+        input_field = run_data.get("template_input_field")
         template_llm_prompt = run_data.get("template_llm_prompt")
-        actual_filtered_response = filter_json(
-            actual_response, run_data.get("template_output_field")
-        )
+        question = filter_json(request_data, input_field)
+        answer = filter_json(actual_response, output_field)
+        context = ""
 
-        # Compare with golden response if available
-        if golden_response and actual_filtered_response:
-            try:
-                # Assess the actual response against the golden response using an LLM
-                llm_assessment = ask_llm_against_golden(
-                    statement=actual_filtered_response.get(output_field),
-                    golden=golden_response,
-                    prompt=template_llm_prompt,
-                )
+        # --- Evaluation Logic ---
+        evaluation_types = run_data.get("evaluation_types", [])
 
-                # Evaluate LLM assessment results
-                if llm_assessment and "similarity" in llm_assessment:
-                    if llm_assessment.get("similarity") > 0.5:
-                        test_result = {
-                            "status": "Passed",
-                            "response": actual_response,
-                            "assessment": llm_assessment,
-                            "status_code": status_code,
-                        }
-                    else:
-                        test_result = {
-                            "status": "Failed",
-                            "expected": golden_response,
-                            "response": actual_response,
-                            "assessment": llm_assessment,
-                            "status_code": status_code,
-                        }
-                else:
-                    # Handle invalid LLM assessment
-                    test_result = {
-                        "status": "Error",
-                        "response": actual_response,
-                        "error": "LLM assessment returned an invalid response",
-                        "status_code": status_code,
-                    }
-
-            except Exception as e:
-                # Log errors from the LLM assessment
-                worker_logger.log_text(
-                    f"Error in ask_llm_against_golden: {str(e)}",
-                    severity="ERROR",
-                )
-                test_result = {
-                    "status": "Error",
-                    "response": actual_response,
-                    "error": f"Error during LLM assessment: {str(e)}",
-                    "status_code": status_code,
-                }
-        elif actual_filtered_response:
-            # Handle cases where no golden response is provided
+        # If no assessment is done, just return the response
+        if evaluation_types == {
+            "llm_assessment": False,
+            "ragas": False,
+            "deepeval": [],
+        }:
             test_result = {
-                "status": "Passed",
+                "status": "Completed",
                 "response": actual_response,
-                "note": "No golden response available",
                 "status_code": status_code,
             }
         else:
             test_result = {
-                "status": "Failed",
+                "status": "Completed",
                 "response": actual_response,
-                "note": "No response available",
                 "status_code": status_code,
+                "assessment": {},
             }
+
+        # Evaluate with RAGAS
+        if "ragas" in evaluation_types:
+            if evaluation_types["ragas"]:
+                test_result["assessment"]["ragas_evaluation"] = evaluate_ragas(
+                    question.get(input_field),
+                    answer.get(output_field),
+                    golden_response,
+                    context,
+                )
+
+        # Evaluate with DeepEval
+        if "deepeval" in evaluation_types:
+            if isinstance(evaluation_types["deepeval"], list):
+                for metric_type in evaluation_types["deepeval"]:
+                    deepeval_metric = deepeval_metric_factory(metric_type)
+                    test_result["assessment"][f"{metric_type}_deepeval_evaluation"] = (
+                        evaluate_deepeval(
+                            question.get(input_field),
+                            answer.get(output_field),
+                            golden_response,
+                            context,
+                            deepeval_metric,
+                        )
+                    )
+            else:
+                worker_logger.log_text(
+                    f"Error: deepeval needs to be list: {evaluation_types}",
+                    severity="ERROR",
+                )
+
+        # Evaluate with Custom Method (llm_assessment)
+        if "llm_assessment" in evaluation_types:
+            if evaluation_types["llm_assessment"]:
+                if golden_response and answer:
+                    try:
+                        # Assess the actual response against the golden response using an LLM
+                        llm_assessment = ask_llm_against_golden(
+                            statement=answer.get(output_field),
+                            golden=golden_response,
+                            prompt=template_llm_prompt,
+                        )
+
+                        # Evaluate LLM assessment results
+                        if llm_assessment and "similarity" in llm_assessment:
+                            if llm_assessment.get("similarity") > 0.5:
+                                test_result["status"] = "Passed"
+                            else:
+                                test_result["status"] = "Failed"
+
+                            # Include other assessment details regardless of status
+                            test_result["response"] = actual_response
+                            test_result["assessment"]["llm_assessment"] = llm_assessment
+                            test_result["status_code"] = status_code
+
+                        else:
+                            # Handle invalid LLM assessment
+                            test_result = {
+                                "status": "Error",
+                                "response": actual_response,
+                                "error": "LLM assessment returned an invalid response",
+                                "status_code": status_code,
+                            }
+
+                    except Exception as e:
+                        # Log errors from the LLM assessment
+                        worker_logger.log_text(
+                            f"Error in ask_llm_against_golden: {str(e)}",
+                            severity="ERROR",
+                        )
+                        test_result = {
+                            "status": "Error",
+                            "response": actual_response,
+                            "error": f"Error during LLM assessment: {str(e)}",
+                            "status_code": status_code,
+                        }
+                elif answer:
+                    # Handle cases where no golden response is provided
+                    test_result = {
+                        "status": "Passed",
+                        "response": actual_response,
+                        "note": "No golden response available",
+                        "status_code": status_code,
+                    }
+                else:
+                    test_result = {
+                        "status": "Failed",
+                        "response": actual_response,
+                        "note": "No response available",
+                        "status_code": status_code,
+                    }
 
     except Exception as e:
         test_result = {"status": "Failed", "error": str(e), "status_code": status_code}
@@ -491,7 +485,8 @@ def execute_tests_and_store_results(run_id, template_id):
         test_case_ref = db.collection(f"test_cases_{run_id}").document(
             f"test_case_{i+1}"
         )
-        test_case_ref.update({"result": test_result})
+
+        test_case_ref.update({"result": convert_to_firestore_compatible(test_result)})
         test_case_ref.update({"tracing_id": tracing_id})
 
         num_completed += 1
@@ -504,6 +499,32 @@ def execute_tests_and_store_results(run_id, template_id):
     # Update run status to "Completed"
     run_ref.update({"status": "Completed", "end_time": end_time})
     worker_logger.log_text(f"Running tests completed")
+
+
+def convert_to_firestore_compatible(data):
+    """
+    Recursively converts data to be Firestore compatible, handling numpy arrays
+    and ensuring all dictionary keys and list elements are strings.
+
+    Args:
+      data: The data structure to convert.
+
+    Returns:
+      The converted data structure.
+    """
+    if isinstance(data, np.ndarray):
+        return data.tolist()
+    elif isinstance(data, dict):
+        return {
+            str(key): convert_to_firestore_compatible(value)
+            for key, value in data.items()
+        }
+    elif isinstance(data, list):
+        return [convert_to_firestore_compatible(item) for item in data]
+    elif not isinstance(data, str):
+        return str(data)  # Convert non-string values to strings
+    else:
+        return data
 
 
 def filter_json(data, filter_pathx):
@@ -589,6 +610,68 @@ def log_request_and_response(request_data, response, start_time, end_time, error
         request_log["error"] = error
 
     core_logger.log_struct(request_log)
+
+
+def process_file_references(data):
+    """Replaces file references in the data with the content of the referenced files.
+
+    Args:
+        data: The request data (could be a string, dictionary, or list).
+
+    Returns:
+        The processed data with file references replaced.
+    """
+    if isinstance(data, str):
+        return replace_file_reference_in_string(data)
+    elif isinstance(data, dict):
+        for key, value in data.items():
+            data[key] = process_file_references(value)
+        return data
+    elif isinstance(data, list):
+        return [process_file_references(item) for item in data]
+    else:
+        return data
+
+
+def replace_file_reference_in_string(text):
+    """
+    Replaces file references in a string with the content of the referenced file.
+
+    Args:
+        text (str): The text that may contain file references.
+
+    Returns:
+        str: The text with file references replaced.
+    """
+
+    pattern = r"\[FILE:\s*(.+?)\]"
+    matches = re.findall(pattern, text)
+
+    for match in matches:
+        file_content = read_file_from_gcs(f"{files_prefix}{match}")
+
+        text = text.replace(f"[FILE: {match}]", file_content)
+
+    return text
+
+
+def read_file_from_gcs(file):
+    """Reads the content of a file from Google Cloud Storage.
+
+    Args:
+        gcs_path: The full GCS path to the file (e.g., "gs://my-bucket/my-file.txt").
+
+    Returns:
+        str: The content of the file, or an error message if reading fails.
+    """
+    try:
+        blob = files_bucket.blob(file)  # Remove "gs://" prefix
+        return blob.download_as_text()
+    except Exception as e:
+        worker_logger.log_text(
+            f"Error reading file from GCS: {file}, {str(e)}", severity="ERROR"
+        )
+        return f"Error reading file: {file}"
 
 
 if __name__ == "__main__":

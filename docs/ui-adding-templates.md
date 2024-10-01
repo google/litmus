@@ -6,7 +6,7 @@ This document outlines the steps to add a new test template using the Litmus Use
 
 Litmus supports two types of templates:
 
-- **Test Run:** For evaluating individual requests against expected responses, optionally with LLM-based assessment.
+- **Test Run:** For evaluating individual requests against expected responses.
 - **Test Mission:** For evaluating multi-turn conversations guided by an LLM, where the LLM generates requests based on a mission description and previous interactions.
 
 ![Add template via the UI](/img/add-template.png)
@@ -50,9 +50,16 @@ Litmus supports two types of templates:
      - Use the JSON editor to define the structure of your test request.
      - Include placeholders (e.g., `{query}`) for dynamic values from your test cases or missions. For "Test Missions", the {query} placeholder will be dynamically replaced with the LLM's generated requests in each turn.
    - **Pre-Request and Post-Request (optional):** Use the JSON editor to define optional requests to be executed before and after the main test request. These apply to both Test Runs and Test Missions.
+   - **Evaluation Types:**
+     - Navigate to the "LLM Evaluation Prompt" tab.
+     - Select the evaluation methods you want to use:
+       - **Custom LLM Evaluation:** Enable this to use the LLM Evaluation Prompt for assessment.
+       - **Ragas:** Enable this to apply Ragas metrics for evaluation.
+       - **DeepEval:** Enable this and select the specific DeepEval metrics you want to use from the list.
    - **LLM Evaluation Prompt (optional):**
-     - For **Test Runs:** Provide a prompt to guide the LLM in assessing similarity between actual responses and golden responses for individual test cases.
-     - For **Test Missions:** Provide a prompt to guide the LLM in evaluating the overall success of the mission based on the mission description, conversation history, and expected outcome.
+     - Provide a prompt to guide the LLM in assessing responses.
+     - This prompt is used for **Custom LLM Evaluation** and for evaluating **Test Missions** after all turns are complete.
+     - The UI provides a default prompt, which you can modify or replace.
    - **Input and Output Field Selection:**
      ![Input Field](/img/select-input-field.png)
      - Click on the "Input Field" button. The left-hand pane will display a JSON representation of your "Request Payload." Click the node corresponding to the field you wish to use as input to your test cases or missions.
