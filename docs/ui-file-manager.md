@@ -9,7 +9,7 @@ The Litmus File Manager provides a centralized location for managing files that 
 - **Improved Readability:** Test cases and templates become more concise and easier to understand without large text blocks.
 - **Version Control:** Track changes to your files independently, making it easier to identify and revert to previous versions.
 - **Reduced Payload Size:** Smaller JSON payloads lead to faster processing and lower storage costs.
-- ** Reusability:** Easily reuse the same files across multiple test cases and templates.
+- **Reusability:** Easily reuse the same files across multiple test cases and templates.
 
 ## Uploading Files
 

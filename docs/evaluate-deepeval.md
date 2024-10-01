@@ -54,8 +54,6 @@ Once DeepEval is enabled and you've selected the desired metrics, Litmus will au
 }
 ```
 
-```
-
 ## Configuring and Extending DeepEval
 
 The configuration and extension of DeepEval, like Ragas, **require code changes within the worker service.**
@@ -70,4 +68,3 @@ The configuration and extension of DeepEval, like Ragas, **require code changes 
 - Ensure your test cases provide sufficient context for DeepEval to assess faithfulness and other context-dependent metrics accurately.
 - Be aware that DeepEval uses another LLM for evaluation. This introduces another layer of complexity and potential biases.
 - Stay updated with DeepEval's development and consider incorporating new metrics or features as they become available.
-```
