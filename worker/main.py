@@ -302,21 +302,32 @@ def execute_test_run(run_data, test_case, tracing_id):
         # --- Evaluation Logic ---
         evaluation_types = run_data.get("evaluation_types", [])
 
+        # If no assessment is done, just return the response
+        if not evaluation_types:
+            test_result = {
+                "status": "Completed",
+                "response": actual_response,
+                "status_code": status_code,
+            }
+        else:
+            test_result["assessment"] = {}
+
         # Evaluate with RAGAS
         if "ragas" in evaluation_types:
-            test_result["ragas_evaluation"] = evaluate_ragas(
-                question.get(input_field),
-                answer.get(output_field),
-                golden_response,
-                context,
-            )
+            if evaluation_types["ragas"]:
+                test_result["assessment"]["ragas_evaluation"] = evaluate_ragas(
+                    question.get(input_field),
+                    answer.get(output_field),
+                    golden_response,
+                    context,
+                )
 
         # Evaluate with DeepEval
         if "deepeval" in evaluation_types:
             if isinstance(evaluation_types["deepeval"], list):
                 for metric_type in evaluation_types["deepeval"]:
                     deepeval_metric = deepeval_metric_factory(metric_type)
-                    test_result[f"{metric_type}_deepeval_evaluation"] = (
+                    test_result["assessment"][f"{metric_type}_deepeval_evaluation"] = (
                         evaluate_deepeval(
                             question.get(input_field),
                             answer.get(output_field),
@@ -333,71 +344,64 @@ def execute_test_run(run_data, test_case, tracing_id):
 
         # Evaluate with Custom Method (llm_assessment)
         if "llm_assessment" in evaluation_types:
-            if golden_response and answer:
-                try:
-                    # Assess the actual response against the golden response using an LLM
-                    llm_assessment = ask_llm_against_golden(
-                        statement=answer.get(output_field),
-                        golden=golden_response,
-                        prompt=template_llm_prompt,
-                    )
+            if evaluation_types["llm_assessment"]:
+                if golden_response and answer:
+                    try:
+                        # Assess the actual response against the golden response using an LLM
+                        llm_assessment = ask_llm_against_golden(
+                            statement=answer.get(output_field),
+                            golden=golden_response,
+                            prompt=template_llm_prompt,
+                        )
 
-                    # Evaluate LLM assessment results
-                    if llm_assessment and "similarity" in llm_assessment:
-                        if llm_assessment.get("similarity") > 0.5:
-                            test_result["status"] = "Passed"
+                        # Evaluate LLM assessment results
+                        if llm_assessment and "similarity" in llm_assessment:
+                            if llm_assessment.get("similarity") > 0.5:
+                                test_result["status"] = "Passed"
+                            else:
+                                test_result["status"] = "Failed"
+
+                            # Include other assessment details regardless of status
+                            test_result["response"] = actual_response
+                            test_result["assessment"]["llm_assessment"] = llm_assessment
+                            test_result["status_code"] = status_code
+
                         else:
-                            test_result["status"] = "Failed"
+                            # Handle invalid LLM assessment
+                            test_result = {
+                                "status": "Error",
+                                "response": actual_response,
+                                "error": "LLM assessment returned an invalid response",
+                                "status_code": status_code,
+                            }
 
-                        # Include other assessment details regardless of status
-                        test_result["response"] = actual_response
-                        test_result["assessment"] = llm_assessment
-                        test_result["status_code"] = status_code
-
-                    else:
-                        # Handle invalid LLM assessment
+                    except Exception as e:
+                        # Log errors from the LLM assessment
+                        worker_logger.log_text(
+                            f"Error in ask_llm_against_golden: {str(e)}",
+                            severity="ERROR",
+                        )
                         test_result = {
                             "status": "Error",
                             "response": actual_response,
-                            "error": "LLM assessment returned an invalid response",
+                            "error": f"Error during LLM assessment: {str(e)}",
                             "status_code": status_code,
                         }
-
-                except Exception as e:
-                    # Log errors from the LLM assessment
-                    worker_logger.log_text(
-                        f"Error in ask_llm_against_golden: {str(e)}",
-                        severity="ERROR",
-                    )
+                elif answer:
+                    # Handle cases where no golden response is provided
                     test_result = {
-                        "status": "Error",
+                        "status": "Passed",
                         "response": actual_response,
-                        "error": f"Error during LLM assessment: {str(e)}",
+                        "note": "No golden response available",
                         "status_code": status_code,
                     }
-            elif answer:
-                # Handle cases where no golden response is provided
-                test_result = {
-                    "status": "Passed",
-                    "response": actual_response,
-                    "note": "No golden response available",
-                    "status_code": status_code,
-                }
-            else:
-                test_result = {
-                    "status": "Failed",
-                    "response": actual_response,
-                    "note": "No response available",
-                    "status_code": status_code,
-                }
-
-        # If no assessment is done, just return the response
-        if not evaluation_types:
-            test_result = {
-                "status": "Completed",
-                "response": actual_response,
-                "status_code": status_code,
-            }
+                else:
+                    test_result = {
+                        "status": "Failed",
+                        "response": actual_response,
+                        "note": "No response available",
+                        "status_code": status_code,
+                    }
 
     except Exception as e:
         test_result = {"status": "Failed", "error": str(e), "status_code": status_code}
