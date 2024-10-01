@@ -45,8 +45,6 @@ Once Ragas is enabled, Litmus will automatically use it to evaluate LLM response
 }
 ```
 
-```
-
 ## Configuring and Extending Ragas
 
 Currently, Litmus utilizes a predefined set of Ragas metrics, including answer relevancy, context recall, context precision, harmfulness, and answer similarity. **Extending this set or adjusting metric thresholds would require code modifications within the worker service**.
@@ -63,6 +61,3 @@ For instance:
 - Ragas evaluation relies on the availability of context along with the question and answer. Ensure that your test cases and templates provide appropriate context for meaningful Ragas assessments.
 - Consider the limitations and potential biases of the underlying LLM used for both generating responses and performing Ragas evaluations.
 - Regularly review and update your evaluation strategies and metrics as your LLM applications evolve and new Ragas features become available.
-
-
-```
