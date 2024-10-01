@@ -30,7 +30,7 @@ from util.assess import (
     evaluate_mission,
 )
 from util.ragas_eval import evaluate_ragas
-from util.deepeval_eval import evaluate_deepeval
+from util.deepeval_eval import evaluate_deepeval, deepeval_metric_factory
 
 
 # Setup logging
@@ -280,13 +280,6 @@ def execute_test_run(run_data, test_case, tracing_id):
     status_code = 0  # Initialize status_code here
 
     try:
-        print(
-            evaluate_deepeval(
-                "whats 2+2?",
-                "22",
-                "math",
-            )
-        )
         # Execute the main request
         actual_response, status_code = execute_request(request_data)
 
@@ -319,12 +312,24 @@ def execute_test_run(run_data, test_case, tracing_id):
 
         # Evaluate with DeepEval
         if "deepeval" in evaluation_types:
-            test_result["deepeval_evaluation"] = evaluate_deepeval(
-                question.get(input_field),
-                answer.get(output_field),
-                golden_response,
-                context,
-            )
+            for metric_type in [
+                "answer_relevancy",
+                "faithfulness",
+                "contextual_precision",
+                "contextual_recall",
+                "contextual_relevancy",
+                "hallucination",
+                "bias",
+                "toxicity",
+            ]:
+                deepeval_metric = deepeval_metric_factory(metric_type)
+                test_result[f"{metric_type}_evaluation"] = evaluate_deepeval(
+                    question.get(input_field),
+                    answer.get(output_field),
+                    golden_response,
+                    context,
+                    deepeval_metric,
+                )
 
         # Evaluate with Custom Method (llm_assessment)
         if "llm_assessment" in evaluation_types:

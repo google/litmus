@@ -16,7 +16,16 @@
 
 from google.cloud import logging
 from deepeval import evaluate as deepeval
-from deepeval.metrics import AnswerRelevancyMetric
+from deepeval.metrics import (
+    AnswerRelevancyMetric,
+    FaithfulnessMetric,
+    ContextualPrecisionMetric,
+    ContextualRecallMetric,
+    ContextualRelevancyMetric,
+    HallucinationMetric,
+    BiasMetric,
+    ToxicityMetric,
+)
 from deepeval.models.base_model import DeepEvalBaseLLM
 from deepeval.test_case import LLMTestCase
 from langchain_google_vertexai import ChatVertexAI
@@ -67,12 +76,38 @@ gemini_pro = ChatVertexAI(
     response_validation=False,  # Important since deepeval cannot handle validation errors
 )
 deepeval_llm = GoogleVertexAIDeepEval(model=gemini_pro)
-deepeval_metric = AnswerRelevancyMetric(
-    threshold=0.5, model=deepeval_llm, async_mode=False
-)
 
 
-def evaluate_deepeval(question, answer, context):
+def deepeval_metric_factory(metric_type: str):
+    """Factory function to create DeepEval metrics based on metric_type."""
+    metrics = {
+        "answer_relevancy": AnswerRelevancyMetric(
+            threshold=0.5, model=deepeval_llm, async_mode=False
+        ),
+        "faithfulness": FaithfulnessMetric(
+            threshold=0.5, model=deepeval_llm, async_mode=False
+        ),
+        "contextual_precision": ContextualPrecisionMetric(
+            threshold=0.5, model=deepeval_llm, async_mode=False
+        ),
+        "contextual_recall": ContextualRecallMetric(
+            threshold=0.5, model=deepeval_llm, async_mode=False
+        ),
+        "contextual_relevancy": ContextualRelevancyMetric(
+            threshold=0.5, model=deepeval_llm, async_mode=False
+        ),
+        "hallucination": HallucinationMetric(
+            threshold=0.5, model=deepeval_llm, async_mode=False
+        ),
+        "bias": BiasMetric(threshold=0.5, model=deepeval_llm, async_mode=False),
+        "toxicity": ToxicityMetric(threshold=0.5, model=deepeval_llm, async_mode=False),
+    }
+    if metric_type not in metrics:
+        raise ValueError(f"Invalid metric type: {metric_type}")
+    return metrics[metric_type]
+
+
+def evaluate_deepeval(question, answer, golden_response, context, deepeval_metric):
     """Evaluates the LLM response using DeepEval.
 
     Args:
@@ -89,6 +124,7 @@ def evaluate_deepeval(question, answer, context):
         deepeval_test_case = LLMTestCase(
             input=question,
             actual_output=answer,
+            expected_output=golden_response,  # Include golden response for reference metrics
             retrieval_context=[
                 context
             ],  # You might need to provide context here based on your setup
@@ -97,7 +133,7 @@ def evaluate_deepeval(question, answer, context):
         # Evaluate with DeepEval and store results
         deepeval_metric.measure(deepeval_test_case)
         return {
-            "metric": "AnswerRelevancy",
+            "metric": deepeval_metric.__class__.__name__,  # Get class name as metric name
             "score": deepeval_metric.score,
             "reason": deepeval_metric.reason,
         }
