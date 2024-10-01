@@ -26,7 +26,7 @@ import (
 )
 
 // DestroyResources removes all resources created by the Litmus application.
-func DestroyResources(projectID, region string, quiet bool) {
+func DestroyResources(projectID, region string, preserveData, quiet bool) {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond)
 	if !quiet {
 		if !utils.ConfirmPrompt(fmt.Sprintf("\nThis will delete all Litmus resources in the project '%s'. Are you sure you want to continue?", projectID)) {
@@ -59,8 +59,21 @@ func DestroyResources(projectID, region string, quiet bool) {
 				"--project", projectID,
 				"--quiet",
 			)
-		} else if resourceType == "bucket" { // Add bucket deletion
+		} else if resourceType == "bucket" {
 			cmd = exec.Command("gcloud", "storage", "rm", "-r", fmt.Sprintf("gs://%s", resourceName))
+		} else if resourceType == "firestore" {
+			cmd = exec.Command("gcloud", "firestore", "databases", "delete",
+				"--project", projectID,
+				"--database", resourceName,
+				"--quiet",
+			)
+		} else if resourceType == "bqDataset" { // Added BigQuery dataset deletion
+			cmd = exec.Command(
+				"bq", "rm",
+				"--project_id", projectID,
+				"--dataset", "--force", // Force delete the dataset
+				fmt.Sprintf("%s:%s", projectID, resourceName),
+			)
 		} else {
 			log.Fatalf("Invalid resource type: %s", resourceType)
 		}
@@ -87,7 +100,7 @@ func DestroyResources(projectID, region string, quiet bool) {
 	deleteResource("job", "litmus-worker")
 
 	// --- Delete Secrets from Secret Manager ---
-	secretsToDelete := []string{"litmus-password", "litmus-service-url", "litmus-files-bucket"} // Add files bucket secret
+	secretsToDelete := []string{"litmus-password", "litmus-service-url"}
 	for _, secretID := range secretsToDelete {
 		deleteResource("secret", secretID)
 	}
@@ -101,18 +114,32 @@ func DestroyResources(projectID, region string, quiet bool) {
 		deleteResource("serviceAccount", sa)
 	}
 
-	// --- Delete Files Bucket ---
-	bucketName := fmt.Sprintf("%s-litmus-files", projectID)
-	deleteResource("bucket", bucketName)
-
-	if !quiet {
-		s.Suffix = " Removing analytics... "
-		s.Start()
-		defer s.Stop()
+	// --- Conditionally Delete Files Bucket ---
+	if !preserveData {
+		bucketName := fmt.Sprintf("%s-litmus-files", projectID)
+		deleteResource("bucket", bucketName)
 	}
+
+	// --- Conditionally Delete Firestore Database ---
+	if !preserveData {
+		deleteResource("firestore", "(default)")
+	}
+
+	// --- Conditionally Delete BigQuery Dataset ---
+	if !preserveData {
+		deleteResource("bqDataset", "litmus_analytics")
+	}
+
 	// Destroy Analytics
-	if err := analytics.DestroyAnalytics(projectID, region, true); err != nil {
-		utils.HandleGcloudError(err)
+	if !preserveData {
+		if !quiet {
+			s.Suffix = " Removing analytics... "
+			s.Start()
+			defer s.Stop()
+		}
+		if err := analytics.DestroyAnalytics(projectID, region, true); err != nil {
+			utils.HandleGcloudError(err)
+		}
 	}
 
 	if !quiet {

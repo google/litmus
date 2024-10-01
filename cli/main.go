@@ -43,6 +43,7 @@ func main() {
 	region := "us-central1" // Default region
 	var runID string
 	quiet := false           // Check for --quiet flag
+	preserveData := false // Flag to preserve data
 
 	// Parse command-line arguments
 	args := os.Args[2:] // Skip program name and command
@@ -66,6 +67,8 @@ func main() {
 			}
 		case "--quiet":
 			quiet = true
+		case "--preserve-data":
+			preserveData = true
 		case "open": // Assuming "open" might also need a runID
 			if i+1 < len(args) && !strings.HasPrefix(args[i+1], "-") {
 				runID = args[i+1]
@@ -104,7 +107,7 @@ func main() {
 		}
 		cmd.DeployApplication(projectID, region, envVars, env, quiet)
 	case "destroy":
-		cmd.DestroyResources(projectID, region, quiet)
+		cmd.DestroyResources(projectID, region, preserveData, quiet)
 	case "update":
 		env := "prod"
 		if len(args) > 0 && !strings.HasPrefix(args[0], "-") { // Check if a service name is provided
