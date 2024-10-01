@@ -150,12 +150,19 @@ limitations under the License.
           </n-tab-pane>
 
           <n-tab-pane name="LLM Evaluation Prompt" tab="LLM Evaluation Prompt">
-            <!-- Evaluation Types Checkboxes -->
             <div v-if="templateData.template_type === 'Test Run'">
               <h3>Evaluation Types</h3>
-              <n-checkbox @update:checked="updateEvaluationType('llm_assessment', $event)">Custom LLM Evaluation</n-checkbox>
-              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)">RAGAS</n-checkbox>
-              <n-checkbox @update:checked="toggleDeepEvalOptions($event)">DeepEval</n-checkbox>
+              <!-- Evaluation Types Checkboxes -->
+              <n-checkbox
+                @update:checked="updateEvaluationType('llm_assessment', $event)"
+                :checked="templateData.evaluation_types.llm_assessment"
+              >
+                Custom LLM Evaluation
+              </n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)" :checked="templateData.evaluation_types.ragas">
+                RAGAS
+              </n-checkbox>
+              <n-checkbox @update:checked="toggleDeepEvalOptions($event)" :checked="showDeepEvalOptions"> DeepEval </n-checkbox>
 
               <div v-if="showDeepEvalOptions">
                 <h4>DeepEval Metrics</h4>
@@ -488,12 +495,14 @@ const submitForm = async () => {
   loading.value = true;
 
   try {
+    // Include evaluation_types in dataToSend
     const dataToSend = {
       ...templateData.value,
       template_data: templateData.value.template_data.map((item) => ({
         ...item,
         filter: typeof item.filter === 'string' ? item.filter.split(',') : []
-      }))
+      })),
+      evaluation_types: templateData.value.evaluation_types // Add this line
     };
 
     const response = await fetch(editMode.value ? '/templates/update' : '/templates/add', {
@@ -501,7 +510,7 @@ const submitForm = async () => {
       headers: {
         'Content-Type': 'application/json'
       },
-      body: JSON.stringify(dataToSend)
+      body: JSON.stringify(dataToSend) // Send updated data
     });
 
     if (!response.ok) {
