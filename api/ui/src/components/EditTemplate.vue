@@ -149,9 +149,29 @@ limitations under the License.
             <json-editor-vue v-model="templateData.test_post_request" mode="text"></json-editor-vue>
           </n-tab-pane>
 
-          <!-- LLM Evaluation Prompt (Optional) Tab -->
           <n-tab-pane name="LLM Evaluation Prompt" tab="LLM Evaluation Prompt">
+            <!-- Evaluation Types Checkboxes -->
+            <div v-if="templateData.template_type === 'Test Run'">
+              <h3>Evaluation Types</h3>
+              <n-checkbox @update:checked="updateEvaluationType('llm_assessment', $event)">Custom LLM Evaluation</n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)">RAGAS</n-checkbox>
+              <n-checkbox @update:checked="toggleDeepEvalOptions($event)">DeepEval</n-checkbox>
+
+              <div v-if="showDeepEvalOptions">
+                <h4>DeepEval Metrics</h4>
+                <n-checkbox
+                  v-for="metric in deepevalMetrics"
+                  :key="metric"
+                  :checked="templateData.evaluation_types.deepeval.includes(metric)"
+                  @update:checked="updateDeepEvalMetric(metric, $event)"
+                >
+                  {{ metric }}
+                </n-checkbox>
+              </div>
+            </div>
+            <n-divider></n-divider>
             <!-- Textarea for LLM Evaluation Prompt -->
+            <h3>Custom LLM Evalutation Prompt</h3>
             <n-input
               v-model:value="templateData.template_llm_prompt"
               type="textarea"
@@ -159,26 +179,6 @@ limitations under the License.
                 minRows: 3
               }"
             />
-
-            <!-- Evaluation Types Checkboxes -->
-            <div v-if="templateData.template_type === 'Test Run'">
-              <h3>Evaluation Types</h3>
-              <n-checkbox v-model:checked="templateData.evaluation_types.llm_assessment">LLM Assessment</n-checkbox>
-              <n-checkbox v-model:checked="templateData.evaluation_types.ragas">RAGAS</n-checkbox>
-              <n-checkbox v-model:checked="showDeepEvalOptions">DeepEval</n-checkbox>
-
-              <!-- DeepEval Metric Options -->
-              <div v-if="showDeepEvalOptions">
-                <h4>DeepEval Metrics</h4>
-                <n-checkbox
-                  v-for="metric in deepevalMetrics"
-                  :key="metric"
-                  v-model:checked="templateData.evaluation_types.deepeval.includes(metric)"
-                >
-                  {{ metric }}
-                </n-checkbox>
-              </div>
-            </div>
           </n-tab-pane>
         </n-tabs>
       </n-card>
@@ -247,9 +247,6 @@ import JsonEditorVue from 'json-editor-vue';
 import { JsonTreeView } from 'json-tree-view-vue3';
 import 'json-tree-view-vue3/dist/style.css';
 
-// Get access to the router
-const router = useRouter();
-
 // Define a ref for the templateTabs component
 const templateTabs = ref<TabsInst | null>(null);
 const tabvalue = ref();
@@ -275,6 +272,13 @@ interface DataItem {
   block: boolean;
   category: string;
 }
+
+// Define the type for evaluation_types
+type EvaluationTypes = {
+  llm_assessment: boolean;
+  ragas: boolean;
+  deepeval: string[];
+};
 
 // Type for Primitive Data Types
 type PrimitiveTypes = string | number | boolean | null;
@@ -742,6 +746,34 @@ Comparison result:
     };
   }
 });
+
+// Function to update evaluation types in templateData
+const updateEvaluationType = (type: keyof EvaluationTypes, checked: boolean) => {
+  if (type === 'deepeval') {
+    // For DeepEval, toggle all metrics on/off
+    templateData.value.evaluation_types.deepeval = checked ? [...deepevalMetrics] : [];
+  } else {
+    // For other types, update the specific property
+    templateData.value.evaluation_types[type] = checked;
+  }
+};
+
+// Function to toggle DeepEval options visibility
+const toggleDeepEvalOptions = (checked: boolean) => {
+  showDeepEvalOptions.value = checked;
+};
+
+// Function to update DeepEval metrics in templateData
+const updateDeepEvalMetric = (metric: string, checked: boolean) => {
+  if (checked) {
+    templateData.value.evaluation_types.deepeval.push(metric);
+  } else {
+    const index = templateData.value.evaluation_types.deepeval.indexOf(metric);
+    if (index > -1) {
+      templateData.value.evaluation_types.deepeval.splice(index, 1);
+    }
+  }
+};
 
 // Watch for changes in showDeepEvalOptions
 watch(showDeepEvalOptions, (newValue) => {

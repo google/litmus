@@ -62,18 +62,17 @@ limitations under the License.
 
             <!-- Evaluation Types Tab -->
             <n-tab-pane name="Evaluation Types" tab="Evaluation Types">
-              <!-- Checkboxes for Evaluation Types -->
-              <n-checkbox v-model:checked="formData.evaluation_types.llm_assessment">LLM Assessment</n-checkbox>
-              <n-checkbox v-model:checked="formData.evaluation_types.ragas">RAGAS</n-checkbox>
-              <n-checkbox v-model:checked="showDeepEvalOptions">DeepEval</n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('llm_assessment', $event)">LLM Assessment</n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)">RAGAS</n-checkbox>
+              <n-checkbox @update:checked="toggleDeepEvalOptions($event)">DeepEval</n-checkbox>
 
-              <!-- DeepEval Metric Options (visible when DeepEval checkbox is checked) -->
               <div v-if="showDeepEvalOptions">
                 <h4>DeepEval Metrics</h4>
                 <n-checkbox
                   v-for="metric in deepevalMetrics"
                   :key="metric"
-                  v-model:checked="formData.evaluation_types.deepeval.includes(metric)"
+                  :checked="formData.evaluation_types.deepeval.includes(metric)"
+                  @update:checked="updateDeepEvalMetric(metric, $event)"
                 >
                   {{ metric }}
                 </n-checkbox>
@@ -166,18 +165,25 @@ const message = useMessage();
 // Reference to the form element
 const formRef = ref();
 
+// Define the type for evaluation_types
+type EvaluationTypes = {
+  llm_assessment: boolean;
+  ragas: boolean;
+  deepeval: string[];
+};
+
 // Reactive variable for storing form data
 const formData = ref({
-  template_id: '', // Selected template ID
-  run_id: '', // User-defined run ID
-  test_request: {}, // Test request payload
-  pre_request: {}, // Pre-request payload (optional)
-  post_request: {}, // Post-request payload (optional)
+  template_id: '',
+  run_id: '',
+  test_request: {},
+  pre_request: {},
+  post_request: {},
   evaluation_types: {
-    llm_assessment: false, // Whether to use LLM assessment
-    ragas: false, // Whether to use RAGAS evaluation
-    deepeval: [] // Array to store selected DeepEval metrics
-  }
+    llm_assessment: false,
+    ragas: false,
+    deepeval: [] as string[]
+  } as EvaluationTypes // Apply the EvaluationTypes type here
 });
 
 // DeepEval Metrics
@@ -294,6 +300,40 @@ const submitForm = async () => {
       }
     }
   });
+};
+
+// Function to update evaluation types in formData
+const updateEvaluationType = (type: keyof EvaluationTypes, checked: boolean) => {
+  if (type === 'deepeval') {
+    // Handle deepeval (string array) case
+    if (checked) {
+      // If checked, add all deepevalMetrics to the array
+      formData.value.evaluation_types.deepeval = [...deepevalMetrics];
+    } else {
+      // If unchecked, clear the deepeval array
+      formData.value.evaluation_types.deepeval = [];
+    }
+  } else {
+    // Handle llm_assessment and ragas (boolean) cases
+    formData.value.evaluation_types[type] = checked;
+  }
+};
+
+// Function to toggle DeepEval options visibility
+const toggleDeepEvalOptions = (checked: boolean) => {
+  showDeepEvalOptions.value = checked;
+};
+
+// Function to update DeepEval metrics in formData
+const updateDeepEvalMetric = (metric: string, checked: boolean) => {
+  if (checked) {
+    formData.value.evaluation_types.deepeval.push(metric);
+  } else {
+    const index = formData.value.evaluation_types.deepeval.indexOf(metric);
+    if (index > -1) {
+      formData.value.evaluation_types.deepeval.splice(index, 1);
+    }
+  }
 };
 
 const noSpace = (value: string) => !/ /g.test(value);
