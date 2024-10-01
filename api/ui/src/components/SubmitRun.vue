@@ -62,16 +62,24 @@ limitations under the License.
 
             <!-- Evaluation Types Tab -->
             <n-tab-pane name="Evaluation Types" tab="Evaluation Types">
-              <n-checkbox @update:checked="updateEvaluationType('llm_assessment', $event)">LLM Assessment</n-checkbox>
-              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)">RAGAS</n-checkbox>
-              <n-checkbox @update:checked="toggleDeepEvalOptions($event)">DeepEval</n-checkbox>
+              <!-- Evaluation Types Checkboxes -->
+              <n-checkbox
+                @update:checked="updateEvaluationType('llm_assessment', $event)"
+                :checked="templateData.evaluation_types.llm_assessment"
+              >
+                Custom LLM Evaluation
+              </n-checkbox>
+              <n-checkbox @update:checked="updateEvaluationType('ragas', $event)" :checked="templateData.evaluation_types.ragas">
+                RAGAS
+              </n-checkbox>
+              <n-checkbox @update:checked="toggleDeepEvalOptions($event)" :checked="showDeepEvalOptions"> DeepEval </n-checkbox>
 
               <div v-if="showDeepEvalOptions">
                 <h4>DeepEval Metrics</h4>
                 <n-checkbox
                   v-for="metric in deepevalMetrics"
                   :key="metric"
-                  :checked="formData.evaluation_types.deepeval.includes(metric)"
+                  :checked="templateData.evaluation_types.deepeval.includes(metric)"
                   @update:checked="updateDeepEvalMetric(metric, $event)"
                 >
                   {{ metric }}

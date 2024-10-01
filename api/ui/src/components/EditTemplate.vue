@@ -574,7 +574,7 @@ const testRequest = async () => {
 
       if (response.ok) {
         const resptemp = await response.json();
-        test_response = resptemp;
+        test_response = JSON.stringify(resptemp);
         showOutputUI.value = true;
       } else {
         message.error('Error: ' + response.status + ' ' + response.statusText);
@@ -633,14 +633,14 @@ onMounted(() => {
     templateData.value = {
       template_id: '',
       template_data: [],
-      test_request: {
+      test_request: JSON.stringify({
         body: { query: '{query}' },
         headers: {
           'Content-Type': 'application/json'
         },
         method: 'POST',
         url: 'https://example.com/request' // Placeholder URL
-      },
+      }),
       template_llm_prompt: `You are a thorough quality inspector. Your task is to compare a statement about some topic to a golden response. The statement and the response can have different formats. You should inspect the statement and the response to find out:
 - has the question been answered at all?
 - does the statement contradict the response?

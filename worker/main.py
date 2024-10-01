@@ -19,6 +19,7 @@ import os
 import re
 from datetime import datetime
 from uuid import uuid4
+import numpy as np
 
 import requests
 from google.cloud import firestore, logging, storage
@@ -315,12 +316,14 @@ def execute_test_run(run_data, test_case, tracing_id):
             if isinstance(evaluation_types["deepeval"], list):
                 for metric_type in evaluation_types["deepeval"]:
                     deepeval_metric = deepeval_metric_factory(metric_type)
-                    test_result[f"{metric_type}_evaluation"] = evaluate_deepeval(
-                        question.get(input_field),
-                        answer.get(output_field),
-                        golden_response,
-                        context,
-                        deepeval_metric,
+                    test_result[f"{metric_type}_deepeval_evaluation"] = (
+                        evaluate_deepeval(
+                            question.get(input_field),
+                            answer.get(output_field),
+                            golden_response,
+                            context,
+                            deepeval_metric,
+                        )
                     )
             else:
                 worker_logger.log_text(
@@ -469,7 +472,8 @@ def execute_tests_and_store_results(run_id, template_id):
         test_case_ref = db.collection(f"test_cases_{run_id}").document(
             f"test_case_{i+1}"
         )
-        test_case_ref.update({"result": test_result})
+
+        test_case_ref.update({"result": convert_to_firestore_compatible(test_result)})
         test_case_ref.update({"tracing_id": tracing_id})
 
         num_completed += 1
@@ -482,6 +486,32 @@ def execute_tests_and_store_results(run_id, template_id):
     # Update run status to "Completed"
     run_ref.update({"status": "Completed", "end_time": end_time})
     worker_logger.log_text(f"Running tests completed")
+
+
+def convert_to_firestore_compatible(data):
+    """
+    Recursively converts data to be Firestore compatible, handling numpy arrays
+    and ensuring all dictionary keys and list elements are strings.
+
+    Args:
+      data: The data structure to convert.
+
+    Returns:
+      The converted data structure.
+    """
+    if isinstance(data, np.ndarray):
+        return data.tolist()
+    elif isinstance(data, dict):
+        return {
+            str(key): convert_to_firestore_compatible(value)
+            for key, value in data.items()
+        }
+    elif isinstance(data, list):
+        return [convert_to_firestore_compatible(item) for item in data]
+    elif not isinstance(data, str):
+        return str(data)  # Convert non-string values to strings
+    else:
+        return data
 
 
 def filter_json(data, filter_pathx):
