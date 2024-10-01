@@ -312,23 +312,20 @@ def execute_test_run(run_data, test_case, tracing_id):
 
         # Evaluate with DeepEval
         if "deepeval" in evaluation_types:
-            for metric_type in [
-                "answer_relevancy",
-                "faithfulness",
-                "contextual_precision",
-                "contextual_recall",
-                "contextual_relevancy",
-                "hallucination",
-                "bias",
-                "toxicity",
-            ]:
-                deepeval_metric = deepeval_metric_factory(metric_type)
-                test_result[f"{metric_type}_evaluation"] = evaluate_deepeval(
-                    question.get(input_field),
-                    answer.get(output_field),
-                    golden_response,
-                    context,
-                    deepeval_metric,
+            if isinstance(evaluation_types["deepeval"], list):
+                for metric_type in evaluation_types["deepeval"]:
+                    deepeval_metric = deepeval_metric_factory(metric_type)
+                    test_result[f"{metric_type}_evaluation"] = evaluate_deepeval(
+                        question.get(input_field),
+                        answer.get(output_field),
+                        golden_response,
+                        context,
+                        deepeval_metric,
+                    )
+            else:
+                worker_logger.log_text(
+                    f"Error: deepeval needs to be list: {evaluation_types}",
+                    severity="ERROR",
                 )
 
         # Evaluate with Custom Method (llm_assessment)
