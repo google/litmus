@@ -29,6 +29,7 @@
 """This module defines the API routes for file management."""
 
 from flask import Blueprint, jsonify, request, send_file
+from werkzeug.utils import secure_filename
 from google.cloud import storage
 import os
 from api.auth import auth
@@ -74,7 +75,8 @@ def download_file(filename):
         return jsonify({"error": f"File '{filename}' not found"}), 404
 
     # Create a temporary file to store the downloaded content
-    temp_filename = f"/tmp/{filename}"
+    safe_filename = secure_filename(filename)
+    temp_filename = os.path.join("/tmp", safe_filename)
     blob.download_to_filename(temp_filename)
 
     # Send the downloaded file to the client
