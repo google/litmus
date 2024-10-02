@@ -1,6 +1,6 @@
 # Evaluating LLMs with Ragas
 
-This document provides a comprehensive guide to enabling, using, configuring, and extending Ragas (Retrieval Augmented Generation for Answer Synthesis) within the Litmus framework for evaluating LLM responses.
+This document provides a comprehensive guide to enabling, using, configuring, and extending Ragas (RAG Assessment) within the Litmus framework for evaluating LLM responses.
 
 ## What is Ragas?
 

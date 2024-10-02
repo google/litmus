@@ -14,11 +14,12 @@ A command-line interface for deploying and managing Litmus, a tool for quickly b
 Make sure you have the Google Cloud SDK installed and configured with the correct project.
 
 Install binary:
+
 - **Linux**:
-```curl https://storage.googleapis.com/litmus-cloud/install/linux.sh | sudo sh```
+  `curl https://storage.googleapis.com/litmus-cloud/install/linux.sh | sudo sh`
 - sha256: [https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/linux/litmus.sha256)
 - **OSX**:
-```curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sudo sh```
+  `curl https://storage.googleapis.com/litmus-cloud/install/osx.sh | sudo sh`
 - sha256: [https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256](https://storage.googleapis.com/litmus-cloud/prod/osx/litmus.sha256)
 
 ## Installation (Manual Build)
@@ -50,58 +51,70 @@ Install binary:
 ## Usage
 
 ```
-Usage: go run main.go <command> [options] [flags] 
+Usage: go run main.go <command> [options] [flags]
 
 Commands:
-  open: Open the Web application in your browser
-  deploy: Deploy the application
-  destroy: Remove the application
-  status: Show the status of the Litmus deployment
-  version: Display the version of the Litmus CLI
-  execute <payload>: Execute a payload to the deployed endpoint
-  ls: List all runs
-  run <runID>: Open the URL for a certain runID 
+
+  open        Open the Litmus dashboard
+  deploy      Deploy the application
+  destroy     Destroy Litmus resources
+  status      Show the status of the Litmus deployment
+  version     Display the version of the Litmus CLI
+  execute     Execute a payload against the Litmus application
+  ls          List all runs
+  run         Open a specific Litmus run
+  analytics   Manage Litmus analytics (deploy or destroy)
+  proxy       Manage Litmus proxy (deploy, list, destroy, destroy-all)
 
 Options:
   --project <project-id>: Specify the project ID (overrides default)
   --region <region>: Specify the region (defaults to 'us-central1')
+  --quiet                Suppress verbose output
+  --preserve-data        Preserve data in Cloud Storage, Firestore, and BigQuery
 ```
 
 ### Examples
 
 - **Deploy Litmus:**
+
   ```bash
   go run main.go deploy
   ```
 
 - **Deploy to a specific project and region:**
+
   ```bash
   go run main.go deploy --project my-project-id --region us-east1
   ```
 
 - **Destroy the Litmus deployment:**
+
   ```bash
-  go run main.go destroy 
+  go run main.go destroy
   ```
 
 - **Get deployment status:**
+
   ```bash
-  go run main.go status 
+  go run main.go status
   ```
 
 - **Display CLI version:**
+
   ```bash
   go run main.go version
   ```
 
 - **Execute a payload:**
+
   ```bash
   go run main.go execute "Hello, world!"
   ```
 
 - **List all runs:**
+
   ```bash
-  go run main.go ls 
+  go run main.go ls
   ```
 
 - **Open a specific run:**

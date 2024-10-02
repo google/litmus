@@ -188,7 +188,7 @@ jobs:
           wget https://storage.googleapis.com/litmus-cloud/dev/linux/litmus
           chmod 755 ./litmus
           ./litmus deploy dev --project litmusai-dev --quiet
-          ./litmus destroy dev --project litmusai-dev --quiet
+          ./litmus destroy dev --project litmusai-dev --quiet --preserve-data
           ./litmus deploy dev --project litmusai-dev --quiet
           ./litmus update dev --project litmusai-dev --quiet
           ./litmus proxy destroy-all --project litmusai-dev --quiet
