@@ -12,7 +12,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-FROM python:latest
+FROM python:3.12
 
 # Allow statements and log messages to immediately appear in the logs
 ENV PYTHONUNBUFFERED True
