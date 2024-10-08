@@ -315,6 +315,7 @@ func createLogSink(a Analytics, quiet bool, name string, filter string) error {
 		"gcloud", "projects", "add-iam-policy-binding", a.ProjectID,
 		"--member", fmt.Sprintf("serviceAccount:%s", serviceAccountEmail),
 		"--role", "roles/bigquery.dataEditor",
+		"--condition=None",
 	)
 
 	if err := grantBigQueryDataEditorRole.Run(); err != nil {
