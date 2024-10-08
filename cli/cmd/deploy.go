@@ -364,6 +364,7 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 				"gcloud", "projects", "add-iam-policy-binding", projectID,
 				"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
 				"--role", role,
+				"--condition=None",
 			)
 			output, err := cmd.CombinedOutput()
 			if err != nil {
