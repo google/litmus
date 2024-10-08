@@ -5,8 +5,8 @@ google-cloud-storage
 google-cloud-firestore
 google-cloud-run
 google-cloud-logging
+google-cloud-bigquery
 requests
 uuid
 gunicorn
-bigquery
 werkzeug
