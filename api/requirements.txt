@@ -9,5 +9,4 @@ requests
 uuid
 gunicorn
 bigquery
-numpy
 werkzeug
