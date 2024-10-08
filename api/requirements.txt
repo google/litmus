@@ -10,3 +10,4 @@ uuid
 gunicorn
 bigquery
 numpy
+werkzeug
