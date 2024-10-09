@@ -126,10 +126,34 @@ limitations under the License.
 
           <!-- Request Payload Tab -->
           <n-tab-pane name="Request Payload" tab="Request Payload">
-            <!-- Test Request Button -->
+            <!-- Test Request and Import Buttons -->
             <n-space justify="end" size="large">
               <v-btn variant="flat" color="secondary" class="mt-2" @click="testRequest"> Test Request </v-btn>
+              <v-btn variant="flat" color="secondary" class="mt-2" @click="openImportModal"> Import </v-btn>
             </n-space>
+
+            <!-- Import Modal -->
+            <n-modal v-model:show="showImportModal">
+              <n-card style="width: 600px" title="Import Curl Command" :bordered="false" size="huge" role="dialog" aria-modal="true">
+                <n-input
+                  v-model:value="curlCommandInput"
+                  type="textarea"
+                  placeholder="Paste your curl command here"
+                  :autosize="{
+                    minRows: 5,
+                    maxRows: 10
+                  }"
+                />
+                <n-divider></n-divider>
+                <div class="modal-footer">
+                  <n-space>
+                    <v-btn variant="flat" color="primary" class="mt-2" @click="handleImport">Import</v-btn>
+                    <v-btn @click="showImportModal = false" class="mt-2">Cancel</v-btn>
+                  </n-space>
+                </div>
+              </n-card>
+            </n-modal>
+
             <n-divider />
             <!-- JSON Editor for Request Payload -->
             <json-editor-vue v-model="templateData.test_request" mode="text"></json-editor-vue>
@@ -245,7 +269,8 @@ import {
   useMessage,
   NSelect,
   NInputNumber,
-  NCheckbox
+  NCheckbox,
+  NModal
 } from 'naive-ui';
 import type { TabsInst } from 'naive-ui';
 import type { UploadFileInfo } from 'naive-ui';
@@ -393,6 +418,36 @@ const rules = {
     trigger: ['blur', 'input']
   }
   // ... add validation rules for other fields
+};
+
+// Ref for the modal visibility
+const showImportModal = ref(false);
+
+// Ref for the curl command input
+const curlCommandInput = ref('');
+
+/**
+ * Opens the import modal.
+ */
+const openImportModal = () => {
+  showImportModal.value = true;
+};
+
+/**
+ * Handles the import of a curl command.
+ */
+const handleImport = () => {
+  try {
+    const json = curlToJson(curlCommandInput.value); // Call curlToJson function
+    templateData.value.test_request = JSON.stringify(json, null, 2); // Format as JSON string
+    message.success('Curl command imported successfully!');
+  } catch (error) {
+    console.error('Error importing curl command:', error);
+    message.error('Invalid curl command.');
+  } finally {
+    showImportModal.value = false; // Close the modal
+    curlCommandInput.value = ''; // Reset the input
+  }
 };
 
 /**
@@ -562,6 +617,11 @@ const addItem = () => {
 const testRequest = async () => {
   const reqString = templateData.value.test_request;
 
+  // Type guard function to check if an object is an Error
+  function isError(error: unknown): error is Error {
+    return typeof error === 'object' && error !== null && 'message' in error;
+  }
+
   if (typeof reqString === 'string') {
     try {
       const req = JSON.parse(reqString);
@@ -577,11 +637,31 @@ const testRequest = async () => {
         test_response = JSON.stringify(resptemp);
         showOutputUI.value = true;
       } else {
-        message.error('Error: ' + response.status + ' ' + response.statusText);
+        // Handle non-OK responses with more detail
+        let errorMessage = `Error: ${response.status} ${response.statusText}`;
+
+        try {
+          // Attempt to parse the error response as JSON for more context
+          const errorJson = await response.json();
+          if (errorJson && errorJson.message) {
+            errorMessage += ` - ${errorJson.message}`;
+          } else if (errorJson) {
+            errorMessage += ` - ${JSON.stringify(errorJson)}`;
+          }
+        } catch (error) {
+          // If parsing the error response fails, just use the status/statusText
+        }
+
+        message.error(errorMessage);
       }
     } catch (parseError) {
+      // Handle JSON parsing errors with the specific error message (using the type guard)
       console.error('Error parsing JSON:', parseError);
-      message.error('Invalid JSON format in Request Payload');
+      if (isError(parseError)) {
+        message.error(`Invalid JSON format in Request Payload: ${parseError.message}`);
+      } else {
+        message.error(`Invalid JSON format in Request Payload (unknown error): ${parseError}`);
+      }
     }
   } else {
     console.error('test_request is undefined');
@@ -796,4 +876,154 @@ watch(showDeepEvalOptions, (newValue) => {
 onUnmounted(() => {
   // ... Perform any cleanup if necessary
 });
+
+interface RequestBody {
+  [key: string]: any; // Allow any key-value pairs in the request body
+}
+
+interface TransformedRequest {
+  body?: RequestBody | string; // Allow string body for non-JSON data
+  headers: { [key: string]: string };
+  method: string;
+  url: string;
+}
+
+function curlToJson(curlCommand: string): TransformedRequest {
+  const lines = curlCommand.split('\n');
+  let requestBody: RequestBody | string | undefined;
+  const headers: { [key: string]: string } = {};
+  let method = 'GET'; // Default to GET if not specified
+  let url = '';
+  let inDataSection = false;
+  let inHeredoc = false;
+  let heredocContent = '';
+
+  // Extract values from the curl command
+  lines.forEach((line) => {
+    line = line.trim();
+
+    // Remove backslashes and leading/trailing single quotes from URL, data, and method (where appropriate)
+    if (
+      line.startsWith('curl') ||
+      line.startsWith('-X') ||
+      line.startsWith('-d') ||
+      line.startsWith('--data') ||
+      line.startsWith('--data-raw')
+    ) {
+      line = line.replace(/\\\\/g, ''); // Only remove backslashes from these lines
+    }
+    if (line.startsWith('curl') || line.startsWith('-d') || line.startsWith('--data') || line.startsWith('--data-raw')) {
+      line = line.replace(/^'/, '').replace(/'$/, ''); // Only remove single quotes from these lines
+    }
+
+    if (line.startsWith('cat << EOF')) {
+      inHeredoc = true;
+    } else if (line === 'EOF') {
+      inHeredoc = false;
+      try {
+        requestBody = JSON.parse(heredocContent);
+      } catch (error) {
+        // If not valid JSON, treat as plain text
+        requestBody = heredocContent;
+      }
+      heredocContent = ''; // Reset for potential future heredocs
+    } else if (inHeredoc) {
+      heredocContent += line + '\n';
+    } else if (line.startsWith('curl')) {
+      // Extract URL if present on the same line (handle both single and double quotes)
+      const urlMatch = line.match(/'(.*?)'|"(.*?)"/);
+      if (urlMatch) {
+        url = urlMatch[1] || urlMatch[2]; // Use the captured group that matched
+      }
+    } else if (line.startsWith('-X')) {
+      // Capture the method (and remove any trailing backslashes and spaces)
+      method = line.substring('-X '.length).trim().replace(/\\$/, '').toUpperCase().replace(/\s/g, '');
+    } else if (line.startsWith('-H')) {
+      // Capture headers (handle both single and double quotes correctly, and URLs)
+      const headerMatch = line.match(/'(.*?)'|"(.*?)"/);
+      if (headerMatch) {
+        const headerLine = headerMatch[1] || headerMatch[2];
+        const colonIndex = headerLine.indexOf(':');
+        if (colonIndex > -1) {
+          const key = headerLine.substring(0, colonIndex).trim();
+          const value = headerLine.substring(colonIndex + 1).trim();
+          headers[key] = value;
+        }
+      }
+    } else if (line.startsWith('-d') || line.startsWith('--data') || line.startsWith('--data-raw')) {
+      // Capture request body (handle file path or inline data)
+      const singleQuoteDataStartIndex = line.indexOf("'") + 1; // Assuming data is enclosed in single quotes
+      const doubleQuoteDataStartIndex = line.indexOf('"') + 1; // Assuming data is enclosed in double quotes
+      let data = '';
+      if (line.includes("'")) {
+        data = line.substring(singleQuoteDataStartIndex);
+        if (data.endsWith("'")) {
+          data = data.substring(0, data.length - 1);
+        }
+      } else if (line.includes('"')) {
+        data = line.substring(doubleQuoteDataStartIndex);
+        if (data.endsWith('"')) {
+          // Corrected: Removed extra double quote
+          data = data.substring(0, data.length - 1);
+        }
+      }
+
+      if (data.startsWith('@')) {
+        // If data starts with '@', it's a file path, so use the heredoc content as the body
+        requestBody = requestBody; // Assuming requestBody was already populated from the heredoc
+      } else {
+        // Otherwise, it's inline data, try parsing as JSON or keep as string
+        if (headers['Content-Type'] && headers['Content-Type'].includes('application/json')) {
+          try {
+            requestBody = JSON.parse(data);
+          } catch (error) {
+            // If it's supposed to be JSON but parsing fails, try to fix it or keep as string
+            try {
+              requestBody = fixInvalidJson(data);
+            } catch (fixError) {
+              requestBody = data;
+              console.warn('Invalid JSON in request body (could not fix):', data);
+            }
+          }
+        } else if (headers['Content-Type'] && headers['Content-Type'].includes('application/x-www-form-urlencoded')) {
+          requestBody = parseUrlEncodedData(data);
+        } else {
+          requestBody = data;
+        }
+      }
+    } else if (line.startsWith("'") && !inDataSection) {
+      // If no other match and not in the data section, assume it's the URL
+      url = line.substring(1, line.length - 1);
+    } else if (line.startsWith('"') && !inDataSection) {
+      // If no other match and not in the data section, assume it's the URL
+      url = line.substring(1, line.length - 1);
+    }
+  });
+
+  // Construct the output object
+  const outputObject: TransformedRequest = {
+    body: requestBody,
+    headers,
+    method,
+    url
+  };
+
+  return outputObject;
+}
+
+function fixInvalidJson(jsonString: string): RequestBody {
+  // Basic attempt to fix common JSON errors (e.g., trailing commas)
+  const fixedJsonString = jsonString.replace(/,\s*([}\]])/g, '$1');
+  return JSON.parse(fixedJsonString);
+}
+
+function parseUrlEncodedData(data: string): RequestBody {
+  const result: RequestBody = {};
+  const pairs = data.split('&');
+  pairs.forEach((pair) => {
+    const [key, value] = pair.split('=');
+    result[decodeURIComponent(key)] = decodeURIComponent(value);
+  });
+  return result;
+}
 </script>
