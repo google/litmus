@@ -3,3 +3,4 @@ api/lib64
 cli/cli
 proxy/proxy
 api/api/lib64
+worker/lib64
