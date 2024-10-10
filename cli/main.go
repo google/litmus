@@ -15,12 +15,14 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"os"
 	"strings"
 
 	"github.com/google/litmus/cli/analytics"
 	"github.com/google/litmus/cli/cmd"
+	"github.com/google/litmus/cli/tunnel"
 	"github.com/google/litmus/cli/utils"
 	"github.com/google/uuid"
 )
@@ -123,6 +125,39 @@ func main() {
 		cmd.ExecutePayload(projectID, payload)
 	case "ls":
 		cmd.ListRuns(projectID)
+	case "tunnel":
+		// Tunnel command handling
+		tunnelFlags := flag.NewFlagSet("tunnel", flag.ExitOnError)
+		project := tunnelFlags.String("project", "", "Project ID for the Litmus instance")
+		port := tunnelFlags.Int("port", 8081, "Local port to tunnel to")
+		quiet := tunnelFlags.Bool("quiet", false, "Suppress verbose output")
+	
+		// Check if there are any arguments for the tunnel command's flags
+		tunnelArgs := []string{}
+		if len(args) > 1 {
+			tunnelArgs = args[1:]
+		}
+	
+		if err := tunnelFlags.Parse(tunnelArgs); err != nil { // Parse tunnel flags
+			fmt.Println("Error parsing tunnel flags:", err)
+			return
+		}
+
+		projectIDForTunnel := projectID
+		if *project != "" {
+			projectIDForTunnel = *project
+		}
+
+		serviceURL, err := utils.AccessSecret(projectIDForTunnel, "litmus-service-url")
+		if err != nil {
+			fmt.Println("Litmus is not deployed in the specified project. Please deploy Litmus before tunneling.")
+			return
+		}
+		serviceURL = utils.RemoveAnsiEscapeSequences(serviceURL)
+
+		if err := tunnel.CreateTunnel(serviceURL, *port, *quiet, projectIDForTunnel); err != nil { // Pass the Project ID
+			utils.HandleGcloudError(err)
+		}
 	case "open":
 		if runID != "" {
 			cmd.OpenRun(projectID, runID) // Open specific run
