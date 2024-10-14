@@ -45,7 +45,8 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 		"aiplatform.googleapis.com",
 		"secretmanager.googleapis.com",
 		"cloudresourcemanager.googleapis.com",
-		"storage.googleapis.com", // Add Storage API
+		"storage.googleapis.com", 
+		"bigquery.googleapis.com",
 	}
 	for _, api := range apisToEnable {
 		if !utils.IsAPIEnabled(api, projectID) {
