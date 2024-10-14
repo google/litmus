@@ -69,12 +69,16 @@ Commands:
   start       Starts a new Litmus run
   analytics   Manage Litmus analytics (deploy or destroy)
   proxy       Manage Litmus proxy (deploy, list, destroy, destroy-all)
+  tunnel      Create a tunnel to the Litmus UI
 
 Options:
   --project <project-id>: Specify the project ID (overrides default)
   --region <region>: Specify the region (defaults to 'us-central1')
   --quiet                Suppress verbose output
   --preserve-data        Preserve data in Cloud Storage, Firestore, and BigQuery
+
+Tunnel Options:
+  --port <port>: Specify the local port for the tunnel (default: 8081)
 
 ```
 
@@ -233,17 +237,21 @@ Options:
   This command destroys the specified Litmus proxy deployment. Replace `<service_name>` with the name of the deployed proxy (e.g., `us-central1-aiplatform-litmus-abcd`).
 
 - **Destroy all Litmus Proxy deployments:**
+
   ```bash
   litmus proxy destroy-all
   ```
+
   This command destroys all Litmus proxy deployments in your current project and region.
+
+- **Create a tunnel to the Litmus UI:**
+  ```bash
+  litmus tunnel --port 8081
+  ```
+  This command creates an SSH tunnel to the Litmus UI, making it accessible on your local machine at `http://localhost:8081`.
 
 ## Configuration
 
 - The CLI uses your default gcloud project configuration.
 - You can use the `--project` flag to specify a different project for all commands.
 - You can use the `--region` flag to specify a different region for the `deploy` and `destroy` commands.
-- Most commands accept environment variables as key-value pairs separated by `=`, for example:
-  ```bash
-  litmus deploy KEY1=VALUE1 KEY2=VALUE2
-  ```
