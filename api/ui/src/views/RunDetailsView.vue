@@ -46,8 +46,17 @@ limitations under the License.
 
       <!-- Clear Filters Button -->
       <v-btn variant="flat" color="primary" @click="clearFilter"> Clear Filters </v-btn>
+    </div>
+
+    <!-- Filter and Action Buttons -->
+    <div class="action-container">
       <!-- Export Test Cases Button -->
-      <v-btn variant="flat" color="primary" @click="exportTestCasesCSV"> Export Test Cases to CSV </v-btn>
+      <v-btn variant="flat" color="secondary" @click="exportTestCasesCSV"> Export to CSV </v-btn>
+      <!-- Add PDF Report Button -->
+      <v-btn variant="flat" color="secondary" @click="downloadReport" :disabled="isDownloadingReport">
+        <template v-if="isDownloadingReport"> <VueSpinner size="20" /> Generating Report... </template>
+        <template v-else> Download PDF Report </template>
+      </v-btn>
     </div>
 
     <!-- Test Cases Table -->
@@ -275,6 +284,7 @@ import { CaretUpOutline, CaretDownOutline } from '@vicons/ionicons5';
 import { AlertCircle } from '@vicons/ionicons5';
 // Import custom Icon component
 import Icon from '@/components/common/Icon.vue';
+import { VueSpinner } from 'vue3-spinners';
 
 // Define names for success and failure icons
 const SuccessIcon = 'carbon:checkmark-outline';
@@ -638,6 +648,50 @@ const sortTable = (field: string) => {
   }
 };
 
+// Reactive variable to track report download status
+const isDownloadingReport = ref(false);
+
+/**
+ * Downloads the PDF report for the current run.
+ */
+const downloadReport = async () => {
+  try {
+    isDownloadingReport.value = true; // Show spinner and disable button
+
+    // Fetch the report from the backend
+    const response = await fetch(`/runs/report/${runId}`, {
+      method: 'GET' // Use GET method for report download
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json(); // Attempt to parse error response
+      throw new Error(errorData.error || 'Failed to download report'); // Throw error with details or generic message
+    }
+
+    // Create a blob from the response data
+    const blob = await response.blob();
+    const url = window.URL.createObjectURL(blob);
+
+    // Create a hidden link and click it to trigger download
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `report_${runId}.pdf`; // Set filename
+    link.target = '_blank'; // Open in new tab/window
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    window.URL.revokeObjectURL(url); // Clean up
+
+    message.success('Report downloaded successfully!');
+  } catch (error) {
+    // Display error message from the server or provide generic message
+    message.error((error as Error).message || 'An error occurred while downloading the report.');
+  } finally {
+    isDownloadingReport.value = false; // Hide spinner and enable button
+  }
+};
+
 // --- Helper Functions ---
 
 /**
@@ -920,6 +974,13 @@ onMounted(() => {
   gap: 10px;
   margin-bottom: 10px;
   align-items: center;
+}
+
+.action-container {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  align-items: right;
 }
 
 td {
