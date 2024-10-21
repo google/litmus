@@ -85,12 +85,13 @@ Today is {current_time.strftime('%A, %B %-d %Y')}. The current time is {current_
 
 Here is your task:
 Statement: {strip_references(statement)}
-Best-known response: {strip_references(golden)}
+Best-known response: {golden}
 
 Comparison result:
 """
 
     try:
+        print(llm_prompt)
         # Send the prompt to the LLM and get the response
         responses = model.generate_content(
             llm_prompt, stream=False, generation_config=config
