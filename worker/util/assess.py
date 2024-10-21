@@ -85,7 +85,7 @@ Today is {current_time.strftime('%A, %B %-d %Y')}. The current time is {current_
 
 Here is your task:
 Statement: {strip_references(statement)}
-Best-known response: {strip_references(golden)}
+Best-known response: {golden}
 
 Comparison result:
 """
