@@ -16,11 +16,16 @@
 import json
 from datetime import datetime
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, send_file
 from google.cloud import firestore
 from google.cloud import run_v2
 from api.auth import auth
 from util.settings import settings
+from reportlab.lib.pagesizes import letter
+from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet
+from io import BytesIO
+from util.assess import ask_llm_for_summary
 
 bp = Blueprint("runs", __name__)
 db = firestore.Client()  # Initialize Firestore client
@@ -724,3 +729,105 @@ def comment_on_test_case(run_id, case_id):
         jsonify({"message": f"Comment added to test case '{case_id}' successfully"}),
         201,
     )
+
+
+@bp.route("/report/<run_id>", methods=["GET"])
+@auth.login_required
+def generate_report(run_id):
+    """Generates a PDF report for a given run ID."""
+
+    try:
+        run_ref = db.collection("test_runs").document(run_id)
+        run_data = run_ref.get().to_dict()
+
+        if not run_data:
+            return jsonify({"error": f"Run with ID '{run_id}' not found"}), 404
+
+        test_cases_ref = db.collection(f"test_cases_{run_id}")
+        test_cases = []
+        test_summaries = []
+
+        for doc in test_cases_ref.stream():
+            case_data = doc.to_dict()
+            test_cases.append(case_data)
+
+            test_summary = ask_llm_for_summary(
+                question=case_data.get("request"),
+                answer=case_data.get("result"),
+                golden=case_data.get("golden_response"),
+            )
+            test_summaries.append(test_summary)
+
+        # Create PDF
+        buffer = BytesIO()
+        doc = SimpleDocTemplate(buffer, pagesize=letter)
+        styles = getSampleStyleSheet()
+        story = []
+
+        # Run Information
+        story.append(Paragraph(f"Test Run Report: {run_id}", styles["Heading1"]))
+        story.append(Spacer(1, 12))
+        story.append(
+            Paragraph(f"Template ID: {run_data.get('template_id')}", styles["Normal"])
+        )
+        story.append(
+            Paragraph(
+                f"Start Time: {run_data.get('start_time')}",
+                styles["Normal"],
+            )
+        )
+        story.append(
+            Paragraph(
+                f"End Time: {run_data.get('end_time')}",
+                styles["Normal"],
+            )
+        )
+        story.append(Spacer(1, 24))
+
+        # Overall Summary
+        overall_summary = ask_llm_for_summary(summaries=test_summaries)
+        story.append(Paragraph(f"<b>{overall_summary}</b>", styles["Normal"]))
+        story.append(Spacer(1, 24))
+
+        overall_outliers = ask_llm_for_summary(outliers=test_summaries)
+        story.append(Paragraph(f"<b>{overall_outliers}</b>", styles["Normal"]))
+        story.append(Spacer(1, 24))
+
+        story.append(PageBreak())
+
+        for i, test_case in enumerate(test_cases):
+            story.append(Paragraph(f"Test Case {i + 1}", styles["Heading1"]))
+            story.append(Spacer(1, 12))
+
+            story.append(Paragraph(f"<b>{test_summaries[i]}</b>", styles["Normal"]))
+            story.append(Spacer(1, 12))
+
+            request_json = json.dumps(test_case.get("request"), indent=2)
+            story.append(
+                Paragraph(
+                    f"<i>Request: <pre>{request_json}</pre></i>", styles["Normal"]
+                )
+            )
+            story.append(Spacer(1, 12))
+
+            result = test_case.get("result")
+            result_json = json.dumps(result, indent=2)
+            story.append(
+                Paragraph(f"<i>Result:<pre>{result_json}</pre></i>", styles["Normal"])
+            )
+            story.append(Spacer(1, 24))
+
+            story.append(PageBreak())
+
+        doc.build(story)
+        buffer.seek(0)
+
+        return send_file(
+            buffer,
+            as_attachment=True,
+            download_name=f"report_{run_id}.pdf",
+            mimetype="application/pdf",
+        )
+
+    except Exception as e:
+        return jsonify({"error": f"Error generating report: {str(e)}"}), 500
