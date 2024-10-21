@@ -430,26 +430,34 @@ def execute_tests_and_store_results(run_id, template_id):
     run_ref = db.collection("test_runs").document(run_id)
     run_data = run_ref.get().to_dict()
 
+    # Check if the run data exists
     if not run_data:
         worker_logger.log_text(f"Error: Run ID '{run_id}' not found.")
         return
 
+    # Check if the template ID is provided
     if not template_id:
         worker_logger.log_text(f"Error: Template ID not found for run '{run_id}'")
         return
 
-    # Retrieve test cases from Firestore
+    # Get a reference to the test cases collection
     test_cases_ref = db.collection(f"test_cases_{run_id}")
-    test_cases = [doc.to_dict() for doc in test_cases_ref.stream()]
 
     # Update run status to "Running"
     run_ref.update({"status": "Running"})
-    num_tests = len(test_cases)
+    num_tests = 0
     num_completed = 0
+
+    # Efficiently count the number of test cases
+    for _ in test_cases_ref.stream():
+        num_tests += 1
+
     worker_logger.log_text(f"Running {num_tests} tests")
 
-    # Iterate through each test case
-    for i, test_case in enumerate(test_cases):
+    # Iterate through each test case document snapshot
+    for test_case_doc in test_cases_ref.stream():
+        test_case = test_case_doc.to_dict()  # Get the test case data
+        test_case_id = test_case_doc.id  # Get the actual document ID
         tracing_id = str(uuid4())  # Generate a unique tracing ID
 
         try:
@@ -458,15 +466,15 @@ def execute_tests_and_store_results(run_id, template_id):
                 test_case["pre_request"]["tracing_id"] = tracing_id
                 execute_request(test_case["pre_request"])
 
-            # If "Test Mission" - execute_test_mission
+            # Execute the appropriate test type (Test Mission or Test Run)
             if run_data.get("template_type") == "Test Mission":
                 test_result = execute_test_mission(
                     run_data,
                     test_case,
-                    test_cases_ref.document(f"test_case_{i+1}"),
+                    test_cases_ref.document(test_case_id),
                     tracing_id,
                 )
-            else:  # "Test Run"
+            else:
                 test_result = execute_test_run(run_data, test_case, tracing_id)
 
             # Execute post-request hook if defined
@@ -474,29 +482,32 @@ def execute_tests_and_store_results(run_id, template_id):
                 test_case["post_request"]["tracing_id"] = tracing_id
                 execute_request(test_case["post_request"])
 
+        # Handle exceptions during test execution
         except Exception as e:
-            # Log and store any errors that occur during test execution
             worker_logger.log_text(
-                f"Error executing test case {i+1}: {str(e)}", severity="ERROR"
+                f"Error executing test case {test_case_id}: {str(e)}", severity="ERROR"
             )
             test_result = {"status": "Failed", "error": str(e)}
 
-        # Store the test result in Firestore
-        test_case_ref = db.collection(f"test_cases_{run_id}").document(
-            f"test_case_{i+1}"
-        )
-
-        test_case_ref.update({"result": convert_to_firestore_compatible(test_result)})
-        test_case_ref.update({"tracing_id": tracing_id})
+        # Update the test case document with the results and tracing ID
+        test_case_ref = test_cases_ref.document(test_case_id)
+        try:
+            test_case_ref.update(
+                {"result": convert_to_firestore_compatible(test_result)}
+            )
+            test_case_ref.update({"tracing_id": tracing_id})
+        except Exception as e:
+            worker_logger.log_text(
+                f"Error updating Firestore for test case {test_case_id}: {str(e)}",
+                severity="ERROR",
+            )
 
         num_completed += 1
-
         # Update the progress of the test run
         run_ref.update({"progress": f"{num_completed}/{num_tests}"})
 
     end_time = datetime.utcnow()
-
-    # Update run status to "Completed"
+    # Update run status to "Completed" and set the end time
     run_ref.update({"status": "Completed", "end_time": end_time})
     worker_logger.log_text(f"Running tests completed")
 
