@@ -91,7 +91,6 @@ Comparison result:
 """
 
     try:
-        print(llm_prompt)
         # Send the prompt to the LLM and get the response
         responses = model.generate_content(
             llm_prompt, stream=False, generation_config=config
