@@ -27,5 +27,5 @@ class settings:
     # AI Specific
 
     ai_location = os.environ.get("AI_LOCATION", "global")
-    ai_default_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash")
-    ai_validation_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash")
+    ai_default_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash-002")
+    ai_validation_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash-002")
