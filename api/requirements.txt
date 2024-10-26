@@ -9,7 +9,7 @@ google-cloud-bigquery==3.26.0
 requests==2.32.3
 uuid==1.30
 gunicorn==23.0.0
-Werkzeug==3.0.4
+Werkzeug==3.0.6
 blinker==1.8.2
 Brotli==1.1.0
 cachetools==5.5.0
