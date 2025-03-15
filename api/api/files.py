@@ -29,6 +29,7 @@
 """This module defines the API routes for file management."""
 
 from flask import Blueprint, jsonify, request, send_file
+from werkzeug.utils import secure_filename
 from google.cloud import storage
 import os
 from api.auth import auth
