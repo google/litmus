@@ -1,7 +1,7 @@
 requests==2.32.3
 uuid==1.30
 google-cloud-firestore==2.19.0
-google-cloud-aiplatform==1.84.0
+google-cloud-aiplatform==1.81.0
 google-cloud-logging==3.11.2
 vertexai==1.71.1
 datasets==2.18.0
