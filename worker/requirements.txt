@@ -1,4 +1,4 @@
-requests==2.32.3
+requests==2.32.4
 uuid==1.30
 google-cloud-firestore==2.19.0
 google-cloud-aiplatform==1.71.1
