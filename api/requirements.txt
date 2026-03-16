@@ -6,7 +6,7 @@ google-cloud-firestore==2.19.0
 google-cloud-run==0.10.9
 google-cloud-logging==3.11.2
 google-cloud-bigquery==3.26.0
-requests==2.32.3
+requests==2.32.4
 uuid==1.30
 gunicorn==23.0.0
 Werkzeug==3.0.6
