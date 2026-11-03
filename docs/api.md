@@ -389,7 +389,7 @@ Authorization: Basic YWRtaW46WU9VUl9TVFJPTkdfUEFTU1dPUkQ=
 
 **Query Parameters:**
 
-- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `date`: Date of the log entries (format: `YYYYMMDD`, e.g. `20240131`; other formats are rejected with `400`).
 - `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
 - `flatten` (optional): Whether to flatten the JSON structure of the results (default: `False`).
 
@@ -414,7 +414,7 @@ Authorization: Basic YWRtaW46WU9VUl9TVFJPTkdfUEFTU1dPUkQ=
 
 **Query Parameters:**
 
-- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `date`: Date of the log entries (format: `YYYYMMDD`, e.g. `20240131`; other formats are rejected with `400`).
 - `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
 - `flatten` (optional): Whether to flatten the JSON structure of the results (default: `False`).
 
@@ -439,7 +439,7 @@ Authorization: Basic YWRtaW46WU9VUl9TVFJPTkdfUEFTU1dPUkQ=
 
 **Query Parameters:**
 
-- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `date`: Date of the log entries (format: `YYYYMMDD`, e.g. `20240131`; other formats are rejected with `400`).
 - `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
 
 **Response:**
