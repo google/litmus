@@ -14,6 +14,8 @@
 
 """This module defines the API routes for proxy data."""
 
+import re
+
 from flask import Blueprint, jsonify, request
 from google.cloud import bigquery
 from google.cloud import run_v2
@@ -24,6 +26,36 @@ from util.settings import settings
 bp = Blueprint("proxy", __name__)
 bq_client = bigquery.Client()
 
+# The log tables are date-sharded (e.g. litmus_proxy_log_20240131), so `date`
+# is a YYYYMMDD table-name suffix. It is interpolated into a table identifier,
+# which BigQuery cannot bind as a query parameter, so it must be strictly
+# whitelisted to prevent SQL injection.
+DATE_PATTERN = re.compile(r"[0-9]{8}")
+
+
+def _is_valid_date(date):
+    """Returns True if `date` is a well-formed YYYYMMDD table suffix."""
+    return bool(date) and DATE_PATTERN.fullmatch(date) is not None
+
+
+def _query_config(context):
+    """Builds a job config that binds `context` as a query parameter.
+
+    Binding the value (referenced as @context in the SQL) instead of
+    interpolating it into the query string prevents SQL injection.
+
+    Args:
+        context: The user-supplied context filter, or a falsy value if unset.
+
+    Returns:
+        A QueryJobConfig, or None when no context filter is applied.
+    """
+    if not context:
+        return None
+    return bigquery.QueryJobConfig(
+        query_parameters=[bigquery.ScalarQueryParameter("context", "STRING", context)]
+    )
+
 
 @bp.route("/data", methods=["GET"])
 @auth.login_required
@@ -31,7 +63,7 @@ def proxy_data():
     """Retrieves proxy log data from BigQuery.
 
     Expects query parameters:
-        - date: Date of the log data (format: YYYY-MM-DD).
+        - date: Date of the log data (format: YYYYMMDD).
         - context (optional): Litmus context to filter the results.
         - flatten (optional): Whether to flatten the JSON structure of the results (default: False).
 
@@ -47,8 +79,8 @@ def proxy_data():
     )
 
     # Input validation
-    if not date:
-        return jsonify({"error": 'Missing "date" or "context" parameter'}), 400
+    if not _is_valid_date(date):
+        return jsonify({"error": 'Missing or invalid "date" parameter (expected YYYYMMDD)'}), 400
 
     query = f"""
         SELECT jsonPayload
@@ -61,13 +93,13 @@ def proxy_data():
         query = f"""
             SELECT jsonPayload
             FROM `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
-            WHERE jsonPayload.litmuscontext = "{context}"
+            WHERE jsonPayload.litmuscontext = @context
             ORDER BY jsonPayload.timestamp ASC
             LIMIT 100
         """
 
     try:
-        query_job = bq_client.query(query)
+        query_job = bq_client.query(query, job_config=_query_config(context))
         results = list(query_job.result())
 
         # Flatten the results if requested
@@ -91,7 +123,7 @@ def litmus_data():
     """Retrieves proxy log data from BigQuery.
 
     Expects query parameters:
-        - date: Date of the log data (format: YYYY-MM-DD).
+        - date: Date of the log data (format: YYYYMMDD).
         - context (optional): Litmus context to filter the results.
         - flatten (optional): Whether to flatten the JSON structure of the results (default: False).
 
@@ -107,8 +139,8 @@ def litmus_data():
     )
 
     # Input validation
-    if not date:
-        return jsonify({"error": 'Missing "date" or "context" parameter'}), 400
+    if not _is_valid_date(date):
+        return jsonify({"error": 'Missing or invalid "date" parameter (expected YYYYMMDD)'}), 400
 
     query = f"""
         SELECT jsonPayload
@@ -121,13 +153,13 @@ def litmus_data():
         query = f"""
             SELECT jsonPayload
             FROM `{settings.project_id}.litmus_analytics.litmus_core_log_{date}`
-            WHERE jsonPayload.requestheaders.x_litmus_request = "{context}"
+            WHERE jsonPayload.requestheaders.x_litmus_request = @context
             ORDER BY jsonPayload.timestamp ASC
             LIMIT 1000
         """
 
     try:
-        query_job = bq_client.query(query)
+        query_job = bq_client.query(query, job_config=_query_config(context))
         results = list(query_job.result())
 
         # Flatten the results if requested
@@ -151,7 +183,7 @@ def proxy_agg():
     """Retrieves aggregated proxy log data from BigQuery.
 
     Expects query parameters:
-        - date: Date of the log data (format: YYYY-MM-DD).
+        - date: Date of the log data (format: YYYYMMDD).
         - context (optional): Litmus context to filter the results.
 
     Returns:
@@ -161,8 +193,8 @@ def proxy_agg():
     context = request.args.get("context")
 
     # Input validation
-    if not date:
-        return jsonify({"error": 'Missing "date" parameter'}), 400
+    if not _is_valid_date(date):
+        return jsonify({"error": 'Missing or invalid "date" parameter (expected YYYYMMDD)'}), 400
 
     query = f"""
         SELECT
@@ -186,12 +218,12 @@ def proxy_agg():
                 avg(jsonPayload.latency) AS average_latency
             FROM
                 `{settings.project_id}.litmus_analytics.litmus_proxy_log_{date}`
-            WHERE jsonPayload.litmuscontext = "{context}"
+            WHERE jsonPayload.litmuscontext = @context
             GROUP BY 1;
         """
 
     try:
-        query_job = bq_client.query(query)
+        query_job = bq_client.query(query, job_config=_query_config(context))
         results = list(query_job.result())
 
         # Convert BigQuery Rows to dictionaries before JSON serialization

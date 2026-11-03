@@ -165,7 +165,7 @@ func DestroyAnalytics(projectID, region string, quiet bool) error {
 // func createLoggingBucket(a Analytics, quiet bool) error {
 // 	// Check if bucket already exists
 // 	cmd := exec.Command(
-// 		"gsutil", "ls",
+// 		"gcloud", "storage", "ls",
 // 		fmt.Sprintf("gs://%s", a.BucketName),
 // 	)
 // 	_, err := cmd.CombinedOutput()
@@ -178,10 +178,10 @@ func DestroyAnalytics(projectID, region string, quiet bool) error {
 
 // 	// Bucket doesn't exist, proceed with creation
 // 	cmd = exec.Command(
-// 		"gsutil", "mb",
-// 		"-l", a.Region,
-// 		"-p", a.ProjectID,
+// 		"gcloud", "storage", "buckets", "create",
 // 		fmt.Sprintf("gs://%s", a.BucketName),
+// 		"--location", a.Region,
+// 		"--project", a.ProjectID,
 // 	)
 // 	output, err := cmd.CombinedOutput()
 // 	if err != nil {
@@ -329,7 +329,7 @@ func createLogSink(a Analytics, quiet bool, name string, filter string) error {
 
 // func deleteLoggingBucket(a Analytics, quiet bool) error {
 // 	cmd := exec.Command(
-// 		"gsutil", "-m", "rm", "-r",
+// 		"gcloud", "storage", "rm", "--recursive",
 // 		fmt.Sprintf("gs://%s", a.BucketName),
 // 	)
 // 	output, err := cmd.CombinedOutput()

@@ -32,6 +32,7 @@ from util.assess import (
 )
 from util.ragas_eval import evaluate_ragas
 from util.deepeval_eval import evaluate_deepeval, deepeval_metric_factory
+from util.safe_request import BlockedTargetError, send_request
 
 
 # Setup logging
@@ -78,30 +79,35 @@ def execute_request(request_data):
     url = request_data.get("url")
     method = request_data.get("method", "POST")
     body = request_data.get("body")
-    headers = request_data.get("headers")
+    headers = dict(request_data.get("headers") or {})
     tracing_id = request_data.get("tracing_id")
 
-    # Add tracing ID to headers for tracking
+    # Add tracing ID to headers for tracking. The headers are written back to
+    # request_data so that the tracing ID is included in the request log, which
+    # the API's /proxy/litmus_data endpoint filters on.
     if tracing_id:
         headers["X-Litmus-Request"] = tracing_id
+    request_data["headers"] = headers
 
     # Process file references in the request body
     body = process_file_references(body)
 
     start_time = datetime.utcnow()
+    status_code = 0
 
     try:
-        # Send the HTTP request based on the specified method
-        if method == "POST":
-            response = requests.post(url, json=body, headers=headers)
-        elif method == "GET":
-            response = requests.get(url, headers=headers)
-        elif method == "PUT":
-            response = requests.put(url, json=body, headers=headers)
-        elif method == "DELETE":
-            response = requests.delete(url, headers=headers)
-        else:
+        if method not in ("POST", "GET", "PUT", "DELETE"):
             raise ValueError(f"Unsupported HTTP method: {method}")
+
+        # Send the HTTP request. send_request refuses destinations such as the
+        # metadata server (also when reached via redirect), which would
+        # otherwise leak the worker's service-account credentials.
+        response = send_request(
+            method,
+            url,
+            json=body if method in ("POST", "PUT") else None,
+            headers=headers,
+        )
 
         status_code = response.status_code
         response.raise_for_status()  # Raise an exception for bad status codes
@@ -112,6 +118,15 @@ def execute_request(request_data):
         )  # Log the request and response
 
         return response.json(), status_code
+    except BlockedTargetError as e:
+        end_time = datetime.utcnow()
+        worker_logger.log_text(
+            f"Blocked request to disallowed destination: {e}", severity="WARNING"
+        )
+        log_request_and_response(
+            request_data, None, start_time, end_time, error=str(e)
+        )  # Log the error
+        return {"status": "Failed", "error": str(e)}, status_code
     except requests.exceptions.RequestException as e:
         end_time = datetime.utcnow()
         log_request_and_response(

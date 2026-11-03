@@ -47,9 +47,22 @@ class Settings:
     """
     auth_user: str = os.environ.get("USERNAME", "admin")
     """Username for authentication. Defaults to "admin"."""
-    auth_pass: str = os.environ.get("PASSWORD", "admin")
-    """Password for authentication. Defaults to "admin"."""
+    auth_pass: str = os.environ.get("PASSWORD", "")
+    """Password for authentication. Must be provided via the PASSWORD
+    environment variable when authentication is enabled; there is no default.
+    """
 
 
 # Create an instance of the Settings class to access settings
 settings = Settings()
+
+# Fail closed: refuse to start with authentication enabled but no password
+# configured. This prevents deployments from silently exposing a well-known
+# default credential (CWE-1392).
+if not settings.disable_auth and not settings.auth_pass:
+    raise RuntimeError(
+        "Litmus API refuses to start: PASSWORD environment variable is "
+        "required when authentication is enabled (no default credentials). "
+        "Set PASSWORD to a strong password, or set DISABLE_AUTH=True to "
+        "explicitly run without authentication (not recommended)."
+    )

@@ -150,6 +150,7 @@ jobs:
       - name: Build & Store
         working-directory: ./cli
         run: |
+          go mod tidy
           go install
           go build main.go
           sha256sum main > litmus.sha256
