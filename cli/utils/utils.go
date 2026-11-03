@@ -31,6 +31,34 @@ import (
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
 )
 
+// RunWithRetry runs the command returned by newCmd and, if it fails with output
+// that shouldRetry classifies as transient, runs it again after a delay. The
+// delay grows linearly (delay, 2*delay, ...). A fresh *exec.Cmd is requested for
+// every attempt because a Cmd cannot be run twice. The output and error of the
+// last attempt are returned.
+func RunWithRetry(newCmd func() *exec.Cmd, attempts int, delay time.Duration, shouldRetry func(output string) bool) ([]byte, error) {
+	var output []byte
+	var err error
+	for attempt := 1; attempt <= attempts; attempt++ {
+		output, err = newCmd().CombinedOutput()
+		if err == nil || attempt == attempts || !shouldRetry(string(output)) {
+			return output, err
+		}
+		time.Sleep(delay * time.Duration(attempt))
+	}
+	return output, err
+}
+
+// IsIAMPropagationError reports whether gcloud output indicates that a
+// just-created service account is not yet visible to IAM. IAM is eventually
+// consistent: a policy binding added right after `gcloud iam service-accounts
+// create` can fail with "Service account ... does not exist" for a short while
+// (noticeably longer when an account with the same name was deleted moments
+// before, as `litmus destroy` followed by `litmus deploy` does).
+func IsIAMPropagationError(output string) bool {
+	return strings.Contains(output, "does not exist")
+}
+
 // GenerateRandomPassword generates a random password of the given length.
 func GenerateRandomPassword(length int) string {
 	rand.Seed(time.Now().UnixNano())
