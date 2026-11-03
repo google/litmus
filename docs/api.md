@@ -11,10 +11,10 @@ The Litmus API uses basic authentication to protect its endpoints. To authentica
 **Example:**
 
 ```
-Authorization: Basic YWRtaW46YWRtaW4=
+Authorization: Basic YWRtaW46WU9VUl9TVFJPTkdfUEFTU1dPUkQ=
 ```
 
-**Note:** The example above shows the Base64 encoded string for username "admin" and password "admin". Replace these with your actual credentials. You can disable authentication by setting `DISABLE_AUTH=True` as an environment variable for the API service.
+**Note:** The example above shows the Base64 encoded string for username "admin" and password "YOUR_STRONG_PASSWORD". Replace these with your actual credentials. The password is configured via the `PASSWORD` environment variable of the API service and has no default — the API refuses to start if authentication is enabled and no password is set. The username defaults to "admin" and can be changed via the `USERNAME` environment variable. You can disable authentication by setting `DISABLE_AUTH=True` as an environment variable for the API service.
 
 ## Endpoints
 
