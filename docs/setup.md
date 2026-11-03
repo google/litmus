@@ -110,10 +110,14 @@ gcloud services enable run.googleapis.com firestore.googleapis.com bigquery.goog
   docker push gcr.io/YOUR_PROJECT_ID/litmus-api:latest
   ```
 
-- Deploy the API service to Cloud Run:
+- Deploy the API service to Cloud Run, passing the password you stored in step 3.1 via the `PASSWORD` environment variable:
+
   ```bash
-  gcloud run deploy litmus-api --image gcr.io/YOUR_PROJECT_ID/litmus-api:latest --region YOUR_REGION  --allow-unauthenticated --project YOUR_PROJECT_ID
+  gcloud run deploy litmus-api --image gcr.io/YOUR_PROJECT_ID/litmus-api:latest --region YOUR_REGION  --allow-unauthenticated --project YOUR_PROJECT_ID \
+    --set-env-vars "PASSWORD=$(gcloud secrets versions access latest --secret=litmus-password --project YOUR_PROJECT_ID)"
   ```
+
+  > **Note:** `PASSWORD` is required. There is no default password: if authentication is enabled and `PASSWORD` is unset or empty, the API fails closed and refuses to start. The username defaults to `admin` and can be overridden with the `USERNAME` environment variable. Authentication can be disabled entirely with `DISABLE_AUTH=True`, but this is not recommended for production.
 
 **4.3. Update Service URL Secret:**
 

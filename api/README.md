@@ -69,11 +69,11 @@ This repository contains the code for the Litmus API, a service that manages and
 - **Service Accounts:** Create service accounts for the API and worker, granting the worker permission to invoke the API and access necessary resources (Firestore, BigQuery, Cloud Storage).
 - **Cloud Run Job:** Deploy the worker service as a Cloud Run _job_ (see the worker service documentation for instructions).
 - **Docker Image:** Build and push a Docker image for the API to a container registry (e.g., Google Container Registry).
-- **Settings Configuration:** Create a `api/util/settings.py` file to configure essential settings, including:
+- **Settings Configuration:** Configure essential settings via environment variables (see `api/util/settings.py`), including:
   - GCP project ID
   - GCP region
   - AI model settings (location, default model, validation model)
-  - Authentication settings (enable/disable, username, password)
+  - Authentication settings (enable/disable, username, password). **`PASSWORD` is required** when authentication is enabled; there is no default password and the API refuses to start without one.
 - **UI Deployment (optional):** Deploy the Litmus UI to a web server to provide a graphical interface for interacting with the API (see the UI documentation for instructions).
 
 ## Deployment
@@ -96,8 +96,10 @@ This repository contains the code for the Litmus API, a service that manages and
          --image=gcr.io/<your-project-id>/litmus-api:latest \
          --region=<your-gcp-region> \
          --allow-unauthenticated \
-         --service-account=<your-api-service-account>
+         --service-account=<your-api-service-account> \
+         --set-env-vars=PASSWORD=<your-strong-password>
      ```
+   - `PASSWORD` is mandatory: the API will refuse to start if authentication is enabled and no password is configured. Prefer sourcing the value from Secret Manager rather than typing it inline (see the [Setup Guide](https://google.github.io/litmus/setup)).
 
 ## Usage
 
@@ -107,6 +109,8 @@ Once deployed, you can interact with the Litmus API using your preferred HTTP cl
 
 - The API uses basic authentication to protect its endpoints.
 - To authenticate, include an `Authorization` header in your requests with the username and password encoded in Base64.
+- The password is read from the `PASSWORD` environment variable and **has no default**. If authentication is enabled and `PASSWORD` is unset or empty, the API fails closed and refuses to start.
+- The username defaults to `admin` and can be changed with the `USERNAME` environment variable.
 - You can disable authentication by setting `DISABLE_AUTH=True` as an environment variable for the API service. **Caution:** Disabling authentication is not recommended for production environments.
 
 ## Error Handling

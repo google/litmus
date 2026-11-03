@@ -11,10 +11,10 @@ The Litmus API uses basic authentication to protect its endpoints. To authentica
 **Example:**
 
 ```
-Authorization: Basic YWRtaW46YWRtaW4=
+Authorization: Basic YWRtaW46WU9VUl9TVFJPTkdfUEFTU1dPUkQ=
 ```
 
-**Note:** The example above shows the Base64 encoded string for username "admin" and password "admin". Replace these with your actual credentials. You can disable authentication by setting `DISABLE_AUTH=True` as an environment variable for the API service.
+**Note:** The example above shows the Base64 encoded string for username "admin" and password "YOUR_STRONG_PASSWORD". Replace these with your actual credentials. The password is configured via the `PASSWORD` environment variable of the API service and has no default — the API refuses to start if authentication is enabled and no password is set. The username defaults to "admin" and can be changed via the `USERNAME` environment variable. You can disable authentication by setting `DISABLE_AUTH=True` as an environment variable for the API service.
 
 ## Endpoints
 
@@ -389,7 +389,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 **Query Parameters:**
 
-- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `date`: Date of the log entries (format: `YYYYMMDD`, e.g. `20240131`; other formats are rejected with `400`).
 - `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
 - `flatten` (optional): Whether to flatten the JSON structure of the results (default: `False`).
 
@@ -414,7 +414,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 **Query Parameters:**
 
-- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `date`: Date of the log entries (format: `YYYYMMDD`, e.g. `20240131`; other formats are rejected with `400`).
 - `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
 - `flatten` (optional): Whether to flatten the JSON structure of the results (default: `False`).
 
@@ -439,7 +439,7 @@ Authorization: Basic YWRtaW46YWRtaW4=
 
 **Query Parameters:**
 
-- `date`: Date of the log entries (format: YYYY-MM-DD).
+- `date`: Date of the log entries (format: `YYYYMMDD`, e.g. `20240131`; other formats are rejected with `400`).
 - `context` (optional): Litmus context to filter the results (e.g., `litmus-context-your-context-id`).
 
 **Response:**

@@ -26,6 +26,14 @@ import (
 	"github.com/google/litmus/cli/utils"
 )
 
+// IAM is eventually consistent, so policy bindings for a service account that
+// was created moments ago can transiently fail with "does not exist". Retry a
+// few times with a growing delay (5s, 10s, ... ~75s in total) before giving up.
+const (
+	iamRetryAttempts = 6
+	iamRetryDelay    = 5 * time.Second
+)
+
 // DeployApplication deploys the Litmus application to Google Cloud.
 func DeployApplication(projectID, region string, envVars map[string]string, env string, quiet bool) {
 	s := spinner.New(spinner.CharSets[14], 100*time.Millisecond) // Create a new spinner instance
@@ -312,15 +320,17 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 			s.Start()
 			defer s.Stop()
 		}
-		grantPermissionCmd := exec.Command(
-			"gcloud", "run", "jobs", "add-iam-policy-binding", "litmus-worker",
-			"--member", fmt.Sprintf("serviceAccount:%s", apiServiceAccount),
-			"--role", "roles/run.invoker",
-			"--project", projectID,
-			"--region", region,
-		)
-		if err := grantPermissionCmd.Run(); err != nil {
-			log.Fatalf("Error granting permission: %v\n", err)
+		output, err := utils.RunWithRetry(func() *exec.Cmd {
+			return exec.Command(
+				"gcloud", "run", "jobs", "add-iam-policy-binding", "litmus-worker",
+				"--member", fmt.Sprintf("serviceAccount:%s", apiServiceAccount),
+				"--role", "roles/run.invoker",
+				"--project", projectID,
+				"--region", region,
+			)
+		}, iamRetryAttempts, iamRetryDelay, utils.IsIAMPropagationError)
+		if err != nil {
+			log.Fatalf("Error granting permission: %v\nOutput: %s\n", err, output)
 		}
 		if !quiet {
 			fmt.Println("Done! Granting API permission to invoke Worker.\n")
@@ -361,13 +371,14 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 
 	for _, role := range roles {
 		if !utils.BindingExists(projectID, "", "", serviceAccount, role) {
-			cmd := exec.Command(
-				"gcloud", "projects", "add-iam-policy-binding", projectID,
-				"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
-				"--role", role,
-				"--condition=None",
-			)
-			output, err := cmd.CombinedOutput()
+			output, err := utils.RunWithRetry(func() *exec.Cmd {
+				return exec.Command(
+					"gcloud", "projects", "add-iam-policy-binding", projectID,
+					"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
+					"--role", role,
+					"--condition=None",
+				)
+			}, iamRetryAttempts, iamRetryDelay, utils.IsIAMPropagationError)
 			if err != nil {
 				return fmt.Errorf("error granting role '%s': %v\nOutput: %s", role, err, output)
 			}
@@ -378,13 +389,14 @@ func grantPermissions(serviceAccount, projectID string, quiet bool, bucketName s
 
 	// Grant Storage Object Admin role on the bucket
 	if !utils.BindingExists(projectID, "", bucketName, serviceAccount, "roles/storage.objectAdmin") {
-		cmd := exec.Command(
-			"gcloud", "storage", "buckets",
-			"add-iam-policy-binding", fmt.Sprintf("gs://%s", bucketName),
-			"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
-			"--role", "roles/storage.objectAdmin",
-		)
-		output, err := cmd.CombinedOutput()
+		output, err := utils.RunWithRetry(func() *exec.Cmd {
+			return exec.Command(
+				"gcloud", "storage", "buckets",
+				"add-iam-policy-binding", fmt.Sprintf("gs://%s", bucketName),
+				"--member", fmt.Sprintf("serviceAccount:%s", serviceAccount),
+				"--role", "roles/storage.objectAdmin",
+			)
+		}, iamRetryAttempts, iamRetryDelay, utils.IsIAMPropagationError)
 		if err != nil {
 			return fmt.Errorf("error granting Storage Object Admin role: %w\nOutput: %s", err, output)
 		}
