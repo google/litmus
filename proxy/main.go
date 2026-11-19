@@ -19,6 +19,7 @@ import (
 	"compress/gzip"
 	"context"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log"
 	"net/http"
@@ -27,10 +28,29 @@ import (
 	"os"
 	"regexp"
 	"strconv"
+	"sync/atomic"
 	"time"
 
 	"cloud.google.com/go/logging"
 	"github.com/google/uuid"
+	"golang.org/x/sync/semaphore"
+)
+
+const (
+	// maxLoggedBodyBytes is the largest request or response body that the proxy
+	// holds in memory and writes to its request log. Larger bodies are still
+	// proxied, but they are streamed and the log only records their size.
+	// Cloud Logging does not accept log entries above 256 KiB, so a larger body
+	// could not be logged in any case.
+	maxLoggedBodyBytes = 256 << 10
+
+	// maxConcurrentLoggedBytes limits the combined size of the bodies that are
+	// being turned into log entries at any one time. A structured log payload
+	// can take over two hundred times the memory of the JSON document it was
+	// parsed from (every "{" becomes a map, several times over), so the
+	// bodies of concurrent requests must not all be converted at once. The
+	// limit leaves room for the two bodies of one request.
+	maxConcurrentLoggedBytes = 2 * maxLoggedBodyBytes
 )
 
 var (
@@ -42,6 +62,16 @@ var (
 	logAuthorizationHeader, _ = strconv.ParseBool(os.Getenv("LOG_AUTHORIZATION_HEADER"))
 	// Regex to match /litmus-context-<random-string>/ path prefix
 	contextPathRegex = regexp.MustCompile(`^/?(litmus-context-[a-zA-Z0-9\-]+)?(/.*)?$`)
+
+	// logCapacity enforces maxConcurrentLoggedBytes.
+	logCapacity = semaphore.NewWeighted(maxConcurrentLoggedBytes)
+	// logQueueTimeout is how long a request waits for logCapacity before it is
+	// logged without its bodies instead.
+	logQueueTimeout = 5 * time.Second
+	// writeLogEntry sends an entry to Cloud Logging. Tests replace it.
+	writeLogEntry = func(ctx context.Context, entry logging.Entry) error {
+		return logger.LogSync(ctx, entry)
+	}
 )
 
 type requestLog struct {
@@ -59,6 +89,99 @@ type requestLog struct {
 	ResponseBody   interface{} `json:"responseBody"`
 	ResponseSize   int64       `json:"responseSize"`
 	Latency        int64       `json:"latency"`
+	// Set when a body is left out of the log, see loggedBody.
+	RequestBodyOmitted  bool `json:"requestBodyOmitted,omitempty"`
+	ResponseBodyOmitted bool `json:"responseBodyOmitted,omitempty"`
+}
+
+// loggedBody is a request or response body as it goes into the request log.
+type loggedBody struct {
+	data []byte // the complete body, nil if omitted
+	size int64  // the number of body bytes that went through the proxy
+	// omitted reports that the body is not logged, because it is larger than
+	// maxLoggedBodyBytes, could not be decoded, or had to give way to other
+	// requests (see logQueueTimeout).
+	omitted bool
+}
+
+// logValue returns the body in the form in which it is logged: parsed if it is
+// JSON, as a string if it is not, and nil if it is omitted.
+func (b loggedBody) logValue() interface{} {
+	if b.omitted {
+		return nil
+	}
+	var value interface{}
+	if err := json.Unmarshal(b.data, &value); err != nil {
+		// If unmarshaling fails, keep the raw string
+		return string(b.data)
+	}
+	return value
+}
+
+// withoutData returns the body with its content left out of the log.
+func (b loggedBody) withoutData() loggedBody {
+	if len(b.data) == 0 {
+		return b
+	}
+	return loggedBody{size: b.size, omitted: true}
+}
+
+// limitedBuffer is an io.Writer that keeps what is written to it only while
+// the total stays within limit. Once the limit is exceeded it drops what it
+// held and merely counts, so it never holds more than limit bytes however much
+// is written to it.
+type limitedBuffer struct {
+	limit int64
+	data  []byte
+	size  int64
+}
+
+func (b *limitedBuffer) Write(p []byte) (int, error) {
+	b.size += int64(len(p))
+	if b.size > b.limit {
+		b.data = nil
+	} else {
+		b.data = append(b.data, p...)
+	}
+	return len(p), nil
+}
+
+func (b *limitedBuffer) body() loggedBody {
+	return loggedBody{data: b.data, size: b.size, omitted: b.size > b.limit}
+}
+
+// countingReader counts the bytes read through it. The count is atomic because
+// the HTTP transport may still be reading a request body when the round trip
+// has already returned.
+type countingReader struct {
+	io.Reader
+	n atomic.Int64
+}
+
+func (c *countingReader) Read(p []byte) (int, error) {
+	n, err := c.Reader.Read(p)
+	c.n.Add(int64(n))
+	return n, err
+}
+
+// gunzip decompresses data, which must not inflate to more than limit bytes.
+// The limit keeps a small compressed body from being expanded into an
+// arbitrarily large buffer.
+func gunzip(data []byte, limit int64) ([]byte, error) {
+	gr, err := gzip.NewReader(bytes.NewReader(data))
+	if err != nil {
+		return nil, err
+	}
+	defer gr.Close()
+
+	decoded, err := io.ReadAll(io.LimitReader(gr, limit+1))
+	if err != nil {
+		return nil, err
+	}
+	if int64(len(decoded)) > limit {
+		return nil, fmt.Errorf("decompressed body is larger than %d bytes", limit)
+	}
+	return decoded, nil
 }
 
 func main() {
@@ -117,20 +240,31 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 		r.URL.Host = upstreamURL.Host
 	}
 
-	// Create a new buffer to hold the request body
-	requestBodyBuffer := bytes.NewBuffer(nil)
-	// Copy the request body to the buffer
-	if _, err := io.Copy(requestBodyBuffer, r.Body); err != nil {
+	// Read the request body, but hold no more than maxLoggedBodyBytes of it in
+	// memory. Reading all of it would let a client make the proxy allocate as
+	// much memory as the client cares to send.
+	requestBody, err := io.ReadAll(io.LimitReader(r.Body, maxLoggedBodyBytes+1))
+	if err != nil {
 		log.Printf("Error reading request body: %v", err)
 		http.Error(w, "Internal Server Error", http.StatusInternalServerError)
 		return
 	}
 
-	// Get the byte slice from the buffer
-	requestBody := requestBodyBuffer.Bytes()
-
-	// Reset the request body for the proxy using the buffer
-	r.Body = io.NopCloser(requestBodyBuffer)
+	request := loggedBody{data: requestBody, size: int64(len(requestBody))}
+	var streamed *countingReader
+	if request.size <= maxLoggedBodyBytes {
+		// Reset the request body for the proxy using the bytes read
+		r.Body = io.NopCloser(bytes.NewReader(requestBody))
+	} else {
+		// The body is too large to be logged. Pass on what has been read
+		// followed by the rest of the body, which is streamed, not buffered.
+		request.data, request.omitted = nil, true
+		streamed = &countingReader{Reader: r.Body}
+		r.Body = struct {
+			io.Reader
+			io.Closer
+		}{io.MultiReader(bytes.NewReader(requestBody), streamed), r.Body}
+	}
 
 	// Set the Host header to the upstream URL
 	r.Host = upstreamURL.Host
@@ -147,54 +281,55 @@ func handleRequest(w http.ResponseWriter, r *http.Request, proxy *httputil.Rever
 		sanitizedHeaders[name] = values
 	}
 
-	wrappedWriter := &statusRecorder{ResponseWriter: w}
+	wrappedWriter := &statusRecorder{ResponseWriter: w, body: limitedBuffer{limit: maxLoggedBodyBytes}}
 
 	// Explicitly call the proxy's ServeHTTP
 	proxy.ServeHTTP(wrappedWriter, r)
 
 	endTime := time.Now()
 
-	// Handle gzip encoded response
-	var responseBody []byte
-	if wrappedWriter.Header().Get("Content-Encoding") == "gzip" {
-		gr, err := gzip.NewReader(bytes.NewReader(wrappedWriter.buf.Bytes()))
-		if err != nil {
-			log.Printf("Failed to create gzip reader: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
-		}
-		defer gr.Close()
+	if streamed != nil {
+		request.size += streamed.n.Load()
+	}
 
-		var buf bytes.Buffer
-		if _, err := io.Copy(&buf, gr); err != nil {
+	// Handle gzip encoded response. The response has been sent to the client
+	// by now, so a body that cannot be decoded is only left out of the log.
+	response := wrappedWriter.body.body()
+	if len(response.data) > 0 && wrappedWriter.Header().Get("Content-Encoding") == "gzip" {
+		decoded, err := gunzip(response.data, maxLoggedBodyBytes)
+		if err != nil {
 			log.Printf("Failed to decompress response body: %v", err)
-			http.Error(w, "Internal Server Error", http.StatusInternalServerError)
-			return
+			response = response.withoutData()
+		} else {
+			response = loggedBody{data: decoded, size: int64(len(decoded))}
 		}
-		responseBody = buf.Bytes()
-	} else {
-		responseBody = wrappedWriter.buf.Bytes()
 	}
 
 	// Log the combined request and response details
-	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, requestBody, responseBody, sanitizedHeaders)
+	logRequestAndResponse(requestID, tracingID, litmusContext, r, startTime, endTime, upstreamURL, request, response, sanitizedHeaders)
 }
 
-func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, requestBody []byte, responseBody []byte, sanitizedHeaders http.Header) {
+func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.Request, startTime time.Time, endTime time.Time, upstreamURL *url.URL, request loggedBody, response loggedBody, sanitizedHeaders http.Header) {
 
-	// Attempt to unmarshal the request body
-	var requestBodyJSON interface{}
-	if err := json.Unmarshal(requestBody, &requestBodyJSON); err != nil {
-		// If unmarshaling fails, keep the raw string
-		requestBodyJSON = string(requestBody)
+	// Turning the bodies into a log entry takes far more memory than the
+	// bodies themselves, so wait for capacity first. If there is none for too
+	// long because many large bodies are being logged, log this request
+	// without its bodies rather than hold it up.
+	if weight := int64(len(request.data) + len(response.data)); weight > 0 {
+		ctx, cancel := context.WithTimeout(context.Background(), logQueueTimeout)
+		err := logCapacity.Acquire(ctx, weight)
+		cancel()
+		if err != nil {
+			log.Printf("Logging request %s without bodies: too many bodies are being logged", requestID)
+			request, response = request.withoutData(), response.withoutData()
+		} else {
+			defer logCapacity.Release(weight)
+		}
 	}
 
-	// Attempt to unmarshal the response body
-	var responseBodyJSON interface{}
-	if err := json.Unmarshal(responseBody, &responseBodyJSON); err != nil {
-		// If unmarshaling fails, keep the raw string
-		responseBodyJSON = string(responseBody)
-	}
+	// Use the unmarshalled or raw bodies, nil for a body that is omitted
+	requestBodyJSON := request.logValue()
+	responseBodyJSON := response.logValue()
 
 	requestLog := requestLog{
 		ID:             requestID,
@@ -206,11 +341,14 @@ func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.R
 		UpstreamURL:    upstreamURL.String(),
 		RequestHeaders: sanitizedHeaders, // Log the potentially filtered headers
 		RequestBody:    requestBodyJSON,  // Use the unmarshalled or raw request body
-		RequestSize:    int64(len(requestBody)),
+		RequestSize:    request.size,
 		ResponseStatus: 0,                // Placeholder - will be updated below
 		ResponseBody:   responseBodyJSON, // Use the unmarshalled or raw response body
-		ResponseSize:   int64(len(responseBody)),
+		ResponseSize:   response.size,
 		Latency:        endTime.Sub(startTime).Milliseconds(),
+
+		RequestBodyOmitted:  request.omitted,
+		ResponseBodyOmitted: response.omitted,
 	}
 
 	// Update ResponseStatus now that we have it
@@ -219,7 +357,7 @@ func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.R
 	}
 
 	// Log the combined entry
-	if err := logger.LogSync(context.Background(), logging.Entry{
+	if err := writeLogEntry(context.Background(), logging.Entry{
 		Payload: requestLog,
 	}); err != nil {
 		log.Printf("Failed to log request and response: %v", err)
@@ -230,12 +368,12 @@ func logRequestAndResponse(requestID, tracingID, litmusContext string, r *http.R
 type statusRecorder struct {
 	http.ResponseWriter
 	status int
-	buf    bytes.Buffer
+	body   limitedBuffer
 }
 
 // Write reimplements the necessary methods to capture the response body
 func (rec *statusRecorder) Write(b []byte) (int, error) {
-	rec.buf.Write(b)
+	rec.body.Write(b)
 	// Flush the buffer after writing
 	return rec.ResponseWriter.Write(b)
 }
