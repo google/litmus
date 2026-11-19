@@ -135,6 +135,9 @@ The Litmus Proxy logs, stored in BigQuery, provide a comprehensive record of eac
 - `responseBody`: The response body, parsed as JSON if possible.
 - `responseSize`: The size of the response body in bytes.
 - `latency`: The request latency in milliseconds.
+- `requestBodyOmitted`, `responseBodyOmitted`: Present and `true` if the body is not included in the log entry, see below.
+
+**Body size limit:** The proxy forwards request and response bodies of any size, but it logs a body only if it is no larger than 256 KiB, which is the most that a Cloud Logging entry can hold. A larger body is passed through without being stored. Its log entry has no `requestBody` or `responseBody`, still reports the size of the body, and is marked with `requestBodyOmitted` or `responseBodyOmitted`. When the proxy receives more large bodies than it can log at once, it also logs requests without their bodies, marked in the same way, rather than delay them.
 
 You can leverage these logs within BigQuery or the Litmus UI's Data Explorer to:
 
