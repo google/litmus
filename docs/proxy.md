@@ -132,6 +132,8 @@ The Litmus Proxy logs provide a detailed record of each LLM interaction, includi
 - Response body (including LLM outputs)
 - Latency
 
+The proxy forwards request and response bodies of any size, but it logs a body only if it is no larger than 256 KiB, which is the most that a Cloud Logging entry can hold. For a larger body the log entry records the size of the body and is marked with `requestBodyOmitted` or `responseBodyOmitted`.
+
 You can leverage these logs to:
 
 - **Monitor LLM health and performance.**
