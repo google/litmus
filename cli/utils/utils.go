@@ -55,8 +55,14 @@ func RunWithRetry(newCmd func() *exec.Cmd, attempts int, delay time.Duration, sh
 // create` can fail with "Service account ... does not exist" for a short while
 // (noticeably longer when an account with the same name was deleted moments
 // before, as `litmus destroy` followed by `litmus deploy` does).
+//
+// In that same situation the project policy still lists the old account as
+// "deleted:serviceAccount:...?uid=...". Adding a binding writes the whole
+// policy back, and until the deletion has propagated that write can fail with
+// "Deleted member '...?uid=...' is not deleted".
 func IsIAMPropagationError(output string) bool {
-	return strings.Contains(output, "does not exist")
+	return strings.Contains(output, "does not exist") ||
+		(strings.Contains(output, "Deleted member") && strings.Contains(output, "is not deleted"))
 }
 
 // GenerateRandomPassword generates a random password of the given length.
