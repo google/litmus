@@ -18,7 +18,7 @@ charset-normalizer==3.3.2
 click==8.1.7
 Deprecated==1.2.14
 google-api-core==2.20.0
-google-auth==2.35.0
+google-auth==2.47.0
 google-cloud-appengine-logging==1.4.5
 google-cloud-audit-log==0.3.0
 google-cloud-core==2.4.1
@@ -47,5 +47,4 @@ wrapt==1.16.0
 zipp==3.20.2
 zstandard==0.23.0
 reportlab==4.2.5
-google-cloud-aiplatform==1.70.0
-vertexai==1.70.0
+google-cloud-aiplatform==1.133.0
