@@ -12,8 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-# we use the version 3.10 of the python image 
-FROM python:3.10
+# we use the version 3.12 of the python image 
+FROM python:3.12
 
 # Allow statements and log messages to immediately appear in the logs
 ENV PYTHONUNBUFFERED True

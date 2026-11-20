@@ -39,6 +39,22 @@ WORKER_LOG_NAME = "litmus-worker-log"
 worker_logger = logging_client.logger(WORKER_LOG_NAME)
 
 
+def _message_text(message) -> str:
+    """Returns the text of a LangChain chat message.
+
+    Depending on the LangChain version, `content` is either a plain string or a
+    list of content blocks (e.g. {"type": "text", "text": ...}); deepeval
+    expects a string.
+    """
+    content = message.content
+    if isinstance(content, str):
+        return content
+    return "".join(
+        block.get("text", "") if isinstance(block, dict) else str(block)
+        for block in content
+    )
+
+
 # --- DeepEval Setup ---
 # Base LLM for DeepEval
 class GoogleVertexAIDeepEval(DeepEvalBaseLLM):
@@ -52,28 +68,25 @@ class GoogleVertexAIDeepEval(DeepEvalBaseLLM):
 
     def generate(self, prompt: str) -> str:  # pylint: disable=W0221
         chat_model = self.load_model()
-        return chat_model.invoke(prompt).content
+        return _message_text(chat_model.invoke(prompt))
 
     async def a_generate(self, prompt: str) -> str:  # pylint: disable=W0221
         chat_model = self.load_model()
         res = await chat_model.ainvoke(prompt)
-        return res.content
+        return _message_text(res)
 
     def get_model_name(self):  # pylint: disable=W0236 , W0221
         return "Vertex AI Model"
 
 
-# Initialise safety filters for vertex model
-
-generation_config = {"temperature": 0.0, "topk": 1}
-
-# Initialize Gemini Pro for DeepEval
+# Judge model for DeepEval, configured through the settings
+# (AI_VALIDATION_MODEL, AI_LOCATION) and served from the Vertex AI location
+# used for generative models (default "global").
 gemini_pro = ChatVertexAI(
-    model_name="gemini-1.5-pro",
-    generation_config=generation_config,
+    model_name=settings.ai_validation_model,
+    temperature=0.0,
     project=settings.project_id,
-    location=settings.location,
-    response_validation=False,  # Important since deepeval cannot handle validation errors
+    location=settings.ai_location,
 )
 deepeval_llm = GoogleVertexAIDeepEval(model=gemini_pro)
 

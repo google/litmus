@@ -32,13 +32,14 @@ class Settings:
 
     # AI Specific
     ai_location: str = os.environ.get("AI_LOCATION", "global")
-    """Location for AI models. Defaults to "global"."""
-    ai_default_model: str = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash-002")
-    """Default AI Model. Defaults to "gemini-1.5-flash-002"."""
-    ai_validation_model: str = os.environ.get(
-        "AI_VALIDATION_MODEL", "gemini-1.5-flash-002"
-    )
-    """AI Model for validation of responses. Defaults to "gemini-1.5-flash-002"."""
+    """Vertex AI location used for generative models. Gemini models are served
+    from the "global" endpoint; regional endpoints no longer serve them.
+    Defaults to "global".
+    """
+    ai_default_model: str = os.environ.get("AI_DEFAULT_MODEL", "gemini-3.8-flash")
+    """Default AI Model. Defaults to "gemini-3.8-flash"."""
+    ai_validation_model: str = os.environ.get("AI_VALIDATION_MODEL", "gemini-3.8-flash")
+    """AI Model for validation of responses. Defaults to "gemini-3.8-flash"."""
 
     # Application general
     disable_auth: bool = os.getenv("DISABLE_AUTH", "False") == "True"
