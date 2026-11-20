@@ -333,10 +333,10 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 			log.Fatalf("Error granting permission: %v\nOutput: %s\n", err, output)
 		}
 		if !quiet {
-			fmt.Println("Done! Granting API permission to invoke Worker.\n")
+			fmt.Print("Done! Granting API permission to invoke Worker.\n\n")
 		}
 	} else if !quiet {
-		fmt.Println("API permission to invoke Worker already exists.\n")
+		fmt.Print("API permission to invoke Worker already exists.\n\n")
 	}
 
 	if !quiet {
@@ -350,7 +350,7 @@ func DeployApplication(projectID, region string, envVars map[string]string, env 
 	}
 
 	if !quiet {
-		fmt.Println("\nAll deployments completed \n")
+		fmt.Print("\nAll deployments completed \n\n")
 		fmt.Println("Get started now by visiting: ", serviceURL)
 		fmt.Println("User: admin")
 		fmt.Println("Password: ", password)
