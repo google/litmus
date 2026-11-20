@@ -103,7 +103,7 @@ func DeployProxy(projectID, region, upstreamURL string, quiet bool) error {
 	// Extract and print the service URL
 	serviceURL := utils.ExtractServiceURL(string(output))
 	if !quiet {
-		fmt.Println("\nAll deployments completed \n")
+		fmt.Print("\nAll deployments completed \n\n")
 		fmt.Printf("Proxy URL for '%s': %s\n", serviceName, serviceURL)
 	}
 

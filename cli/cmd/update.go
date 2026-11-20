@@ -58,7 +58,7 @@ func UpdateApplication(projectID, region string, env string, quiet bool) {
 	}
 
 	if !quiet {
-		fmt.Println("Done! Updated API.\n")
+		fmt.Print("Done! Updated API.\n\n")
 	}
 	// Route traffic back to the updated service
 	if !quiet {
