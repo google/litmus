@@ -28,9 +28,8 @@ from util.settings import settings
 
 print("Initializing assessment module...")
 
-# Initialize Vertex AI. Generative models are served from the AI location
-# (default "global"), which is independent of the region the worker runs in.
-vertexai.init(project=settings.project_id, location=settings.ai_location)
+# Initialize Vertex AI with project and location settings
+vertexai.init(project=settings.project_id, location=settings.location)
 
 # Load the specified LLM
 model = GenerativeModel(settings.ai_default_model)

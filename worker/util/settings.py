@@ -26,10 +26,6 @@ class settings:
 
     # AI Specific
 
-    # Vertex AI location for generative models and embeddings. Gemini models
-    # are served from the "global" endpoint; regional endpoints no longer
-    # serve them, so this is deliberately separate from GCP_LOCATION.
     ai_location = os.environ.get("AI_LOCATION", "global")
-    ai_default_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-3.8-flash")
-    ai_validation_model = os.environ.get("AI_VALIDATION_MODEL", "gemini-3.8-flash")
-    ai_embedding_model = os.environ.get("AI_EMBEDDING_MODEL", "gemini-embedding-2")
+    ai_default_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash-002")
+    ai_validation_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-1.5-flash-002")

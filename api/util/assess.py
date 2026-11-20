@@ -21,9 +21,8 @@ import vertexai
 from vertexai.generative_models import GenerativeModel, GenerationConfig
 from util.settings import settings
 
-# Initialize Vertex AI. Generative models are served from the AI location
-# (default "global"), which is independent of the region the app runs in.
-vertexai.init(project=settings.project_id, location=settings.ai_location)
+# Initialize Vertex AI with project and location settings
+vertexai.init(project=settings.project_id, location=settings.region)
 
 # Load the specified LLM
 model = GenerativeModel(settings.ai_validation_model)
