@@ -32,4 +32,4 @@ class settings:
     ai_location = os.environ.get("AI_LOCATION", "global")
     ai_default_model = os.environ.get("AI_DEFAULT_MODEL", "gemini-3.8-flash")
     ai_validation_model = os.environ.get("AI_VALIDATION_MODEL", "gemini-3.8-flash")
-    ai_embedding_model = os.environ.get("AI_EMBEDDING_MODEL", "gemini-embedding-001")
+    ai_embedding_model = os.environ.get("AI_EMBEDDING_MODEL", "gemini-embedding-2")
